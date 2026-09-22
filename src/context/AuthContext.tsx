@@ -1,7 +1,9 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import {
+  browserLocalPersistence,
   getRedirectResult,
   onAuthStateChanged,
+  setPersistence,
   signInWithPopup,
   signInWithRedirect,
   signInWithEmailAndPassword,
@@ -10,7 +12,7 @@ import {
   signOut,
   User as FirebaseUser,
 } from 'firebase/auth';
-import { collection, doc, getDoc, getDocs, setDoc, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { auth, db, googleProvider, testConnection } from '../lib/firebase';
 import { User, Role } from '../types';
 
@@ -70,6 +72,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isProfileIncomplete, setIsProfileIncomplete] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
 
+  useEffect(() => {
+    setPersistence(auth, browserLocalPersistence).catch(error => {
+      console.error('Firebase session persistence error:', error);
+      setAuthError('تعذر حفظ جلسة الدخول. يرجى السماح بملفات الارتباط ثم إعادة المحاولة.');
+    });
+  }, []);
+
   // Test connection on startup
   useEffect(() => {
     async function init() {
@@ -117,13 +126,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
           const isSoleAdmin = fUser.email?.toLowerCase() === ADMIN_EMAIL;
 
-          if (isSoleAdmin) {
-            const usersSnap = await getDocs(collection(db, 'users'));
-            await Promise.all(usersSnap.docs.filter(userDoc => userDoc.id !== fUser.uid && userDoc.data().role === 'ADMIN').map(userDoc =>
-              updateDoc(userDoc.ref, { role: 'EMPLOYEE', updatedAt: new Date().toISOString() })
-            ));
-          }
-
           if (snap.exists()) {
             const data = snap.data() as User;
             const normalized: User = { ...data, id: snap.id, role: isSoleAdmin ? 'ADMIN' : 'EMPLOYEE', status: isSoleAdmin ? 'active' : data.status };
@@ -136,12 +138,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           } else {
             const newUser: User = {
               id: fUser.uid,
+              uid: fUser.uid,
               email: fUser.email || '',
               displayName: fUser.displayName || fUser.email?.split('@')[0] || 'موظف جديد',
+              fullName: fUser.displayName || fUser.email?.split('@')[0] || 'موظف جديد',
               photoURL: fUser.photoURL || undefined,
               role: isSoleAdmin ? 'ADMIN' : 'EMPLOYEE',
               department: isSoleAdmin ? 'الإدارة العامة' : '',
               position: isSoleAdmin ? 'مسؤول النظام' : '',
+              jobTitle: isSoleAdmin ? 'مسؤول النظام' : '',
               phone: '',
               status: isSoleAdmin ? 'active' : 'pending',
               joinedDate: new Date().toISOString().split('T')[0],
@@ -226,22 +231,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setLoading(true);
     try {
       const res = await createUserWithEmailAndPassword(auth, email, pass);
-      const isSoleAdmin = email.toLowerCase() === ADMIN_EMAIL;
       const newUser: User = {
         id: res.user.uid,
+        uid: res.user.uid,
         email,
         displayName,
-        role: isSoleAdmin ? 'ADMIN' : 'EMPLOYEE',
+        fullName: displayName,
+        role: 'EMPLOYEE',
         department,
         position,
+        jobTitle: position,
         phone: phone || '',
-        status: isSoleAdmin ? 'active' : 'pending',
+        status: 'pending',
         joinedDate: new Date().toISOString().split('T')[0],
         createdAt: new Date().toISOString(),
       };
       await setDoc(doc(db, 'users', res.user.uid), newUser);
       setCurrentUser(newUser);
-      setIsProfileIncomplete(!isSoleAdmin);
+      setIsProfileIncomplete(true);
     } catch (err) {
       console.error('Registration error:', err);
       throw err;
@@ -262,9 +269,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const userRef = doc(db, 'users', currentUser.id);
       const updated: Partial<User> = {
         displayName: data.displayName,
+        fullName: data.displayName,
         phone: data.phone,
         department: data.department,
         position: data.position,
+        jobTitle: data.position,
         status: currentUser.role === 'ADMIN' ? 'active' : 'pending',
         updatedAt: new Date().toISOString(),
       };

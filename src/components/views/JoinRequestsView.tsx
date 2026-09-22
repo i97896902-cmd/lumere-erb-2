@@ -29,7 +29,7 @@ export const JoinRequestsView: React.FC<JoinRequestsViewProps> = ({ pendingUsers
   const { currentUser } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedUserForApproval, setSelectedUserForApproval] = useState<User | null>(null);
-  const [assignedRole, setAssignedRole] = useState<Role>('EMPLOYEE');
+  const assignedRole: Role = 'EMPLOYEE';
   const [selectedUserForRejection, setSelectedUserForRejection] = useState<User | null>(null);
   const [rejectionReason, setRejectionReason] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
@@ -49,8 +49,8 @@ export const JoinRequestsView: React.FC<JoinRequestsViewProps> = ({ pendingUsers
     if (!selectedUserForApproval || !currentUser) return;
     setIsProcessing(true);
     try {
-      await DataService.approveUser(selectedUserForApproval.id, assignedRole, currentUser);
-      setActionSuccess(`تمت الموافقة على انضمام ${selectedUserForApproval.displayName} بنجاح وتعيين رتبته كـ ${assignedRole === 'ADMIN' ? 'مدير عام (Admin)' : 'موظف (Employee)'}.`);
+      await DataService.approveUser(selectedUserForApproval.id, 'EMPLOYEE', currentUser);
+      setActionSuccess(`تمت الموافقة على انضمام ${selectedUserForApproval.displayName} بنجاح وتفعيله كموظف.`);
       setSelectedUserForApproval(null);
       if (onRefresh) onRefresh();
     } catch (err: any) {
@@ -206,7 +206,6 @@ export const JoinRequestsView: React.FC<JoinRequestsViewProps> = ({ pendingUsers
                   id={`btn-approve-user-${user.id}`}
                   onClick={() => {
                     setSelectedUserForApproval(user);
-                    setAssignedRole(user.role || 'EMPLOYEE');
                   }}
                   className="flex-1 py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white text-xs font-semibold transition-colors flex items-center justify-center gap-1.5 shadow-2xs"
                 >
@@ -258,34 +257,14 @@ export const JoinRequestsView: React.FC<JoinRequestsViewProps> = ({ pendingUsers
               {/* Role Selection */}
               <div className="space-y-3 mb-6">
                 <label className="block text-xs font-semibold text-neutral-700">
-                  اختر الصلاحية والرتبة الممنوحة:
+                  الصلاحية الممنوحة:
                 </label>
-                <div className="grid grid-cols-2 gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setAssignedRole('EMPLOYEE')}
-                    className={`p-3 rounded-xl border text-center transition-all ${
-                      assignedRole === 'EMPLOYEE'
-                        ? 'border-emerald-600 bg-emerald-50/80 text-emerald-900 font-bold ring-2 ring-emerald-500/20'
-                        : 'border-neutral-200 text-neutral-700 hover:bg-neutral-50'
-                    }`}
-                  >
-                    <span className="block text-xs font-bold">موظف</span>
+                <div className="grid grid-cols-1 gap-3">
+                  <div className="p-3 rounded-xl border-emerald-600 bg-emerald-50/80 text-center text-emerald-900 font-bold">
+                    <span className="block text-xs">موظف</span>
                     <span className="block text-[10px] text-neutral-500 mt-0.5">Employee (تنفيذ المهام)</span>
-                  </button>
+                  </div>
 
-                  <button
-                    type="button"
-                    onClick={() => setAssignedRole('ADMIN')}
-                    className={`p-3 rounded-xl border text-center transition-all ${
-                      assignedRole === 'ADMIN'
-                        ? 'border-purple-600 bg-purple-50/80 text-purple-900 font-bold ring-2 ring-purple-500/20'
-                        : 'border-neutral-200 text-neutral-700 hover:bg-neutral-50'
-                    }`}
-                  >
-                    <span className="block text-xs font-bold">مدير عام</span>
-                    <span className="block text-[10px] text-neutral-500 mt-0.5">Admin (صلاحيات كاملة)</span>
-                  </button>
                 </div>
               </div>
 

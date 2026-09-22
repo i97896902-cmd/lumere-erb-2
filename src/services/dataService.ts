@@ -47,7 +47,7 @@ export const DataService = {
   async getUsers(): Promise<User[]> {
     try {
       const snap = await getDocs(collection(db, USERS_COLLECTION));
-      return snap.docs.map(d => ({ id: d.id, ...d.data() } as User)).map(user => ({ ...user, role: user.email.toLowerCase() === 'lumerecompany@gmail.com' ? 'ADMIN' : 'EMPLOYEE' }));
+      return snap.docs.map(d => ({ id: d.id, ...d.data() } as User));
     } catch (err) {
       handleFirestoreError(err, OperationType.LIST, USERS_COLLECTION);
     }
@@ -62,7 +62,7 @@ export const DataService = {
     return onSnapshot(
       q,
       snap => {
-        const list = snap.docs.map(d => ({ id: d.id, ...d.data() } as User)).map(user => ({ ...user, role: user.email.toLowerCase() === 'lumerecompany@gmail.com' ? 'ADMIN' : 'EMPLOYEE' }));
+        const list = snap.docs.map(d => ({ id: d.id, ...d.data() } as User));
         callback(list);
       },
       err => {
@@ -898,7 +898,7 @@ export const DataService = {
       const now = new Date().toISOString();
       await updateDoc(doc(db, USERS_COLLECTION, userId), {
         status: 'active',
-        role: assignedRole,
+        role: 'EMPLOYEE',
         approvedBy: actor.id,
         approvedByName: actor.displayName,
         approvedAt: now,
@@ -909,7 +909,7 @@ export const DataService = {
       await this.createNotification({
         userId,
         title: 'تمت الموافقة على انضمامك إلى Luméré',
-        message: `مرحباً بك في فريق Luméré! تم اعتماد حسابك برتبة ${assignedRole === 'ADMIN' ? 'مدير عام' : 'موظف'}.`,
+        message: 'مرحباً بك في فريق Luméré! تمت الموافقة على حسابك كموظف.',
         type: 'join_approved',
         read: false,
       });

@@ -153,6 +153,7 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({
             status: formStatus,
             priority: formPriority,
             startDate: formStartDate,
+            deliveryDate: formDeadline,
             deadline: formDeadline,
             budget: formBudget ? Number(formBudget) : undefined,
             progress: 0,

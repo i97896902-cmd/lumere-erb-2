@@ -20,7 +20,10 @@ service cloud.firestore {
     }
 
     function isAdmin() {
-      return isSoleAdmin();
+      return isSoleAdmin() &&
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'ADMIN' &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.status == 'active';
     }
 
     // 2. Admins collection
@@ -34,17 +37,22 @@ service cloud.firestore {
       allow get: if isSignedIn();
       allow list: if isSignedIn();
       allow create: if isSignedIn() && isCurrentUser(userId)
+        && request.resource.data.uid == userId
         && ((isSoleAdmin() && request.resource.data.role == 'ADMIN' && request.resource.data.status == 'active')
           || (!isSoleAdmin() && request.resource.data.role == 'EMPLOYEE' && request.resource.data.status == 'pending'))
         && request.resource.data.displayName is string
         && request.resource.data.displayName.size() <= 128
         && request.resource.data.email is string
-        && request.resource.data.email.size() <= 256;
+        && request.resource.data.email == request.auth.token.email
+        && request.resource.data.email.size() <= 256
+        && request.resource.data.phone is string
+        && request.resource.data.department is string
+        && request.resource.data.position is string;
 
       allow update: if isSignedIn() && (
-        (isAdmin() && ((userId == request.auth.uid && request.resource.data.role == 'ADMIN') ||
-          (userId != request.auth.uid && request.resource.data.role == 'EMPLOYEE'))) ||
-        (isCurrentUser(userId) && request.resource.data.role == 'EMPLOYEE' &&
+        (isAdmin() && request.resource.data.role == 'EMPLOYEE' && userId != request.auth.uid) ||
+        (isCurrentUser(userId) && request.resource.data.role == resource.data.role &&
+          request.resource.data.status == resource.data.status &&
           !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'status', 'approvedBy', 'approvedAt', 'rejectionReason']))
       );
 

@@ -48,7 +48,7 @@ export function EmployeesView({
   const [editingEmp, setEditingEmp] = useState<User | null>(null);
   const [formName, setFormName] = useState('');
   const [formEmail, setFormEmail] = useState('');
-  const [formRole, setFormRole] = useState<Role>('EMPLOYEE');
+  const formRole: Role = 'EMPLOYEE';
   const [formDept, setFormDept] = useState(departments[0]?.name || 'Development');
   const [formPosition, setFormPosition] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -70,7 +70,6 @@ export function EmployeesView({
     setEditingEmp(null);
     setFormName('');
     setFormEmail('');
-    setFormRole('EMPLOYEE');
     setFormDept(departments[0]?.name || 'Development');
     setFormPosition('');
     setIsModalOpen(true);
@@ -80,7 +79,6 @@ export function EmployeesView({
     setEditingEmp(emp);
     setFormName(emp.displayName);
     setFormEmail(emp.email);
-    setFormRole(emp.role);
     setFormDept(emp.department);
     setFormPosition(emp.position || '');
     setIsModalOpen(true);
@@ -98,7 +96,7 @@ export function EmployeesView({
           editingEmp.id,
           {
             displayName: formName.trim(),
-            role: formRole,
+            role: 'EMPLOYEE',
             department: formDept,
             position: formPosition.trim(),
           },
@@ -111,10 +109,10 @@ export function EmployeesView({
           {
             email: formEmail.trim(),
             displayName: formName.trim(),
-            role: formRole,
+            role: 'EMPLOYEE',
             department: formDept,
             position: formPosition.trim(),
-            status: 'Active',
+            status: 'pending',
             joinedDate: new Date().toISOString().split('T')[0],
             photoURL: `https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=256`,
           },
@@ -349,15 +347,12 @@ export function EmployeesView({
             placeholder="مثال: مهندس برمجيات أول"
           />
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3">
             <Select
-              label="الدور والصلاحية *"
-              value={formRole}
-              onChange={e => setFormRole(e.target.value as Role)}
-              options={[
-                { label: 'موظف (Employee)', value: 'EMPLOYEE' },
-                { label: 'مدير عام (Admin)', value: 'ADMIN' },
-              ]}
+              label="الدور والصلاحية"
+              value="EMPLOYEE"
+              disabled
+              options={[{ label: 'موظف (Employee)', value: 'EMPLOYEE' }]}
             />
 
             <Select
