@@ -1,0 +1,274 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "Luméré user profile with role-based access control",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "email": { "type": "string", "maxLength": 256 },
+        "displayName": { "type": "string", "maxLength": 128 },
+        "photoURL": { "type": "string", "maxLength": 1024 },
+        "role": { "type": "string", "enum": ["ADMIN", "MANAGER", "EMPLOYEE"] },
+        "department": { "type": "string", "maxLength": 100 },
+        "position": { "type": "string", "maxLength": 100 },
+        "phone": { "type": "string", "maxLength": 30 },
+        "status": { "type": "string", "enum": ["pending", "active", "rejected", "suspended", "Active", "Inactive", "Suspended"] },
+        "joinedDate": { "type": "string", "maxLength": 50 },
+        "approvedBy": { "type": "string", "maxLength": 128 },
+        "approvedByName": { "type": "string", "maxLength": 128 },
+        "approvedAt": { "type": "string", "format": "date-time" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["email", "displayName", "role", "status"]
+    },
+    "Client": {
+      "title": "Client",
+      "description": "Commercial client profile in Luméré management system",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "name": { "type": "string", "maxLength": 200 },
+        "phone": { "type": "string", "maxLength": 50 },
+        "email": { "type": "string", "maxLength": 256 },
+        "companyName": { "type": "string", "maxLength": 200 },
+        "clientType": { "type": "string", "enum": ["company", "restaurant", "cafe", "store", "individual", "other"] },
+        "address": { "type": "string", "maxLength": 500 },
+        "notes": { "type": "string", "maxLength": 3000 },
+        "assignedEmployeeId": { "type": "string", "maxLength": 128 },
+        "assignedEmployeeName": { "type": "string", "maxLength": 128 },
+        "status": { "type": "string", "enum": ["active", "inactive"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "phone", "email", "clientType", "address"]
+    },
+    "Project": {
+      "title": "Project",
+      "description": "Client-associated project in Luméré management system",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "name": { "type": "string", "maxLength": 200 },
+        "clientId": { "type": "string", "maxLength": 128 },
+        "clientName": { "type": "string", "maxLength": 200 },
+        "description": { "type": "string", "maxLength": 5000 },
+        "projectType": { "type": "string", "maxLength": 100 },
+        "status": { "type": "string", "enum": ["not_started", "in_progress", "in_review", "completed", "on_hold", "cancelled"] },
+        "startDate": { "type": "string", "maxLength": 50 },
+        "deliveryDate": { "type": "string", "maxLength": 50 },
+        "projectManagerId": { "type": "string", "maxLength": 128 },
+        "projectManagerName": { "type": "string", "maxLength": 128 },
+        "teamMemberIds": { "type": "array", "items": { "type": "string" } },
+        "completionPercentage": { "type": "number" },
+        "budget": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "clientId", "status", "startDate", "deliveryDate"]
+    },
+    "Task": {
+      "title": "Task",
+      "description": "Internal work task in Luméré system",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "taskId": { "type": "string", "maxLength": 30 },
+        "title": { "type": "string", "maxLength": 256 },
+        "description": { "type": "string", "maxLength": 5000 },
+        "createdBy": { "type": "string", "maxLength": 128 },
+        "createdByName": { "type": "string", "maxLength": 128 },
+        "assignedTo": { "type": "string", "maxLength": 128 },
+        "assignedToName": { "type": "string", "maxLength": 128 },
+        "assignedToEmail": { "type": "string", "maxLength": 256 },
+        "department": { "type": "string", "maxLength": 100 },
+        "priority": { "type": "string", "enum": ["Low", "Medium", "High", "Urgent"] },
+        "status": { "type": "string", "enum": ["Pending", "In Progress", "Review", "Completed", "Rejected", "Cancelled"] },
+        "startDate": { "type": "string", "maxLength": 50 },
+        "deadline": { "type": "string", "maxLength": 50 },
+        "completedAt": { "type": "string", "maxLength": 50 },
+        "completionPercentage": { "type": "number" },
+        "reviewStatus": { "type": "string", "enum": ["none", "pending_review", "approved", "rejected"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["title", "description", "department", "priority", "status", "deadline"]
+    },
+    "Comment": {
+      "title": "Comment",
+      "description": "Discussion item on a specific task",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "taskId": { "type": "string", "maxLength": 128 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "userName": { "type": "string", "maxLength": 128 },
+        "userRole": { "type": "string", "maxLength": 50 },
+        "userAvatar": { "type": "string", "maxLength": 1024 },
+        "message": { "type": "string", "maxLength": 3000 },
+        "attachmentName": { "type": "string", "maxLength": 256 },
+        "attachmentUrl": { "type": "string", "maxLength": 2048 },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["taskId", "userId", "userName", "message"]
+    },
+    "Department": {
+      "title": "Department",
+      "description": "Organizational department within Luméré",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "name": { "type": "string", "maxLength": 100 },
+        "description": { "type": "string", "maxLength": 500 },
+        "managerId": { "type": "string", "maxLength": 128 },
+        "managerName": { "type": "string", "maxLength": 128 },
+        "color": { "type": "string", "maxLength": 50 },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name"]
+    },
+    "Notification": {
+      "title": "Notification",
+      "description": "User event notification alert",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "title": { "type": "string", "maxLength": 200 },
+        "message": { "type": "string", "maxLength": 1000 },
+        "type": { "type": "string", "enum": ["task_assigned", "deadline_approaching", "task_rejected", "task_approved", "comment_added", "task_reassigned", "system"] },
+        "relatedTaskId": { "type": "string", "maxLength": 128 },
+        "read": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "title", "message", "type", "read"]
+    },
+    "ActivityLog": {
+      "title": "ActivityLog",
+      "description": "System-wide immutable audit trail",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "actorId": { "type": "string", "maxLength": 128 },
+        "actorName": { "type": "string", "maxLength": 128 },
+        "actorRole": { "type": "string", "maxLength": 50 },
+        "action": { "type": "string", "maxLength": 100 },
+        "target": { "type": "string", "maxLength": 100 },
+        "targetId": { "type": "string", "maxLength": 128 },
+        "metadata": { "type": "string", "maxLength": 1000 },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["actorId", "actorName", "action", "target"]
+    },
+    "AdminDoc": {
+      "title": "AdminDoc",
+      "description": "List of trusted administrator UIDs",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "maxLength": 128 },
+        "email": { "type": "string", "maxLength": 256 },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid"]
+    },
+    "Equipment": {
+      "title": "Equipment",
+      "description": "Company equipment and assets in Luméré inventory",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "name": { "type": "string", "maxLength": 200 },
+        "type": { "type": "string", "maxLength": 100 },
+        "serialNumber": { "type": "string", "maxLength": 100 },
+        "assetId": { "type": "string", "maxLength": 100 },
+        "description": { "type": "string", "maxLength": 2000 },
+        "status": { "type": "string", "enum": ["available", "assigned", "in_maintenance", "damaged", "lost", "inactive"] },
+        "assignedTo": { "type": "string", "maxLength": 128 },
+        "assignedToName": { "type": "string", "maxLength": 128 },
+        "assignedToEmail": { "type": "string", "maxLength": 256 },
+        "projectId": { "type": "string", "maxLength": 128 },
+        "projectName": { "type": "string", "maxLength": 200 },
+        "purchaseDate": { "type": "string", "maxLength": 50 },
+        "receivedDate": { "type": "string", "maxLength": 50 },
+        "value": { "type": "number" },
+        "notes": { "type": "string", "maxLength": 2000 },
+        "photoURL": { "type": "string", "maxLength": 2048 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "type", "serialNumber", "status"]
+    },
+    "EquipmentHistory": {
+      "title": "EquipmentHistory",
+      "description": "Immutable log tracking assignment and lifecycle of equipment",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "equipmentId": { "type": "string", "maxLength": 128 },
+        "equipmentName": { "type": "string", "maxLength": 200 },
+        "action": { "type": "string", "enum": ["created", "assigned", "returned", "maintenance_in", "maintenance_out", "status_change", "updated"] },
+        "assignedToId": { "type": "string", "maxLength": 128 },
+        "assignedToName": { "type": "string", "maxLength": 128 },
+        "returnedById": { "type": "string", "maxLength": 128 },
+        "returnedByName": { "type": "string", "maxLength": 128 },
+        "projectId": { "type": "string", "maxLength": 128 },
+        "projectName": { "type": "string", "maxLength": 200 },
+        "previousStatus": { "type": "string", "maxLength": 50 },
+        "newStatus": { "type": "string", "maxLength": 50 },
+        "notes": { "type": "string", "maxLength": 2000 },
+        "actorId": { "type": "string", "maxLength": 128 },
+        "actorName": { "type": "string", "maxLength": 128 },
+        "actorRole": { "type": "string", "maxLength": 50 },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["equipmentId", "equipmentName", "action", "actorId", "actorName", "timestamp"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User accounts with role and profile info"
+    },
+    "/admins/{adminId}": {
+      "schema": "AdminDoc",
+      "description": "System administrators mapping for role verification"
+    },
+    "/clients/{clientId}": {
+      "schema": "Client",
+      "description": "Company clients directory"
+    },
+    "/projects/{projectId}": {
+      "schema": "Project",
+      "description": "Client projects portfolio"
+    },
+    "/tasks/{taskId}": {
+      "schema": "Task",
+      "description": "Task management records"
+    },
+    "/tasks/{taskId}/comments/{commentId}": {
+      "schema": "Comment",
+      "description": "Task comments discussion stream"
+    },
+    "/departments/{departmentId}": {
+      "schema": "Department",
+      "description": "Company departments"
+    },
+    "/notifications/{notificationId}": {
+      "schema": "Notification",
+      "description": "Targeted notifications for employees and managers"
+    },
+    "/activity_logs/{logId}": {
+      "schema": "ActivityLog",
+      "description": "Immutable activity audit records"
+    },
+    "/equipment/{equipmentId}": {
+      "schema": "Equipment",
+      "description": "Company equipment and asset inventory"
+    },
+    "/equipmentHistory/{historyId}": {
+      "schema": "EquipmentHistory",
+      "description": "Immutable equipment assignment and maintenance history"
+    }
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "name": "Luméré — نظام إدارة الشركة",
+  "description": "نظام إدارة المهام والمشاريع والعملاء الداخلي لشركة Luméré للمدراء والموظفين.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

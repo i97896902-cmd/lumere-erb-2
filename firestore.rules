@@ -1,0 +1,163 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 1. Global Default Deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isCurrentUser(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isSoleAdmin() {
+      return isSignedIn() && request.auth.token.email == 'lumerecompany@gmail.com';
+    }
+
+    function isAdmin() {
+      return isSoleAdmin();
+    }
+
+    // 2. Admins collection
+    match /admins/{adminId} {
+      allow read: if isSoleAdmin();
+      allow write: if false;
+    }
+
+    // 3. Users / Employees
+    match /users/{userId} {
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
+      allow create: if isSignedIn() && isCurrentUser(userId)
+        && ((isSoleAdmin() && request.resource.data.role == 'ADMIN' && request.resource.data.status == 'active')
+          || (!isSoleAdmin() && request.resource.data.role == 'EMPLOYEE' && request.resource.data.status == 'pending'))
+        && request.resource.data.displayName is string
+        && request.resource.data.displayName.size() <= 128
+        && request.resource.data.email is string
+        && request.resource.data.email.size() <= 256;
+
+      allow update: if isSignedIn() && (
+        (isAdmin() && ((userId == request.auth.uid && request.resource.data.role == 'ADMIN') ||
+          (userId != request.auth.uid && request.resource.data.role == 'EMPLOYEE'))) ||
+        (isCurrentUser(userId) && request.resource.data.role == 'EMPLOYEE' &&
+          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'status', 'approvedBy', 'approvedAt', 'rejectionReason']))
+      );
+
+      allow delete: if isAdmin();
+    }
+
+    // 4. Clients (Admin only for manage, all signed in can read)
+    match /clients/{clientId} {
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn() && isAdmin()
+        && request.resource.data.name is string
+        && request.resource.data.name.size() <= 200;
+      allow delete: if isSignedIn() && isAdmin();
+    }
+
+    // 5. Projects (Admin only for manage, all signed in can read)
+    match /projects/{projectId} {
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn() && isAdmin()
+        && request.resource.data.name is string
+        && request.resource.data.name.size() <= 200
+        && request.resource.data.clientId is string;
+      allow delete: if isSignedIn() && isAdmin();
+    }
+
+    // 6. Tasks
+    match /tasks/{taskId} {
+      allow read: if isSignedIn();
+
+      allow create: if isSignedIn() && isAdmin()
+        && request.resource.data.title is string
+        && request.resource.data.title.size() <= 256
+        && request.resource.data.description is string
+        && request.resource.data.description.size() <= 5000
+        && request.resource.data.department is string
+        && request.resource.data.priority in ['Low', 'Medium', 'High', 'Urgent']
+        && request.resource.data.status in ['Pending', 'In Progress', 'Review', 'Completed', 'Rejected', 'Cancelled'];
+
+      allow update: if isSignedIn() && (
+        isAdmin() ||
+        // Employee assigned to task can update status to 'In Progress' or 'Review', progress percentage, and attachments
+        (
+          resource.data.assignedTo == request.auth.uid &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'completionPercentage', 'updatedAt', 'attachments', 'reviewStatus']) &&
+          // Employees cannot jump straight to Completed or approve their own work
+          request.resource.data.status in ['In Progress', 'Review']
+        )
+      );
+
+      allow delete: if isAdmin();
+
+      // Comments sub-collection
+      match /comments/{commentId} {
+        allow read: if isSignedIn();
+        allow create: if isSignedIn()
+          && request.resource.data.userId == request.auth.uid
+          && request.resource.data.message is string
+          && request.resource.data.message.size() <= 3000;
+        allow update: if isSignedIn() && resource.data.userId == request.auth.uid;
+        allow delete: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
+      }
+    }
+
+    // 7. Departments
+    match /departments/{departmentId} {
+      allow read: if isSignedIn();
+      allow create, update, delete: if isAdmin();
+    }
+
+    // 8. Notifications
+    match /notifications/{notificationId} {
+      allow read: if isSignedIn() && (
+        resource.data.userId == request.auth.uid || isAdmin()
+      );
+      allow create: if isSignedIn();
+      allow update: if isSignedIn() && (
+        (resource.data.userId == request.auth.uid && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read'])) ||
+        isAdmin()
+      );
+      allow delete: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+    }
+
+    // 9. Activity Logs (Immutable audit trail, readable by all signed in users)
+    match /activity_logs/{logId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn()
+        && request.resource.data.actorId is string
+        && request.resource.data.action is string;
+      allow update, delete: if false; // Immutable!
+    }
+
+    // 10. Equipment
+    match /equipment/{equipmentId} {
+      allow read: if isSignedIn() && (
+        isAdmin() ||
+        resource.data.assignedTo == request.auth.uid ||
+        resource.data.projectId != null
+      );
+      allow create, update: if isSignedIn() && isAdmin()
+        && request.resource.data.name is string
+        && request.resource.data.name.size() <= 200
+        && request.resource.data.serialNumber is string
+        && request.resource.data.status in ['available', 'assigned', 'in_maintenance', 'damaged', 'lost', 'inactive'];
+      allow delete: if isSignedIn() && isAdmin();
+    }
+
+    // 11. Equipment History (Immutable assignment & lifecycle log)
+    match /equipmentHistory/{historyId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn()
+        && request.resource.data.equipmentId is string
+        && request.resource.data.action is string;
+      allow update, delete: if false; // Immutable!
+    }
+  }
+}
