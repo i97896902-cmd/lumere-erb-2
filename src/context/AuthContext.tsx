@@ -1,7 +1,9 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import {
+  getRedirectResult,
   onAuthStateChanged,
   signInWithPopup,
+  signInWithRedirect,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   sendPasswordResetEmail,
@@ -18,6 +20,7 @@ interface AuthContextType {
   role: Role;
   loading: boolean;
   isProfileIncomplete: boolean;
+  authError: string | null;
   signInWithGoogle: () => Promise<void>;
   loginWithEmail: (email: string, pass: string) => Promise<void>;
   registerWithEmail: (
@@ -42,6 +45,22 @@ interface AuthContextType {
 
 const ADMIN_EMAIL = 'lumerecompany@gmail.com';
 
+function getGoogleAuthErrorMessage(error: unknown): string {
+  const code = (error as { code?: string })?.code;
+  switch (code) {
+    case 'auth/popup-blocked': return 'تم حظر نافذة Google. سيتم تحويلك إلى صفحة تسجيل الدخول الآمنة.';
+    case 'auth/popup-closed-by-user':
+    case 'auth/cancelled-popup-request':
+    case 'auth/popup-cancelled-by-user': return 'تم إلغاء تسجيل الدخول عبر Google.';
+    case 'auth/unauthorized-domain': return 'هذا النطاق غير مصرح به في Firebase. أضف نطاق Vercel إلى Authorized domains.';
+    case 'auth/operation-not-allowed': return 'تسجيل الدخول عبر Google غير مفعّل في Firebase Authentication.';
+    case 'auth/network-request-failed': return 'تعذر الاتصال بخدمة المصادقة. تحقق من اتصال الإنترنت.';
+    case 'auth/account-exists-with-different-credential': return 'يوجد حساب بهذا البريد باستخدام طريقة تسجيل دخول أخرى.';
+    case 'auth/invalid-api-key': return 'إعدادات Firebase غير صحيحة. راجع متغيرات Vercel.';
+    default: return 'تعذر تسجيل الدخول عبر Google. تحقق من إعدادات Firebase Authorized domains وحاول مرة أخرى.';
+  }
+}
+
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -49,6 +68,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [isProfileIncomplete, setIsProfileIncomplete] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
 
   // Test connection on startup
   useEffect(() => {
@@ -65,16 +85,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const snap = await getDoc(userRef);
       if (snap.exists()) {
         const data = snap.data() as User;
-        setCurrentUser({ ...data, id: snap.id });
-        setIsProfileIncomplete(!data.department || !data.position || !data.phone);
+        const isSoleAdmin = firebaseUser.email?.toLowerCase() === ADMIN_EMAIL;
+        const normalized: User = {
+          ...data,
+          id: snap.id,
+          role: isSoleAdmin ? 'ADMIN' : 'EMPLOYEE',
+          status: isSoleAdmin ? 'active' : data.status,
+        };
+        setCurrentUser(normalized);
+        setIsProfileIncomplete(!isSoleAdmin && (!normalized.department || !normalized.position || !normalized.phone));
       }
     } catch (err) {
       console.error('Error refreshing current user:', err);
     }
   };
 
-  // Listen to Auth changes
+  // Listen to Auth changes and surface redirect OAuth errors.
   useEffect(() => {
+    let active = true;
+    getRedirectResult(auth).catch(error => {
+      if (active) setAuthError(getGoogleAuthErrorMessage(error));
+      console.error('Google redirect result error:', error);
+    });
+
     const unsubscribe = onAuthStateChanged(auth, async fUser => {
       setFirebaseUser(fUser);
       if (fUser) {
@@ -98,6 +131,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               await setDoc(userRef, { role: 'ADMIN', status: 'active' }, { merge: true });
             }
             setCurrentUser(normalized);
+            setAuthError(null);
             setIsProfileIncomplete(!isSoleAdmin && (!normalized.department || !normalized.position || !normalized.phone));
           } else {
             const newUser: User = {
@@ -115,10 +149,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             };
             await setDoc(userRef, newUser);
             setCurrentUser(newUser);
+            setAuthError(null);
             setIsProfileIncomplete(!isSoleAdmin);
           }
         } catch (err) {
           console.error('Failed to load user profile from Firestore:', err);
+          setAuthError('تم تسجيل الدخول إلى Google، لكن تعذر تحميل ملفك من Firestore. تحقق من نشر Firestore Rules وإعدادات Firebase.');
           // Never invent an active profile when Firestore is unavailable.
           setCurrentUser(null);
           setIsProfileIncomplete(false);
@@ -131,16 +167,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setLoading(false);
     });
 
-    return () => unsubscribe();
+    return () => {
+      active = false;
+      unsubscribe();
+    };
   }, []);
 
   const signInWithGoogle = async () => {
     setLoading(true);
+    setAuthError(null);
     try {
+      googleProvider.setCustomParameters({ prompt: 'select_account' });
       await signInWithPopup(auth, googleProvider);
-    } catch (err) {
-      console.error('Google sign-in error:', err);
-      throw err;
+    } catch (error) {
+      const code = (error as { code?: string })?.code;
+      console.error('Google sign-in error:', error);
+      // Popup is unreliable in embedded browsers and can be blocked by policy.
+      // Redirect uses Firebase's configured authDomain and works on Vercel HTTPS.
+      if (code === 'auth/popup-blocked' || code === 'auth/popup-cancelled-by-user' || code === 'auth/operation-not-supported-in-this-environment') {
+        try {
+          await signInWithRedirect(auth, googleProvider);
+          return;
+        } catch (redirectError) {
+          const message = getGoogleAuthErrorMessage(redirectError);
+          setAuthError(message);
+          throw Object.assign(new Error(message), { code: (redirectError as { code?: string })?.code });
+        }
+      }
+      const message = getGoogleAuthErrorMessage(error);
+      setAuthError(message);
+      throw Object.assign(new Error(message), { code });
     } finally {
       setLoading(false);
     }
@@ -235,6 +291,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = async () => {
     try {
       await signOut(auth);
+      setAuthError(null);
       setCurrentUser(null);
       setIsProfileIncomplete(false);
     } catch (err) {
@@ -252,6 +309,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         role,
         loading,
         isProfileIncomplete,
+        authError,
         signInWithGoogle,
         loginWithEmail,
         registerWithEmail,
