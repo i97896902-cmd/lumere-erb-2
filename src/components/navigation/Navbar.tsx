@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { RoleBadge } from '../ui/Badge';
-import { useAuth } from '../../context/AuthContext';
+import { AUTH_DISABLED, useAuth } from '../../context/AuthContext';
 import { useCompany } from '../../context/CompanyContext';
 import { Notification, Task } from '../../types';
 import { canCreateTask, getRoleArabicLabel } from '../../utils/rbac';
@@ -331,16 +331,23 @@ export function Navbar({
                   <RoleBadge role={role} />
                 </div>
               </div>
-              <button
-                onClick={() => {
-                  logout();
-                  setShowUserMenu(false);
-                }}
-                className="w-full flex items-center justify-end gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
-              >
-                <span>تسجيل الخروج</span>
-                <LogOut className="w-4 h-4" />
-              </button>
+              {!AUTH_DISABLED && (
+                <button
+                  onClick={() => {
+                    logout();
+                    setShowUserMenu(false);
+                  }}
+                  className="w-full flex items-center justify-end gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                >
+                  <span>تسجيل الخروج</span>
+                  <LogOut className="w-4 h-4" />
+                </button>
+              )}
+              {AUTH_DISABLED && (
+                <div className="px-3 py-1.5 text-[11px] font-medium text-emerald-700 bg-emerald-50 rounded-lg text-right">
+                  الدخول المباشر مفعّل بدون تسجيل دخول
+                </div>
+              )}
             </div>
           )}
         </div>

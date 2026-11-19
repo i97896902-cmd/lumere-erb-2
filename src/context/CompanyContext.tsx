@@ -58,7 +58,7 @@ function mergeWithCoreCompanies(firestoreCompanies: Company[]): Company[] {
 }
 
 export function CompanyProvider({ children }: { children: React.ReactNode }) {
-  const { currentUser, firebaseUser, loading } = useAuth();
+  const { currentUser, loading } = useAuth();
   const [companies, setCompanies] = useState<Company[]>(CORE_COMPANIES);
   const [loadingCompanies, setLoadingCompanies] = useState(false);
 
@@ -75,9 +75,9 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
     return PARENT_COMPANY_ID;
   });
 
-  // Subscribe to Firestore companies collection when signed in and active
+  // Subscribe to companies collection when active
   useEffect(() => {
-    if (loading || !firebaseUser || !currentUser) {
+    if (loading || !currentUser) {
       setCompanies(CORE_COMPANIES);
       return;
     }
@@ -96,7 +96,7 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
     );
 
     return () => unsub();
-  }, [loading, firebaseUser, currentUser, userCanSwitch, assignedCompanyId]);
+  }, [loading, currentUser, userCanSwitch, assignedCompanyId]);
 
   // Enforce strict company lock for non-SUPER_ADMIN users
   const activeCompanyId = useMemo(() => {
@@ -123,7 +123,7 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
   };
 
   const refreshCompanies = async () => {
-    if (!firebaseUser || !currentUser) return;
+    if (!currentUser) return;
     try {
       const fetched = await DataService.getCompanies(userCanSwitch ? null : assignedCompanyId);
       if (fetched.length > 0) {

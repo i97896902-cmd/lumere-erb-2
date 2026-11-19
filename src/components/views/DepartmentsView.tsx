@@ -140,8 +140,14 @@ export function DepartmentsView({
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-3">
                     <div
-                      className="w-10 h-10 rounded-xl flex items-center justify-center text-white font-bold shadow-2xs"
-                      style={{ backgroundColor: dept.color || '#059669' }}
+                      className={`w-10 h-10 rounded-xl flex items-center justify-center text-white font-bold shadow-2xs shrink-0 ${
+                        dept.color?.startsWith('bg-') ? dept.color : ''
+                      }`}
+                      style={
+                        dept.color?.startsWith('bg-')
+                          ? undefined
+                          : { backgroundColor: dept.color || '#059669' }
+                      }
                     >
                       <Building2 className="w-5 h-5" />
                     </div>

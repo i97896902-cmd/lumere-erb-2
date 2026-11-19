@@ -39,6 +39,7 @@ import {
   SUGGESTED_DEPARTMENTS_BY_COMPANY,
 } from '../config/companies';
 import { canAssignRole, getUserCompanyId, isPendingStatus, normalizeRole } from '../utils/rbac';
+import { LocalDataService } from './localDataService';
 
 const COMPANIES_COLLECTION = 'companies';
 const USERS_COLLECTION = 'users';
@@ -92,7 +93,7 @@ function resolveDocCompanyId(explicitCompanyId: string | undefined, actor?: User
   return DEFAULT_SUBSIDIARY_ID;
 }
 
-export const DataService = {
+export const FirestoreDataService = {
   // ==========================================
   // COMPANIES
   // ==========================================
@@ -1467,3 +1468,22 @@ export const DataService = {
     }
   },
 };
+
+type DataServiceContract = typeof FirestoreDataService;
+
+/**
+ * Runtime DataService router:
+ * - Uses FirestoreDataService whenever a Firebase Auth session is active.
+ * - Uses LocalDataService when login is disabled (direct access mode) so every
+ *   multi-company operation works end-to-end without Firestore permission errors.
+ */
+export const DataService: DataServiceContract = new Proxy(FirestoreDataService, {
+  get(_target, prop, _receiver) {
+    const activeService = (auth.currentUser ? FirestoreDataService : LocalDataService) as unknown as Record<
+      PropertyKey,
+      unknown
+    >;
+    const value = activeService[prop];
+    return typeof value === 'function' ? value.bind(activeService) : value;
+  },
+});

@@ -1,5 +1,5 @@
 import { httpsCallable } from 'firebase/functions';
-import { functions } from '../lib/firebase';
+import { auth, functions } from '../lib/firebase';
 import { CanonicalRole, Company, CompanyStatus, User } from '../types';
 import { DataService } from './dataService';
 import { canAssignRole, canManageCompanies, canManageCompanyUsers } from '../utils/rbac';
@@ -17,6 +17,7 @@ function isFunctionsUnavailableError(err: unknown): boolean {
     code.includes('not-found') ||
     code.includes('unavailable') ||
     code.includes('internal') ||
+    code.includes('unauthenticated') ||
     /CORS|Failed to fetch|network|404/i.test(message)
   );
 }
@@ -44,6 +45,25 @@ export const PrivilegedService = {
   ): Promise<PrivilegedActionResult<Company>> {
     if (!canManageCompanies(actor)) {
       throw new Error('عملية إنشاء الشركات محصورة بمدير المجموعة الأعلى (SUPER_ADMIN).');
+    }
+
+    if (!auth.currentUser) {
+      const created = await DataService.createCompany(
+        {
+          name: payload.name,
+          arabicName: payload.arabicName,
+          slug: payload.slug,
+          type: 'subsidiary',
+          parentCompanyId: 'lumere-group',
+          logo: payload.logo || '',
+          description: payload.description,
+          businessSector: payload.businessSector,
+          status: 'active',
+        },
+        actor,
+        payload.seedSuggestedDepartments
+      );
+      return { data: created, executedVia: 'firestore_rules_fallback', claimsSynced: false };
     }
 
     try {
@@ -80,6 +100,11 @@ export const PrivilegedService = {
       throw new Error('تغيير حالة الشركات محصور بمدير المجموعة الأعلى (SUPER_ADMIN).');
     }
 
+    if (!auth.currentUser) {
+      await DataService.updateCompany(companyId, { status }, actor, 'Company Status Changed');
+      return { executedVia: 'firestore_rules_fallback', claimsSynced: false };
+    }
+
     try {
       const fn = httpsCallable<{ companyId: string; status: CompanyStatus }, { ok: boolean }>(
         functions,
@@ -104,6 +129,11 @@ export const PrivilegedService = {
   ): Promise<PrivilegedActionResult> {
     if (!canManageCompanies(actor)) {
       throw new Error('تعيين مدير شركة محصور بمدير المجموعة الأعلى (SUPER_ADMIN).');
+    }
+
+    if (!auth.currentUser) {
+      await DataService.assignCompanyAdmin(params.userId, params.companyId, params.companyName, actor);
+      return { executedVia: 'firestore_rules_fallback', claimsSynced: false };
     }
 
     try {
@@ -134,6 +164,23 @@ export const PrivilegedService = {
       throw new Error('لا تملك الصلاحية لتعديل دور أو شركة هذا المستخدم.');
     }
 
+    if (!auth.currentUser) {
+      await DataService.updateUser(
+        params.userId,
+        {
+          role: params.role,
+          companyId: params.companyId,
+          ...(params.companyName ? { companyName: params.companyName } : {}),
+          ...(params.department !== undefined ? { department: params.department } : {}),
+          ...(params.position !== undefined ? { position: params.position } : {}),
+          ...(params.managerId !== undefined ? { managerId: params.managerId } : {}),
+          ...(params.managerName !== undefined ? { managerName: params.managerName } : {}),
+        },
+        actor
+      );
+      return { executedVia: 'firestore_rules_fallback', claimsSynced: false };
+    }
+
     try {
       const fn = httpsCallable<typeof params, { ok: boolean }>(
         functions,
@@ -161,6 +208,7 @@ export const PrivilegedService = {
   },
 
   async syncCurrentUserClaims(): Promise<boolean> {
+    if (!auth.currentUser) return false;
     try {
       const fn = httpsCallable<Record<string, never>, { synced: boolean }>(functions, 'syncMyClaims');
       const res = await fn({});

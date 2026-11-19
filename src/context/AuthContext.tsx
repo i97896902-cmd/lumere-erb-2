@@ -28,6 +28,9 @@ import {
   PRIMARY_SUPER_ADMIN_EMAIL,
 } from '../utils/rbac';
 import { DEFAULT_SUBSIDIARY_ID, PARENT_COMPANY_ID } from '../config/companies';
+import { DEFAULT_DIRECT_ACCESS_USER } from '../services/localDataService';
+
+export const AUTH_DISABLED = true;
 
 export interface AuthCustomClaims {
   role?: CanonicalRole;
@@ -145,9 +148,13 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [claims, setClaims] = useState<AuthCustomClaims>({});
-  const [loading, setLoading] = useState(true);
+  const [currentUser, setCurrentUser] = useState<User | null>(
+    AUTH_DISABLED ? DEFAULT_DIRECT_ACCESS_USER : null
+  );
+  const [claims, setClaims] = useState<AuthCustomClaims>(
+    AUTH_DISABLED ? { role: 'SUPER_ADMIN', companyId: PARENT_COMPANY_ID } : {}
+  );
+  const [loading, setLoading] = useState(!AUTH_DISABLED);
   const [isProfileIncomplete, setIsProfileIncomplete] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
 
@@ -159,6 +166,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
+    if (AUTH_DISABLED) return;
     async function init() {
       await testConnection();
     }
@@ -187,6 +195,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   useEffect(() => {
+    if (AUTH_DISABLED) {
+      setCurrentUser(DEFAULT_DIRECT_ACCESS_USER);
+      setClaims({ role: 'SUPER_ADMIN', companyId: PARENT_COMPANY_ID });
+      setIsProfileIncomplete(false);
+      setAuthError(null);
+      setLoading(false);
+      return;
+    }
+
     let active = true;
     getRedirectResult(auth).catch(error => {
       if (active) setAuthError(getGoogleAuthErrorMessage(error));
@@ -426,10 +443,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = async () => {
     try {
-      await signOut(auth);
+      if (auth.currentUser) {
+        await signOut(auth);
+      }
       setAuthError(null);
-      setCurrentUser(null);
-      setClaims({});
+      setCurrentUser(AUTH_DISABLED ? DEFAULT_DIRECT_ACCESS_USER : null);
+      setClaims(AUTH_DISABLED ? { role: 'SUPER_ADMIN', companyId: PARENT_COMPANY_ID } : {});
       setIsProfileIncomplete(false);
     } catch (err) {
       console.error('Logout error:', err);

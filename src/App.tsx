@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { AuthProvider, useAuth } from './context/AuthContext';
+import { AUTH_DISABLED, AuthProvider, useAuth } from './context/AuthContext';
 import { CompanyProvider, useCompany } from './context/CompanyContext';
 import { ToastProvider, useToast } from './context/ToastContext';
 import { Sidebar, TabType } from './components/navigation/Sidebar';
@@ -152,7 +152,7 @@ function LumereAppContent() {
 
   const subscriptionScope = getFirestoreSubscriptionScope({
     loading,
-    isAuthenticated: Boolean(firebaseUser && currentUser),
+    isAuthenticated: AUTH_DISABLED ? Boolean(currentUser) : Boolean(firebaseUser && currentUser),
     isProfileIncomplete,
     status: currentUser?.status,
   });
@@ -357,9 +357,12 @@ function LumereAppContent() {
     );
   }
 
-  // 1. Logged out -> Login View
-  if (!currentUser) {
+  // 1. Logged out -> Login View (only when auth is enabled)
+  if (!AUTH_DISABLED && !currentUser) {
     return <LoginView />;
+  }
+  if (!currentUser) {
+    return null;
   }
 
   // 2. Incomplete employee profile -> Onboarding with Company & Department selection
