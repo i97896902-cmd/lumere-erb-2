@@ -10,20 +10,28 @@ import {
 } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 import { getFunctions } from 'firebase/functions';
+import appletFirebaseConfig from '../../firebase-applet-config.json';
 
-// Firebase Web configuration for project "lumere-erb" (public client config).
+// Firebase Web configuration for project "lumere-erb" from firebase-applet-config.json.
 // Environment variables (VITE_FIREBASE_*) can override these values per deployment.
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || 'AIzaSyCaNb3DUoVemzEd-7HecJheXkCUwe07hCU',
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || 'lumere-erb.firebaseapp.com',
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || 'lumere-erb',
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || 'lumere-erb.firebasestorage.app',
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || '1026686151578',
-  appId: import.meta.env.VITE_FIREBASE_APP_ID || '1:1026686151578:web:86bbd9f72e58cff3492823',
-  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || 'G-7NYW806QC4',
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || appletFirebaseConfig.apiKey,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || appletFirebaseConfig.authDomain,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || appletFirebaseConfig.projectId,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || appletFirebaseConfig.storageBucket,
+  messagingSenderId:
+    import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || appletFirebaseConfig.messagingSenderId,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || appletFirebaseConfig.appId,
+  measurementId:
+    import.meta.env.VITE_FIREBASE_MEASUREMENT_ID ||
+    appletFirebaseConfig.measurementId ||
+    'G-7NYW806QC4',
 };
 
-const firestoreDatabaseId = import.meta.env.VITE_FIRESTORE_DATABASE_ID?.trim() || '';
+const firestoreDatabaseId =
+  import.meta.env.VITE_FIRESTORE_DATABASE_ID?.trim() ||
+  appletFirebaseConfig.firestoreDatabaseId ||
+  '';
 
 export const app = initializeApp(firebaseConfig);
 
@@ -37,7 +45,7 @@ function createFirestoreClient(): Firestore {
   }
 }
 
-// Connect to the project's default Firestore database unless a named database ID is explicitly provided
+// Connect to the provisioned Firestore database for lumere-erb
 export const db = createFirestoreClient();
 export const auth = getAuth(app);
 export const storage = getStorage(app);

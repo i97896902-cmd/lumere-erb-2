@@ -735,9 +735,12 @@ export const FirestoreDataService = {
   // ==========================================
   // DEPARTMENTS
   // ==========================================
-  async getDepartments(companyId?: string | null): Promise<Department[]> {
+  async getDepartments(companyId?: string | null, excludeParent = false): Promise<Department[]> {
     try {
-      const q = buildCompanyScopedQuery(DEPARTMENTS_COLLECTION, companyId);
+      const q =
+        !companyId && excludeParent
+          ? query(collection(db, DEPARTMENTS_COLLECTION), where('companyId', '!=', PARENT_COMPANY_ID))
+          : buildCompanyScopedQuery(DEPARTMENTS_COLLECTION, companyId);
       const snap = await getDocs(q);
       return snap.docs.map(d => ({ id: d.id, ...d.data() } as Department));
     } catch (err) {
@@ -747,10 +750,14 @@ export const FirestoreDataService = {
 
   subscribeDepartments(
     callback: (departments: Department[]) => void,
-    companyId?: string | null
+    companyId?: string | null,
+    excludeParent = false
   ): Unsubscribe {
     if (!auth.currentUser) return () => {};
-    const q = buildCompanyScopedQuery(DEPARTMENTS_COLLECTION, companyId);
+    const q =
+      !companyId && excludeParent
+        ? query(collection(db, DEPARTMENTS_COLLECTION), where('companyId', '!=', PARENT_COMPANY_ID))
+        : buildCompanyScopedQuery(DEPARTMENTS_COLLECTION, companyId);
     return onSnapshot(
       q,
       snap => {
@@ -763,7 +770,7 @@ export const FirestoreDataService = {
           handleFirestoreError(err, OperationType.LIST, DEPARTMENTS_COLLECTION);
         }
         console.warn('Realtime departments listener fallback:', err);
-        this.getDepartments(companyId).then(callback).catch(console.error);
+        this.getDepartments(companyId, excludeParent).then(callback).catch(console.error);
       }
     );
   },

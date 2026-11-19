@@ -187,7 +187,7 @@ function LumereAppContent() {
       setPendingUsers([]);
       const unsubDepartments = DataService.subscribeDepartments(fetchedDepts => {
         setDepartments(fetchedDepts);
-      }, null);
+      }, null, true);
       return () => {
         unsubDepartments();
       };

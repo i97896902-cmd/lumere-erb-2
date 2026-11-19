@@ -6,18 +6,19 @@
       "type": "object",
       "properties": {
         "id": { "type": "string", "maxLength": 128 },
-        "name": { "type": "string", "maxLength": 150 },
+        "name": { "type": "string", "minLength": 2, "maxLength": 150 },
         "arabicName": { "type": "string", "maxLength": 150 },
-        "slug": { "type": "string", "maxLength": 100 },
+        "slug": { "type": "string", "minLength": 2, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
         "type": { "type": "string", "enum": ["parent", "subsidiary"] },
         "parentCompanyId": { "type": ["string", "null"], "maxLength": 128 },
         "logo": { "type": "string", "maxLength": 2048 },
         "description": { "type": "string", "maxLength": 1000 },
         "businessSector": { "type": "string", "maxLength": 200 },
         "status": { "type": "string", "enum": ["active", "inactive"] },
+        "theme": { "type": "object" },
         "adminIds": { "type": "array", "items": { "type": "string" } },
-        "createdAt": { "type": "string", "format": "date-time" },
-        "updatedAt": { "type": "string", "format": "date-time" }
+        "createdAt": { "type": "string", "format": "date-time", "maxLength": 64 },
+        "updatedAt": { "type": "string", "format": "date-time", "maxLength": 64 }
       },
       "required": ["name", "slug", "type", "status"]
     },
@@ -28,24 +29,31 @@
       "properties": {
         "id": { "type": "string", "maxLength": 128 },
         "uid": { "type": "string", "maxLength": 128 },
-        "companyId": { "type": "string", "maxLength": 128 },
+        "companyId": { "type": "string", "minLength": 2, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
         "companyName": { "type": "string", "maxLength": 150 },
         "email": { "type": "string", "maxLength": 256 },
-        "displayName": { "type": "string", "maxLength": 128 },
-        "photoURL": { "type": "string", "maxLength": 1024 },
+        "displayName": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "fullName": { "type": "string", "maxLength": 128 },
+        "photoURL": { "type": "string", "maxLength": 2048 },
         "role": { "type": "string", "enum": ["SUPER_ADMIN", "COMPANY_ADMIN", "MANAGER", "EMPLOYEE", "ADMIN"] },
-        "department": { "type": "string", "maxLength": 100 },
-        "position": { "type": "string", "maxLength": 100 },
+        "department": { "type": "string", "maxLength": 120 },
+        "position": { "type": "string", "maxLength": 120 },
+        "jobTitle": { "type": "string", "maxLength": 120 },
         "managerId": { "type": "string", "maxLength": 128 },
         "managerName": { "type": "string", "maxLength": 128 },
-        "phone": { "type": "string", "maxLength": 30 },
+        "phone": { "type": "string", "maxLength": 50 },
         "status": { "type": "string", "enum": ["pending", "active", "rejected", "suspended", "Active", "Inactive", "Suspended"] },
         "joinedDate": { "type": "string", "maxLength": 50 },
         "approvedBy": { "type": "string", "maxLength": 128 },
         "approvedByName": { "type": "string", "maxLength": 128 },
-        "approvedAt": { "type": "string", "format": "date-time" },
-        "createdAt": { "type": "string", "format": "date-time" },
-        "updatedAt": { "type": "string", "format": "date-time" }
+        "approvedAt": { "type": "string", "format": "date-time", "maxLength": 64 },
+        "rejectionReason": { "type": "string", "maxLength": 500 },
+        "assignedTasksCount": { "type": "number" },
+        "completedTasksCount": { "type": "number" },
+        "overdueTasksCount": { "type": "number" },
+        "completionRate": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time", "maxLength": 64 },
+        "updatedAt": { "type": "string", "format": "date-time", "maxLength": 64 }
       },
       "required": ["companyId", "email", "displayName", "role", "status"]
     },
@@ -55,21 +63,26 @@
       "type": "object",
       "properties": {
         "id": { "type": "string", "maxLength": 128 },
-        "companyId": { "type": "string", "maxLength": 128 },
-        "name": { "type": "string", "maxLength": 200 },
+        "companyId": { "type": "string", "minLength": 2, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "name": { "type": "string", "minLength": 1, "maxLength": 200 },
         "phone": { "type": "string", "maxLength": 50 },
         "email": { "type": "string", "maxLength": 256 },
+        "company": { "type": "string", "maxLength": 200 },
         "companyName": { "type": "string", "maxLength": 200 },
         "clientType": { "type": "string", "enum": ["company", "restaurant", "cafe", "store", "individual", "other", "corporate"] },
         "address": { "type": "string", "maxLength": 500 },
         "notes": { "type": "string", "maxLength": 3000 },
         "assignedEmployeeId": { "type": "string", "maxLength": 128 },
         "assignedEmployeeName": { "type": "string", "maxLength": 128 },
+        "assignedEmployeeIds": { "type": "array", "items": { "type": "string" } },
         "status": { "type": "string", "enum": ["active", "inactive"] },
-        "createdAt": { "type": "string", "format": "date-time" },
-        "updatedAt": { "type": "string", "format": "date-time" }
+        "projectsCount": { "type": "number" },
+        "tasksCount": { "type": "number" },
+        "activeTasksCount": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time", "maxLength": 64 },
+        "updatedAt": { "type": "string", "format": "date-time", "maxLength": 64 }
       },
-      "required": ["companyId", "name", "phone", "email", "clientType", "address"]
+      "required": ["companyId", "name"]
     },
     "Project": {
       "title": "Project",
@@ -77,24 +90,34 @@
       "type": "object",
       "properties": {
         "id": { "type": "string", "maxLength": 128 },
-        "companyId": { "type": "string", "maxLength": 128 },
-        "name": { "type": "string", "maxLength": 200 },
+        "companyId": { "type": "string", "minLength": 2, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "name": { "type": "string", "minLength": 1, "maxLength": 200 },
         "clientId": { "type": "string", "maxLength": 128 },
         "clientName": { "type": "string", "maxLength": 200 },
         "description": { "type": "string", "maxLength": 5000 },
         "projectType": { "type": "string", "maxLength": 100 },
+        "department": { "type": "string", "maxLength": 120 },
+        "priority": { "type": "string", "maxLength": 50 },
         "status": { "type": "string", "enum": ["not_started", "in_progress", "in_review", "review", "planning", "completed", "on_hold", "cancelled"] },
         "startDate": { "type": "string", "maxLength": 50 },
         "deliveryDate": { "type": "string", "maxLength": 50 },
+        "deadline": { "type": "string", "maxLength": 50 },
         "projectManagerId": { "type": "string", "maxLength": 128 },
         "projectManagerName": { "type": "string", "maxLength": 128 },
+        "managerId": { "type": "string", "maxLength": 128 },
+        "managerName": { "type": "string", "maxLength": 128 },
         "teamMemberIds": { "type": "array", "items": { "type": "string" } },
         "completionPercentage": { "type": "number" },
+        "progress": { "type": "number" },
         "budget": { "type": "number" },
-        "createdAt": { "type": "string", "format": "date-time" },
-        "updatedAt": { "type": "string", "format": "date-time" }
+        "files": { "type": "array" },
+        "notes": { "type": "string", "maxLength": 3000 },
+        "tasksCount": { "type": "number" },
+        "completedTasksCount": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time", "maxLength": 64 },
+        "updatedAt": { "type": "string", "format": "date-time", "maxLength": 64 }
       },
-      "required": ["companyId", "name", "clientId", "status", "startDate", "deliveryDate"]
+      "required": ["companyId", "name", "clientId"]
     },
     "Task": {
       "title": "Task",
@@ -102,29 +125,35 @@
       "type": "object",
       "properties": {
         "id": { "type": "string", "maxLength": 128 },
-        "companyId": { "type": "string", "maxLength": 128 },
-        "taskId": { "type": "string", "maxLength": 30 },
-        "title": { "type": "string", "maxLength": 256 },
+        "companyId": { "type": "string", "minLength": 2, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "taskId": { "type": "string", "maxLength": 40 },
+        "title": { "type": "string", "minLength": 1, "maxLength": 256 },
         "description": { "type": "string", "maxLength": 5000 },
         "createdBy": { "type": "string", "maxLength": 128 },
         "createdByName": { "type": "string", "maxLength": 128 },
         "assignedTo": { "type": "string", "maxLength": 128 },
         "assignedToName": { "type": "string", "maxLength": 128 },
         "assignedToEmail": { "type": "string", "maxLength": 256 },
-        "department": { "type": "string", "maxLength": 100 },
+        "assignedToPhoto": { "type": "string", "maxLength": 2048 },
+        "coAssignees": { "type": "array", "items": { "type": "string" } },
+        "department": { "type": "string", "maxLength": 120 },
         "priority": { "type": "string", "enum": ["Low", "Medium", "High", "Urgent"] },
         "status": { "type": "string", "enum": ["Pending", "In Progress", "Review", "Completed", "Rejected", "Cancelled"] },
-        "startDate": { "type": "string", "maxLength": 50 },
-        "deadline": { "type": "string", "maxLength": 50 },
-        "completedAt": { "type": "string", "maxLength": 50 },
+        "startDate": { "type": "string", "maxLength": 64 },
+        "deadline": { "type": "string", "maxLength": 64 },
+        "completedAt": { "type": "string", "maxLength": 64 },
         "completionPercentage": { "type": "number" },
         "reviewStatus": { "type": "string", "enum": ["none", "pending_review", "approved", "rejected"] },
         "clientId": { "type": "string", "maxLength": 128 },
+        "clientName": { "type": "string", "maxLength": 200 },
         "projectId": { "type": "string", "maxLength": 128 },
-        "createdAt": { "type": "string", "format": "date-time" },
-        "updatedAt": { "type": "string", "format": "date-time" }
+        "projectName": { "type": "string", "maxLength": 200 },
+        "attachments": { "type": "array" },
+        "commentsCount": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time", "maxLength": 64 },
+        "updatedAt": { "type": "string", "format": "date-time", "maxLength": 64 }
       },
-      "required": ["companyId", "title", "description", "department", "priority", "status", "deadline"]
+      "required": ["companyId", "title", "description", "department", "priority", "status", "completionPercentage", "assignedTo"]
     },
     "Comment": {
       "title": "Comment",
@@ -132,18 +161,19 @@
       "type": "object",
       "properties": {
         "id": { "type": "string", "maxLength": 128 },
-        "companyId": { "type": "string", "maxLength": 128 },
+        "companyId": { "type": "string", "minLength": 2, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
         "taskId": { "type": "string", "maxLength": 128 },
         "userId": { "type": "string", "maxLength": 128 },
         "userName": { "type": "string", "maxLength": 128 },
         "userRole": { "type": "string", "maxLength": 50 },
-        "userAvatar": { "type": "string", "maxLength": 1024 },
-        "message": { "type": "string", "maxLength": 3000 },
+        "userAvatar": { "type": "string", "maxLength": 2048 },
+        "message": { "type": "string", "minLength": 1, "maxLength": 3000 },
         "attachmentName": { "type": "string", "maxLength": 256 },
         "attachmentUrl": { "type": "string", "maxLength": 2048 },
-        "createdAt": { "type": "string", "format": "date-time" }
+        "createdAt": { "type": "string", "format": "date-time", "maxLength": 64 },
+        "updatedAt": { "type": "string", "format": "date-time", "maxLength": 64 }
       },
-      "required": ["companyId", "taskId", "userId", "userName", "message"]
+      "required": ["companyId", "userId", "message"]
     },
     "Department": {
       "title": "Department",
@@ -151,13 +181,21 @@
       "type": "object",
       "properties": {
         "id": { "type": "string", "maxLength": 128 },
-        "companyId": { "type": "string", "maxLength": 128 },
-        "name": { "type": "string", "maxLength": 100 },
+        "companyId": { "type": "string", "minLength": 2, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "name": { "type": "string", "minLength": 1, "maxLength": 120 },
         "description": { "type": "string", "maxLength": 500 },
+        "headName": { "type": "string", "maxLength": 128 },
         "managerId": { "type": "string", "maxLength": 128 },
         "managerName": { "type": "string", "maxLength": 128 },
         "color": { "type": "string", "maxLength": 50 },
-        "createdAt": { "type": "string", "format": "date-time" }
+        "employeesCount": { "type": "number" },
+        "totalTasks": { "type": "number" },
+        "completedTasks": { "type": "number" },
+        "pendingTasks": { "type": "number" },
+        "overdueTasks": { "type": "number" },
+        "completionRate": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time", "maxLength": 64 },
+        "updatedAt": { "type": "string", "format": "date-time", "maxLength": 64 }
       },
       "required": ["companyId", "name"]
     },
@@ -167,16 +205,18 @@
       "type": "object",
       "properties": {
         "id": { "type": "string", "maxLength": 128 },
-        "companyId": { "type": "string", "maxLength": 128 },
+        "companyId": { "type": "string", "minLength": 2, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
         "userId": { "type": "string", "maxLength": 128 },
-        "title": { "type": "string", "maxLength": 200 },
-        "message": { "type": "string", "maxLength": 1000 },
+        "title": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "message": { "type": "string", "maxLength": 2000 },
         "type": { "type": "string", "enum": ["task_assigned", "deadline_approaching", "task_rejected", "task_approved", "comment_added", "task_reassigned", "join_approved", "join_rejected", "client_created", "project_created", "company_updated", "system"] },
         "relatedTaskId": { "type": "string", "maxLength": 128 },
+        "relatedProjectId": { "type": "string", "maxLength": 128 },
+        "relatedClientId": { "type": "string", "maxLength": 128 },
         "read": { "type": "boolean" },
-        "createdAt": { "type": "string", "format": "date-time" }
+        "createdAt": { "type": "string", "format": "date-time", "maxLength": 64 }
       },
-      "required": ["companyId", "userId", "title", "message", "type", "read"]
+      "required": ["companyId", "userId", "title", "read"]
     },
     "ActivityLog": {
       "title": "ActivityLog",
@@ -184,17 +224,17 @@
       "type": "object",
       "properties": {
         "id": { "type": "string", "maxLength": 128 },
-        "companyId": { "type": "string", "maxLength": 128 },
+        "companyId": { "type": "string", "minLength": 2, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
         "actorId": { "type": "string", "maxLength": 128 },
         "actorName": { "type": "string", "maxLength": 128 },
         "actorRole": { "type": "string", "maxLength": 50 },
-        "action": { "type": "string", "maxLength": 100 },
-        "target": { "type": "string", "maxLength": 200 },
+        "action": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "target": { "type": "string", "maxLength": 256 },
         "targetId": { "type": "string", "maxLength": 128 },
-        "metadata": { "type": "string", "maxLength": 1000 },
-        "timestamp": { "type": "string", "format": "date-time" }
+        "metadata": { "type": "string", "maxLength": 1500 },
+        "timestamp": { "type": "string", "format": "date-time", "maxLength": 64 }
       },
-      "required": ["companyId", "actorId", "actorName", "action", "target"]
+      "required": ["companyId", "actorId", "action"]
     },
     "AdminDoc": {
       "title": "AdminDoc",
@@ -203,7 +243,7 @@
       "properties": {
         "uid": { "type": "string", "maxLength": 128 },
         "email": { "type": "string", "maxLength": 256 },
-        "createdAt": { "type": "string", "format": "date-time" }
+        "createdAt": { "type": "string", "format": "date-time", "maxLength": 64 }
       },
       "required": ["uid"]
     },
@@ -213,10 +253,10 @@
       "type": "object",
       "properties": {
         "id": { "type": "string", "maxLength": 128 },
-        "companyId": { "type": "string", "maxLength": 128 },
-        "name": { "type": "string", "maxLength": 200 },
+        "companyId": { "type": "string", "minLength": 2, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "name": { "type": "string", "minLength": 1, "maxLength": 200 },
         "type": { "type": "string", "maxLength": 100 },
-        "serialNumber": { "type": "string", "maxLength": 100 },
+        "serialNumber": { "type": "string", "maxLength": 120 },
         "assetId": { "type": "string", "maxLength": 100 },
         "description": { "type": "string", "maxLength": 2000 },
         "status": { "type": "string", "enum": ["available", "assigned", "in_maintenance", "damaged", "lost", "inactive"] },
@@ -230,10 +270,10 @@
         "value": { "type": "number" },
         "notes": { "type": "string", "maxLength": 2000 },
         "photoURL": { "type": "string", "maxLength": 2048 },
-        "createdAt": { "type": "string", "format": "date-time" },
-        "updatedAt": { "type": "string", "format": "date-time" }
+        "createdAt": { "type": "string", "format": "date-time", "maxLength": 64 },
+        "updatedAt": { "type": "string", "format": "date-time", "maxLength": 64 }
       },
-      "required": ["companyId", "name", "type", "serialNumber", "status"]
+      "required": ["companyId", "name", "serialNumber", "status"]
     },
     "EquipmentHistory": {
       "title": "EquipmentHistory",
@@ -241,7 +281,7 @@
       "type": "object",
       "properties": {
         "id": { "type": "string", "maxLength": 128 },
-        "companyId": { "type": "string", "maxLength": 128 },
+        "companyId": { "type": "string", "minLength": 2, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
         "equipmentId": { "type": "string", "maxLength": 128 },
         "equipmentName": { "type": "string", "maxLength": 200 },
         "action": { "type": "string", "enum": ["created", "assigned", "returned", "maintenance_in", "maintenance_out", "status_change", "updated"] },
@@ -257,9 +297,26 @@
         "actorId": { "type": "string", "maxLength": 128 },
         "actorName": { "type": "string", "maxLength": 128 },
         "actorRole": { "type": "string", "maxLength": 50 },
-        "timestamp": { "type": "string", "format": "date-time" }
+        "timestamp": { "type": "string", "format": "date-time", "maxLength": 64 }
       },
-      "required": ["companyId", "equipmentId", "equipmentName", "action", "actorId", "actorName", "timestamp"]
+      "required": ["companyId", "equipmentId", "action", "actorId"]
+    },
+    "Report": {
+      "title": "Report",
+      "description": "Company-scoped stored operational performance report snapshot",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "companyId": { "type": "string", "minLength": 2, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "title": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "period": { "type": "string", "maxLength": 100 },
+        "generatedBy": { "type": "string", "maxLength": 128 },
+        "generatedByName": { "type": "string", "maxLength": 128 },
+        "metrics": { "type": "object" },
+        "createdAt": { "type": "string", "format": "date-time", "maxLength": 64 },
+        "updatedAt": { "type": "string", "format": "date-time", "maxLength": 64 }
+      },
+      "required": ["companyId", "title", "generatedBy"]
     }
   },
   "firestore": {
@@ -310,6 +367,10 @@
     "/equipmentHistory/{historyId}": {
       "schema": "EquipmentHistory",
       "description": "Company-scoped immutable equipment assignment and maintenance history"
+    },
+    "/reports/{reportId}": {
+      "schema": "Report",
+      "description": "Company-scoped stored performance report snapshots"
     }
   }
 }

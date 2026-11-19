@@ -2,17 +2,29 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     // =========================================================================
-    // 1. GLOBAL DEFAULT DENY
+    // 1. GLOBAL DEFAULT DENY (Master Safety Net)
     // =========================================================================
     match /{document=**} {
       allow read, write: if false;
     }
 
     // =========================================================================
-    // 2. AUTHENTICATION, CUSTOM CLAIMS & MULTI-COMPANY RBAC HELPERS
+    // 2. CORE PRIMITIVES, VALIDATION HELPERS & MULTI-COMPANY RBAC
     // =========================================================================
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
     function isSignedIn() {
       return request.auth != null;
+    }
+
+    function isVerifiedUser() {
+      return isSignedIn() && request.auth.token.email_verified == true;
     }
 
     function isValidId(id) {
@@ -22,14 +34,50 @@ service cloud.firestore {
         && id.matches('^[a-zA-Z0-9_\\-]+$');
     }
 
+    function isValidCompanyId(companyId) {
+      return isValidId(companyId) && companyId.size() >= 2;
+    }
+
+    function isOptionalString(data, key, maxLen) {
+      return !(key in data)
+        || data[key] == null
+        || (data[key] is string && data[key].size() <= maxLen);
+    }
+
+    function isOptionalNumber(data, key, minVal, maxVal) {
+      return !(key in data)
+        || data[key] == null
+        || (data[key] is number && data[key] >= minVal && data[key] <= maxVal);
+    }
+
+    function isOptionalBoundedStringList(data, key, maxItems) {
+      return !(key in data)
+        || data[key] == null
+        || (data[key] is list
+            && data[key].size() <= maxItems
+            && (data[key].size() == 0 || data[key][0] is string));
+    }
+
+    function isOptionalBoundedMapList(data, key, maxItems) {
+      return !(key in data)
+        || data[key] == null
+        || (data[key] is list
+            && data[key].size() <= maxItems
+            && (data[key].size() == 0 || data[key][0] is map));
+    }
+
+    function isImmutableField(key) {
+      return !(key in existing())
+        || (key in incoming() && incoming()[key] == existing()[key]);
+    }
+
     function isCurrentUser(userId) {
       return isSignedIn() && request.auth.uid == userId;
     }
 
     function isBootstrapSuperAdmin() {
-      return isSignedIn()
-        && request.auth.token.email == 'lumerecompany@gmail.com'
-        && request.auth.token.email_verified == true;
+      return isVerifiedUser()
+        && request.auth.token.email == 'lumerecompany@gmail.com';
     }
 
     function userDocPath(uid) {
@@ -102,15 +150,25 @@ service cloud.firestore {
       return isSuperAdmin() || belongsToCompany(companyId);
     }
 
-    function isValidCompanyId(companyId) {
-      return isValidId(companyId) && companyId.size() >= 2;
-    }
-
     function assigneeMatchesCompany(assigneeUid, companyId) {
       return assigneeUid is string
         && isValidId(assigneeUid)
         && exists(userDocPath(assigneeUid))
         && get(userDocPath(assigneeUid)).data.companyId == companyId;
+    }
+
+    function assigneeMatchesCompanyIfPresent(data) {
+      return !('assignedTo' in data)
+        || data.assignedTo == null
+        || data.assignedTo == ''
+        || assigneeMatchesCompany(data.assignedTo, data.companyId);
+    }
+
+    function recipientMatchesCompanyOrSuperAdmin(recipientUid, companyId) {
+      return isValidId(recipientUid)
+        && exists(userDocPath(recipientUid))
+        && (get(userDocPath(recipientUid)).data.companyId == companyId
+            || get(userDocPath(recipientUid)).data.role in ['SUPER_ADMIN', 'ADMIN']);
     }
 
     function projectMatchesCompanyIfPresent(data) {
@@ -131,401 +189,808 @@ service cloud.firestore {
                 || get(/databases/$(database)/documents/clients/$(data.clientId)).data.companyId == data.companyId));
     }
 
+    function equipmentMatchesCompany(equipmentId, companyId) {
+      return isValidId(equipmentId)
+        && exists(/databases/$(database)/documents/equipment/$(equipmentId))
+        && get(/databases/$(database)/documents/equipment/$(equipmentId)).data.companyId == companyId;
+    }
+
     // =========================================================================
-    // 3. ADMINS (Server-managed UID verification map)
+    // 3. STANDALONE ENTITY VALIDATION BLUEPRINTS (Anti-Update-Gap & Bounds)
+    // =========================================================================
+    function isValidCompany(data) {
+      return data.keys().hasAll(['name', 'slug', 'type', 'status'])
+        && data.keys().hasOnly([
+          'id', 'name', 'arabicName', 'slug', 'type', 'parentCompanyId',
+          'logo', 'description', 'businessSector', 'status', 'theme',
+          'adminIds', 'createdAt', 'updatedAt'
+        ])
+        && data.name is string && data.name.size() >= 2 && data.name.size() <= 150
+        && data.slug is string && data.slug.size() >= 2 && data.slug.size() <= 128 && isValidId(data.slug)
+        && data.type in ['parent', 'subsidiary']
+        && data.status in ['active', 'inactive']
+        && isOptionalString(data, 'id', 128)
+        && isOptionalString(data, 'arabicName', 150)
+        && isOptionalString(data, 'parentCompanyId', 128)
+        && isOptionalString(data, 'logo', 2048)
+        && isOptionalString(data, 'description', 1000)
+        && isOptionalString(data, 'businessSector', 200)
+        && (!('theme' in data) || data.theme == null || (data.theme is map && data.theme.size() <= 10))
+        && isOptionalBoundedStringList(data, 'adminIds', 50)
+        && isOptionalString(data, 'createdAt', 64)
+        && isOptionalString(data, 'updatedAt', 64);
+    }
+
+    function isValidUser(data) {
+      return data.keys().hasAll(['companyId', 'email', 'displayName', 'role', 'status'])
+        && data.keys().hasOnly([
+          'id', 'uid', 'companyId', 'companyName', 'email', 'displayName',
+          'fullName', 'photoURL', 'role', 'department', 'position', 'jobTitle',
+          'managerId', 'managerName', 'phone', 'status', 'joinedDate',
+          'approvedBy', 'approvedByName', 'approvedAt', 'rejectionReason',
+          'assignedTasksCount', 'completedTasksCount', 'overdueTasksCount',
+          'completionRate', 'createdAt', 'updatedAt'
+        ])
+        && isValidCompanyId(data.companyId)
+        && data.email is string && data.email.size() <= 256
+        && data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 128
+        && data.role in ['SUPER_ADMIN', 'COMPANY_ADMIN', 'MANAGER', 'EMPLOYEE', 'ADMIN']
+        && data.status in ['pending', 'active', 'rejected', 'suspended', 'Active', 'Inactive', 'Suspended']
+        && isOptionalString(data, 'id', 128)
+        && isOptionalString(data, 'uid', 128)
+        && isOptionalString(data, 'companyName', 150)
+        && isOptionalString(data, 'fullName', 128)
+        && isOptionalString(data, 'photoURL', 2048)
+        && isOptionalString(data, 'department', 120)
+        && isOptionalString(data, 'position', 120)
+        && isOptionalString(data, 'jobTitle', 120)
+        && isOptionalString(data, 'managerId', 128)
+        && isOptionalString(data, 'managerName', 128)
+        && isOptionalString(data, 'phone', 50)
+        && isOptionalString(data, 'joinedDate', 50)
+        && isOptionalString(data, 'approvedBy', 128)
+        && isOptionalString(data, 'approvedByName', 128)
+        && isOptionalString(data, 'approvedAt', 64)
+        && isOptionalString(data, 'rejectionReason', 500)
+        && isOptionalNumber(data, 'assignedTasksCount', 0, 100000)
+        && isOptionalNumber(data, 'completedTasksCount', 0, 100000)
+        && isOptionalNumber(data, 'overdueTasksCount', 0, 100000)
+        && isOptionalNumber(data, 'completionRate', 0, 100)
+        && isOptionalString(data, 'createdAt', 64)
+        && isOptionalString(data, 'updatedAt', 64);
+    }
+
+    function isValidDepartment(data) {
+      return data.keys().hasAll(['companyId', 'name'])
+        && data.keys().hasOnly([
+          'id', 'companyId', 'name', 'description', 'headName', 'managerId',
+          'managerName', 'color', 'employeesCount', 'totalTasks',
+          'completedTasks', 'pendingTasks', 'overdueTasks', 'completionRate',
+          'createdAt', 'updatedAt'
+        ])
+        && isValidCompanyId(data.companyId)
+        && data.name is string && data.name.size() >= 1 && data.name.size() <= 120
+        && isOptionalString(data, 'id', 128)
+        && isOptionalString(data, 'description', 500)
+        && isOptionalString(data, 'headName', 128)
+        && isOptionalString(data, 'managerId', 128)
+        && isOptionalString(data, 'managerName', 128)
+        && isOptionalString(data, 'color', 50)
+        && isOptionalNumber(data, 'employeesCount', 0, 100000)
+        && isOptionalNumber(data, 'totalTasks', 0, 100000)
+        && isOptionalNumber(data, 'completedTasks', 0, 100000)
+        && isOptionalNumber(data, 'pendingTasks', 0, 100000)
+        && isOptionalNumber(data, 'overdueTasks', 0, 100000)
+        && isOptionalNumber(data, 'completionRate', 0, 100)
+        && isOptionalString(data, 'createdAt', 64)
+        && isOptionalString(data, 'updatedAt', 64);
+    }
+
+    function isValidClient(data) {
+      return data.keys().hasAll(['companyId', 'name'])
+        && data.keys().hasOnly([
+          'id', 'companyId', 'name', 'phone', 'email', 'company', 'companyName',
+          'clientType', 'address', 'notes', 'assignedEmployeeId',
+          'assignedEmployeeName', 'assignedEmployeeIds', 'status',
+          'projectsCount', 'tasksCount', 'activeTasksCount',
+          'createdAt', 'updatedAt'
+        ])
+        && isValidCompanyId(data.companyId)
+        && data.name is string && data.name.size() >= 1 && data.name.size() <= 200
+        && isOptionalString(data, 'id', 128)
+        && isOptionalString(data, 'phone', 50)
+        && isOptionalString(data, 'email', 256)
+        && isOptionalString(data, 'company', 200)
+        && isOptionalString(data, 'companyName', 200)
+        && (!('clientType' in data) || data.clientType == null
+            || data.clientType in ['company', 'restaurant', 'cafe', 'store', 'individual', 'other', 'corporate'])
+        && isOptionalString(data, 'address', 500)
+        && isOptionalString(data, 'notes', 3000)
+        && isOptionalString(data, 'assignedEmployeeId', 128)
+        && isOptionalString(data, 'assignedEmployeeName', 128)
+        && isOptionalBoundedStringList(data, 'assignedEmployeeIds', 50)
+        && (!('status' in data) || data.status == null || data.status in ['active', 'inactive'])
+        && isOptionalNumber(data, 'projectsCount', 0, 100000)
+        && isOptionalNumber(data, 'tasksCount', 0, 100000)
+        && isOptionalNumber(data, 'activeTasksCount', 0, 100000)
+        && isOptionalString(data, 'createdAt', 64)
+        && isOptionalString(data, 'updatedAt', 64);
+    }
+
+    function isValidProject(data) {
+      return data.keys().hasAll(['companyId', 'name', 'clientId'])
+        && data.keys().hasOnly([
+          'id', 'companyId', 'name', 'clientId', 'clientName', 'description',
+          'projectType', 'department', 'priority', 'status', 'startDate',
+          'deliveryDate', 'deadline', 'projectManagerId', 'projectManagerName',
+          'managerId', 'managerName', 'teamMemberIds', 'completionPercentage',
+          'progress', 'budget', 'files', 'notes', 'tasksCount',
+          'completedTasksCount', 'createdAt', 'updatedAt'
+        ])
+        && isValidCompanyId(data.companyId)
+        && data.name is string && data.name.size() >= 1 && data.name.size() <= 200
+        && data.clientId is string && data.clientId.size() <= 128
+        && isOptionalString(data, 'id', 128)
+        && isOptionalString(data, 'clientName', 200)
+        && isOptionalString(data, 'description', 5000)
+        && isOptionalString(data, 'projectType', 100)
+        && isOptionalString(data, 'department', 120)
+        && isOptionalString(data, 'priority', 50)
+        && (!('status' in data) || data.status == null
+            || data.status in ['not_started', 'in_progress', 'in_review', 'review', 'planning', 'completed', 'on_hold', 'cancelled'])
+        && isOptionalString(data, 'startDate', 50)
+        && isOptionalString(data, 'deliveryDate', 50)
+        && isOptionalString(data, 'deadline', 50)
+        && isOptionalString(data, 'projectManagerId', 128)
+        && isOptionalString(data, 'projectManagerName', 128)
+        && isOptionalString(data, 'managerId', 128)
+        && isOptionalString(data, 'managerName', 128)
+        && isOptionalBoundedStringList(data, 'teamMemberIds', 100)
+        && isOptionalNumber(data, 'completionPercentage', 0, 100)
+        && isOptionalNumber(data, 'progress', 0, 100)
+        && isOptionalNumber(data, 'budget', 0, 1000000000)
+        && isOptionalBoundedMapList(data, 'files', 50)
+        && isOptionalString(data, 'notes', 3000)
+        && isOptionalNumber(data, 'tasksCount', 0, 100000)
+        && isOptionalNumber(data, 'completedTasksCount', 0, 100000)
+        && isOptionalString(data, 'createdAt', 64)
+        && isOptionalString(data, 'updatedAt', 64);
+    }
+
+    function isValidTask(data) {
+      return data.keys().hasAll([
+          'companyId', 'title', 'description', 'department',
+          'priority', 'status', 'completionPercentage', 'assignedTo'
+        ])
+        && data.keys().hasOnly([
+          'id', 'companyId', 'taskId', 'title', 'description', 'createdBy',
+          'createdByName', 'assignedTo', 'assignedToName', 'assignedToEmail',
+          'assignedToPhoto', 'coAssignees', 'department', 'priority', 'status',
+          'startDate', 'deadline', 'completedAt', 'completionPercentage',
+          'reviewStatus', 'clientId', 'clientName', 'projectId', 'projectName',
+          'attachments', 'commentsCount', 'createdAt', 'updatedAt'
+        ])
+        && isValidCompanyId(data.companyId)
+        && data.title is string && data.title.size() >= 1 && data.title.size() <= 256
+        && data.description is string && data.description.size() <= 5000
+        && data.department is string && data.department.size() <= 120
+        && data.priority in ['Low', 'Medium', 'High', 'Urgent']
+        && data.status in ['Pending', 'In Progress', 'Review', 'Completed', 'Rejected', 'Cancelled']
+        && data.completionPercentage is number
+        && data.completionPercentage >= 0
+        && data.completionPercentage <= 100
+        && isValidId(data.assignedTo)
+        && isOptionalString(data, 'id', 128)
+        && isOptionalString(data, 'taskId', 40)
+        && isOptionalString(data, 'createdBy', 128)
+        && isOptionalString(data, 'createdByName', 128)
+        && isOptionalString(data, 'assignedToName', 128)
+        && isOptionalString(data, 'assignedToEmail', 256)
+        && isOptionalString(data, 'assignedToPhoto', 2048)
+        && isOptionalBoundedStringList(data, 'coAssignees', 20)
+        && isOptionalString(data, 'startDate', 64)
+        && isOptionalString(data, 'deadline', 64)
+        && isOptionalString(data, 'completedAt', 64)
+        && (!('reviewStatus' in data) || data.reviewStatus == null
+            || data.reviewStatus in ['none', 'pending_review', 'approved', 'rejected'])
+        && isOptionalString(data, 'clientId', 128)
+        && isOptionalString(data, 'clientName', 200)
+        && isOptionalString(data, 'projectId', 128)
+        && isOptionalString(data, 'projectName', 200)
+        && isOptionalBoundedMapList(data, 'attachments', 20)
+        && isOptionalNumber(data, 'commentsCount', 0, 100000)
+        && isOptionalString(data, 'createdAt', 64)
+        && isOptionalString(data, 'updatedAt', 64);
+    }
+
+    function isValidComment(data) {
+      return data.keys().hasAll(['companyId', 'userId', 'message'])
+        && data.keys().hasOnly([
+          'id', 'companyId', 'taskId', 'userId', 'userName', 'userRole',
+          'userAvatar', 'message', 'attachmentName', 'attachmentUrl',
+          'createdAt', 'updatedAt'
+        ])
+        && isValidCompanyId(data.companyId)
+        && isValidId(data.userId)
+        && data.message is string && data.message.size() >= 1 && data.message.size() <= 3000
+        && isOptionalString(data, 'id', 128)
+        && isOptionalString(data, 'taskId', 128)
+        && isOptionalString(data, 'userName', 128)
+        && isOptionalString(data, 'userRole', 50)
+        && isOptionalString(data, 'userAvatar', 2048)
+        && isOptionalString(data, 'attachmentName', 256)
+        && isOptionalString(data, 'attachmentUrl', 2048)
+        && isOptionalString(data, 'createdAt', 64)
+        && isOptionalString(data, 'updatedAt', 64);
+    }
+
+    function isValidNotification(data) {
+      return data.keys().hasAll(['companyId', 'userId', 'title', 'read'])
+        && data.keys().hasOnly([
+          'id', 'companyId', 'userId', 'title', 'message', 'type',
+          'relatedTaskId', 'relatedProjectId', 'relatedClientId',
+          'read', 'createdAt'
+        ])
+        && isValidCompanyId(data.companyId)
+        && isValidId(data.userId)
+        && data.title is string && data.title.size() >= 1 && data.title.size() <= 200
+        && data.read is bool
+        && isOptionalString(data, 'id', 128)
+        && isOptionalString(data, 'message', 2000)
+        && (!('type' in data) || data.type == null
+            || data.type in [
+              'task_assigned', 'deadline_approaching', 'task_rejected', 'task_approved',
+              'comment_added', 'task_reassigned', 'join_approved', 'join_rejected',
+              'client_created', 'project_created', 'company_updated', 'system'
+            ])
+        && isOptionalString(data, 'relatedTaskId', 128)
+        && isOptionalString(data, 'relatedProjectId', 128)
+        && isOptionalString(data, 'relatedClientId', 128)
+        && isOptionalString(data, 'createdAt', 64);
+    }
+
+    function isValidActivityLog(data) {
+      return data.keys().hasAll(['companyId', 'actorId', 'action'])
+        && data.keys().hasOnly([
+          'id', 'companyId', 'actorId', 'actorName', 'actorRole',
+          'action', 'target', 'targetId', 'timestamp', 'metadata'
+        ])
+        && isValidCompanyId(data.companyId)
+        && isValidId(data.actorId)
+        && data.action is string && data.action.size() >= 1 && data.action.size() <= 120
+        && isOptionalString(data, 'id', 128)
+        && isOptionalString(data, 'actorName', 128)
+        && isOptionalString(data, 'actorRole', 50)
+        && isOptionalString(data, 'target', 256)
+        && isOptionalString(data, 'targetId', 128)
+        && isOptionalString(data, 'timestamp', 64)
+        && isOptionalString(data, 'metadata', 1500);
+    }
+
+    function isValidEquipment(data) {
+      return data.keys().hasAll(['companyId', 'name', 'serialNumber', 'status'])
+        && data.keys().hasOnly([
+          'id', 'companyId', 'name', 'type', 'serialNumber', 'assetId',
+          'description', 'status', 'assignedTo', 'assignedToName',
+          'assignedToEmail', 'projectId', 'projectName', 'purchaseDate',
+          'receivedDate', 'value', 'notes', 'photoURL', 'createdAt', 'updatedAt'
+        ])
+        && isValidCompanyId(data.companyId)
+        && data.name is string && data.name.size() >= 1 && data.name.size() <= 200
+        && data.serialNumber is string && data.serialNumber.size() <= 120
+        && data.status in ['available', 'assigned', 'in_maintenance', 'damaged', 'lost', 'inactive']
+        && isOptionalString(data, 'id', 128)
+        && isOptionalString(data, 'type', 100)
+        && isOptionalString(data, 'assetId', 100)
+        && isOptionalString(data, 'description', 2000)
+        && isOptionalString(data, 'assignedTo', 128)
+        && isOptionalString(data, 'assignedToName', 128)
+        && isOptionalString(data, 'assignedToEmail', 256)
+        && isOptionalString(data, 'projectId', 128)
+        && isOptionalString(data, 'projectName', 200)
+        && isOptionalString(data, 'purchaseDate', 50)
+        && isOptionalString(data, 'receivedDate', 50)
+        && isOptionalNumber(data, 'value', 0, 1000000000)
+        && isOptionalString(data, 'notes', 2000)
+        && isOptionalString(data, 'photoURL', 2048)
+        && isOptionalString(data, 'createdAt', 64)
+        && isOptionalString(data, 'updatedAt', 64);
+    }
+
+    function isValidEquipmentHistory(data) {
+      return data.keys().hasAll(['companyId', 'equipmentId', 'action', 'actorId'])
+        && data.keys().hasOnly([
+          'id', 'companyId', 'equipmentId', 'equipmentName', 'action',
+          'assignedToId', 'assignedToName', 'returnedById', 'returnedByName',
+          'projectId', 'projectName', 'previousStatus', 'newStatus',
+          'notes', 'actorId', 'actorName', 'actorRole', 'timestamp'
+        ])
+        && isValidCompanyId(data.companyId)
+        && isValidId(data.equipmentId)
+        && data.action in ['created', 'assigned', 'returned', 'maintenance_in', 'maintenance_out', 'status_change', 'updated']
+        && isValidId(data.actorId)
+        && isOptionalString(data, 'id', 128)
+        && isOptionalString(data, 'equipmentName', 200)
+        && isOptionalString(data, 'assignedToId', 128)
+        && isOptionalString(data, 'assignedToName', 128)
+        && isOptionalString(data, 'returnedById', 128)
+        && isOptionalString(data, 'returnedByName', 128)
+        && isOptionalString(data, 'projectId', 128)
+        && isOptionalString(data, 'projectName', 200)
+        && isOptionalString(data, 'previousStatus', 50)
+        && isOptionalString(data, 'newStatus', 50)
+        && isOptionalString(data, 'notes', 2000)
+        && isOptionalString(data, 'actorName', 128)
+        && isOptionalString(data, 'actorRole', 50)
+        && isOptionalString(data, 'timestamp', 64);
+    }
+
+    function isValidReport(data) {
+      return data.keys().hasAll(['companyId', 'title', 'generatedBy'])
+        && data.keys().hasOnly([
+          'id', 'companyId', 'title', 'period', 'generatedBy',
+          'generatedByName', 'metrics', 'createdAt', 'updatedAt'
+        ])
+        && isValidCompanyId(data.companyId)
+        && data.title is string && data.title.size() >= 1 && data.title.size() <= 200
+        && isValidId(data.generatedBy)
+        && isOptionalString(data, 'id', 128)
+        && isOptionalString(data, 'period', 100)
+        && isOptionalString(data, 'generatedByName', 128)
+        && (!('metrics' in data) || data.metrics == null || (data.metrics is map && data.metrics.size() <= 50))
+        && isOptionalString(data, 'createdAt', 64)
+        && isOptionalString(data, 'updatedAt', 64);
+    }
+
+    // =========================================================================
+    // 4. ADMINS (Server-managed UID verification map)
     // =========================================================================
     match /admins/{adminId} {
-      allow read: if isSuperAdmin();
+      allow get: if isValidId(adminId) && isSuperAdmin();
+      allow list: if isSuperAdmin();
       allow write: if false;
     }
 
     // =========================================================================
-    // 4. COMPANIES (Parent LUMERE GROUP + Subsidiaries)
+    // 5. COMPANIES (Parent LUMERE GROUP + Subsidiaries)
     // =========================================================================
     match /companies/{companyId} {
-      allow get: if isSuperAdmin()
+      allow get: if isValidCompanyId(companyId) && (
+        isSuperAdmin()
         || belongsToCompany(companyId)
-        || (isPendingUser() && resource.data.type == 'subsidiary' && resource.data.status == 'active');
+        || (isPendingUser() && resource.data.type == 'subsidiary' && resource.data.status == 'active')
+      );
 
       allow list: if isSuperAdmin()
         || (isPendingUser() && resource.data.type == 'subsidiary' && resource.data.status == 'active');
 
-      allow create: if isSuperAdmin()
+      allow create: if isVerifiedUser()
         && isValidCompanyId(companyId)
-        && request.resource.data.name is string
-        && request.resource.data.name.size() >= 2
-        && request.resource.data.name.size() <= 150
-        && request.resource.data.slug is string
-        && request.resource.data.slug.size() >= 2
-        && request.resource.data.slug.size() <= 128
-        && request.resource.data.type in ['parent', 'subsidiary']
-        && request.resource.data.status in ['active', 'inactive'];
+        && isValidCompany(incoming())
+        && request.resource.data.slug == companyId
+        && isSuperAdmin();
 
-      allow update: if isSuperAdmin()
+      allow update: if isVerifiedUser()
         && isValidCompanyId(companyId)
-        && request.resource.data.name is string
-        && request.resource.data.name.size() >= 2
-        && request.resource.data.name.size() <= 150
-        && request.resource.data.status in ['active', 'inactive']
-        && !(companyId == 'lumere-group' && request.resource.data.status == 'inactive');
+        && isValidCompany(incoming())
+        && isSuperAdmin()
+        && isImmutableField('createdAt')
+        && !(companyId == 'lumere-group' && request.resource.data.status == 'inactive')
+        && !(companyId == 'lumere-group' && request.resource.data.type != 'parent');
 
       allow delete: if false; // Archive/deactivate instead of destructive deletion
     }
 
     // =========================================================================
-    // 5. USERS / EMPLOYEES (Strict Multi-Company & Anti-Escalation Rules)
+    // 6. USERS / EMPLOYEES (Strict Multi-Company & Anti-Escalation Rules)
     // =========================================================================
     match /users/{userId} {
-      allow get: if isCurrentUser(userId)
+      allow get: if isValidId(userId) && (
+        isCurrentUser(userId)
         || isSuperAdmin()
-        || belongsToCompany(resource.data.companyId);
+        || belongsToCompany(resource.data.companyId)
+      );
 
       allow list: if isSuperAdmin()
         || belongsToCompany(resource.data.companyId);
 
-      // Self-registration locked strictly to EMPLOYEE + pending (except bootstrap SUPER_ADMIN)
-      allow create: if isSignedIn() && isValidId(userId) && (
-        (
-          isCurrentUser(userId)
-          && request.resource.data.uid == userId
-          && request.resource.data.email == request.auth.token.email
-          && request.resource.data.displayName is string
-          && request.resource.data.displayName.size() >= 1
-          && request.resource.data.displayName.size() <= 128
-          && isValidCompanyId(request.resource.data.companyId)
-          && (
-            (isBootstrapSuperAdmin() && request.resource.data.role in ['SUPER_ADMIN', 'ADMIN'] && request.resource.data.status == 'active')
-            || (!isBootstrapSuperAdmin()
-                && request.resource.data.role == 'EMPLOYEE'
-                && request.resource.data.status == 'pending'
-                && request.resource.data.companyId != 'lumere-group')
-          )
-        )
-        || (
-          isSuperAdmin()
-          && isValidCompanyId(request.resource.data.companyId)
-          && request.resource.data.displayName is string
-          && request.resource.data.displayName.size() <= 128
-          && request.resource.data.role in ['SUPER_ADMIN', 'COMPANY_ADMIN', 'MANAGER', 'EMPLOYEE']
-        )
-        || (
-          isCompanyAdmin(request.resource.data.companyId)
-          && request.resource.data.companyId != 'lumere-group'
-          && request.resource.data.displayName is string
-          && request.resource.data.displayName.size() <= 128
-          && request.resource.data.role in ['MANAGER', 'EMPLOYEE']
-        )
-      );
-
-      allow update: if isSignedIn() && isValidId(userId) && (
-        // 1. SUPER_ADMIN can manage any user across any company
-        (
-          isSuperAdmin()
-          && isValidCompanyId(request.resource.data.companyId)
-          && request.resource.data.role in ['SUPER_ADMIN', 'COMPANY_ADMIN', 'MANAGER', 'EMPLOYEE', 'ADMIN']
-        )
-        // 2. COMPANY_ADMIN can manage ONLY MANAGER/EMPLOYEE users within their own company (never self, SUPER_ADMIN, or another COMPANY_ADMIN)
-        || (
-          isCompanyAdmin(resource.data.companyId)
-          && resource.data.role in ['MANAGER', 'EMPLOYEE']
-          && request.resource.data.companyId == resource.data.companyId
-          && request.resource.data.role in ['MANAGER', 'EMPLOYEE']
-          && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['uid', 'email', 'companyId'])
-          && userId != request.auth.uid
-        )
-        // 3. Self profile update: cannot alter uid, email, role, status, approval metadata, or jump companies once active
-        || (
-          isCurrentUser(userId)
-          && request.resource.data.role == resource.data.role
-          && request.resource.data.status == resource.data.status
-          && !request.resource.data.diff(resource.data).affectedKeys().hasAny([
-            'uid', 'email', 'role', 'status', 'approvedBy', 'approvedByName', 'approvedAt', 'rejectionReason'
-          ])
-          && (!('displayName' in request.resource.data)
-              || (request.resource.data.displayName is string && request.resource.data.displayName.size() <= 128))
-          && (
-            request.resource.data.companyId == resource.data.companyId
-            || (resource.data.status == 'pending'
-                && isValidCompanyId(request.resource.data.companyId)
-                && request.resource.data.companyId != 'lumere-group')
-          )
-        )
-      );
-
-      allow delete: if isSuperAdmin() && isValidId(userId);
-    }
-
-    // =========================================================================
-    // 6. DEPARTMENTS (Company-Scoped)
-    // =========================================================================
-    match /departments/{departmentId} {
-      // Pending users completing profile can read subsidiary departments to choose their department
-      allow read: if isSuperAdmin()
-        || belongsToCompany(resource.data.companyId)
-        || isPendingUser();
-
-      allow create: if isValidId(departmentId)
-        && canManageCompanyData(request.resource.data.companyId)
-        && isValidCompanyId(request.resource.data.companyId)
-        && request.resource.data.name is string
-        && request.resource.data.name.size() >= 1
-        && request.resource.data.name.size() <= 120;
-
-      allow update: if isValidId(departmentId)
-        && canManageCompanyData(resource.data.companyId)
-        && request.resource.data.companyId == resource.data.companyId
-        && request.resource.data.name is string
-        && request.resource.data.name.size() <= 120;
-
-      allow delete: if isValidId(departmentId) && canManageCompanyData(resource.data.companyId);
-    }
-
-    // =========================================================================
-    // 7. CLIENTS (Company-Scoped)
-    // =========================================================================
-    match /clients/{clientId} {
-      allow read: if canReadCompanyResource(resource.data.companyId);
-
-      allow create: if isValidId(clientId)
-        && canManageOperations(request.resource.data.companyId)
-        && isValidCompanyId(request.resource.data.companyId)
-        && request.resource.data.companyId != 'lumere-group'
-        && request.resource.data.name is string
-        && request.resource.data.name.size() >= 1
-        && request.resource.data.name.size() <= 200
-        && (!('email' in request.resource.data) || (request.resource.data.email is string && request.resource.data.email.size() <= 200))
-        && (!('phone' in request.resource.data) || (request.resource.data.phone is string && request.resource.data.phone.size() <= 50));
-
-      allow update: if isValidId(clientId)
-        && canManageOperations(resource.data.companyId)
-        && request.resource.data.companyId == resource.data.companyId
-        && request.resource.data.name is string
-        && request.resource.data.name.size() <= 200
-        && (!('email' in request.resource.data) || (request.resource.data.email is string && request.resource.data.email.size() <= 200))
-        && (!('phone' in request.resource.data) || (request.resource.data.phone is string && request.resource.data.phone.size() <= 50));
-
-      allow delete: if isValidId(clientId) && canManageCompanyData(resource.data.companyId);
-    }
-
-    // =========================================================================
-    // 8. PROJECTS (Company-Scoped)
-    // =========================================================================
-    match /projects/{projectId} {
-      allow read: if canReadCompanyResource(resource.data.companyId);
-
-      allow create: if isValidId(projectId)
-        && canManageOperations(request.resource.data.companyId)
-        && isValidCompanyId(request.resource.data.companyId)
-        && request.resource.data.companyId != 'lumere-group'
-        && request.resource.data.name is string
-        && request.resource.data.name.size() >= 1
-        && request.resource.data.name.size() <= 200
-        && request.resource.data.clientId is string
-        && request.resource.data.clientId.size() <= 128
-        && clientMatchesCompanyIfPresent(request.resource.data);
-
-      allow update: if isValidId(projectId)
-        && canManageOperations(resource.data.companyId)
-        && request.resource.data.companyId == resource.data.companyId
-        && request.resource.data.name is string
-        && request.resource.data.name.size() <= 200
-        && clientMatchesCompanyIfPresent(request.resource.data);
-
-      allow delete: if isValidId(projectId) && canManageCompanyData(resource.data.companyId);
-    }
-
-    // =========================================================================
-    // 9. TASKS & COMMENTS (Company-Scoped + Cross-Company Assignment Guard)
-    // =========================================================================
-    match /tasks/{taskId} {
-      allow read: if canReadCompanyResource(resource.data.companyId);
-
-      allow create: if isValidId(taskId)
-        && canManageOperations(request.resource.data.companyId)
-        && isValidCompanyId(request.resource.data.companyId)
-        && request.resource.data.companyId != 'lumere-group'
-        && request.resource.data.title is string
-        && request.resource.data.title.size() >= 1
-        && request.resource.data.title.size() <= 256
-        && request.resource.data.description is string
-        && request.resource.data.description.size() <= 5000
-        && request.resource.data.department is string
-        && request.resource.data.department.size() <= 120
-        && request.resource.data.priority in ['Low', 'Medium', 'High', 'Urgent']
-        && request.resource.data.status in ['Pending', 'In Progress', 'Review', 'Completed', 'Rejected', 'Cancelled']
-        && request.resource.data.completionPercentage is number
-        && request.resource.data.completionPercentage >= 0
-        && request.resource.data.completionPercentage <= 100
-        && assigneeMatchesCompany(request.resource.data.assignedTo, request.resource.data.companyId)
-        && projectMatchesCompanyIfPresent(request.resource.data);
-
-      allow update: if isSignedIn()
-        && isValidId(taskId)
-        && request.resource.data.companyId == resource.data.companyId
+      // Self-registration locked strictly to EMPLOYEE + pending (except verified bootstrap SUPER_ADMIN)
+      allow create: if isVerifiedUser()
+        && isValidId(userId)
+        && isValidUser(incoming())
         && (
           (
-            canManageOperations(resource.data.companyId)
-            && request.resource.data.title is string
-            && request.resource.data.title.size() <= 256
-            && request.resource.data.description is string
-            && request.resource.data.description.size() <= 5000
-            && request.resource.data.status in ['Pending', 'In Progress', 'Review', 'Completed', 'Rejected', 'Cancelled']
-            && request.resource.data.completionPercentage is number
-            && request.resource.data.completionPercentage >= 0
-            && request.resource.data.completionPercentage <= 100
-            && assigneeMatchesCompany(request.resource.data.assignedTo, resource.data.companyId)
-            && projectMatchesCompanyIfPresent(request.resource.data)
+            isCurrentUser(userId)
+            && request.resource.data.uid == userId
+            && request.resource.data.email == request.auth.token.email
+            && (
+              (isBootstrapSuperAdmin()
+                && request.resource.data.role in ['SUPER_ADMIN', 'ADMIN']
+                && request.resource.data.status == 'active')
+              || (!isBootstrapSuperAdmin()
+                  && request.resource.data.role == 'EMPLOYEE'
+                  && request.resource.data.status == 'pending'
+                  && request.resource.data.companyId != 'lumere-group')
+            )
           )
           || (
-            belongsToCompany(resource.data.companyId)
-            && resource.data.assignedTo == request.auth.uid
-            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'completionPercentage', 'updatedAt', 'attachments', 'reviewStatus'])
-            && request.resource.data.status in ['In Progress', 'Review']
-            && request.resource.data.completionPercentage is number
-            && request.resource.data.completionPercentage >= 0
-            && request.resource.data.completionPercentage <= 100
+            isSuperAdmin()
+            && request.resource.data.role in ['SUPER_ADMIN', 'COMPANY_ADMIN', 'MANAGER', 'EMPLOYEE']
+          )
+          || (
+            isCompanyAdmin(request.resource.data.companyId)
+            && request.resource.data.companyId != 'lumere-group'
+            && request.resource.data.role in ['MANAGER', 'EMPLOYEE']
           )
         );
 
-      allow delete: if isValidId(taskId) && canManageCompanyData(resource.data.companyId);
+      allow update: if isVerifiedUser()
+        && isValidId(userId)
+        && isValidUser(incoming())
+        && isImmutableField('createdAt')
+        && (
+          // Tier 1: SUPER_ADMIN can manage any user across any company
+          (
+            isSuperAdmin()
+            && request.resource.data.role in ['SUPER_ADMIN', 'COMPANY_ADMIN', 'MANAGER', 'EMPLOYEE', 'ADMIN']
+          )
+          // Tier 2: COMPANY_ADMIN can manage ONLY MANAGER/EMPLOYEE users within their own company
+          || (
+            isCompanyAdmin(resource.data.companyId)
+            && resource.data.role in ['MANAGER', 'EMPLOYEE']
+            && request.resource.data.companyId == resource.data.companyId
+            && request.resource.data.role in ['MANAGER', 'EMPLOYEE']
+            && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['uid', 'email', 'companyId'])
+            && (!('approvedBy' in request.resource.data.diff(resource.data).affectedKeys())
+                || request.resource.data.approvedBy == request.auth.uid)
+            && userId != request.auth.uid
+          )
+          // Tier 3: Self profile update with strict action allowlist (no privilege/status escalation)
+          || (
+            isCurrentUser(userId)
+            && request.resource.data.role == resource.data.role
+            && request.resource.data.status == resource.data.status
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+              'displayName', 'fullName', 'phone', 'department', 'position',
+              'jobTitle', 'photoURL', 'companyId', 'companyName', 'updatedAt'
+            ])
+            && (
+              request.resource.data.companyId == resource.data.companyId
+              || (resource.data.status == 'pending'
+                  && isValidCompanyId(request.resource.data.companyId)
+                  && request.resource.data.companyId != 'lumere-group')
+            )
+          )
+        );
 
+      allow delete: if isVerifiedUser() && isValidId(userId) && isSuperAdmin();
+    }
+
+    // =========================================================================
+    // 7. DEPARTMENTS (Company-Scoped)
+    // =========================================================================
+    match /departments/{departmentId} {
+      // Pending users completing profile can read subsidiary departments (never parent lumere-group)
+      allow get: if isValidId(departmentId) && (
+        isSuperAdmin()
+        || belongsToCompany(resource.data.companyId)
+        || (isPendingUser() && resource.data.companyId != 'lumere-group')
+      );
+
+      allow list: if isSuperAdmin()
+        || belongsToCompany(resource.data.companyId)
+        || (isPendingUser() && resource.data.companyId != 'lumere-group');
+
+      allow create: if isVerifiedUser()
+        && isValidId(departmentId)
+        && isValidDepartment(incoming())
+        && canManageCompanyData(request.resource.data.companyId);
+
+      allow update: if isVerifiedUser()
+        && isValidId(departmentId)
+        && isValidDepartment(incoming())
+        && isImmutableField('createdAt')
+        && canManageCompanyData(resource.data.companyId)
+        && request.resource.data.companyId == resource.data.companyId;
+
+      allow delete: if isVerifiedUser()
+        && isValidId(departmentId)
+        && canManageCompanyData(resource.data.companyId);
+    }
+
+    // =========================================================================
+    // 8. CLIENTS (Company-Scoped)
+    // =========================================================================
+    match /clients/{clientId} {
+      allow get: if isValidId(clientId) && canReadCompanyResource(resource.data.companyId);
+      allow list: if canReadCompanyResource(resource.data.companyId);
+
+      allow create: if isVerifiedUser()
+        && isValidId(clientId)
+        && isValidClient(incoming())
+        && request.resource.data.companyId != 'lumere-group'
+        && canManageOperations(request.resource.data.companyId);
+
+      allow update: if isVerifiedUser()
+        && isValidId(clientId)
+        && isValidClient(incoming())
+        && isImmutableField('createdAt')
+        && canManageOperations(resource.data.companyId)
+        && request.resource.data.companyId == resource.data.companyId;
+
+      allow delete: if isVerifiedUser()
+        && isValidId(clientId)
+        && canManageCompanyData(resource.data.companyId);
+    }
+
+    // =========================================================================
+    // 9. PROJECTS (Company-Scoped)
+    // =========================================================================
+    match /projects/{projectId} {
+      allow get: if isValidId(projectId) && canReadCompanyResource(resource.data.companyId);
+      allow list: if canReadCompanyResource(resource.data.companyId);
+
+      allow create: if isVerifiedUser()
+        && isValidId(projectId)
+        && isValidProject(incoming())
+        && request.resource.data.companyId != 'lumere-group'
+        && canManageOperations(request.resource.data.companyId)
+        && clientMatchesCompanyIfPresent(request.resource.data);
+
+      allow update: if isVerifiedUser()
+        && isValidId(projectId)
+        && isValidProject(incoming())
+        && isImmutableField('createdAt')
+        && canManageOperations(resource.data.companyId)
+        && request.resource.data.companyId == resource.data.companyId
+        && clientMatchesCompanyIfPresent(request.resource.data);
+
+      allow delete: if isVerifiedUser()
+        && isValidId(projectId)
+        && canManageCompanyData(resource.data.companyId);
+    }
+
+    // =========================================================================
+    // 10. TASKS & COMMENTS (Company-Scoped + Cross-Company Assignment Guard)
+    // =========================================================================
+    match /tasks/{taskId} {
+      allow get: if isValidId(taskId) && canReadCompanyResource(resource.data.companyId);
+      allow list: if canReadCompanyResource(resource.data.companyId);
+
+      allow create: if isVerifiedUser()
+        && isValidId(taskId)
+        && isValidTask(incoming())
+        && request.resource.data.companyId != 'lumere-group'
+        && (!('createdBy' in request.resource.data) || request.resource.data.createdBy == request.auth.uid)
+        && canManageOperations(request.resource.data.companyId)
+        && assigneeMatchesCompany(request.resource.data.assignedTo, request.resource.data.companyId)
+        && projectMatchesCompanyIfPresent(request.resource.data)
+        && clientMatchesCompanyIfPresent(request.resource.data);
+
+      allow update: if isVerifiedUser()
+        && isValidId(taskId)
+        && isValidTask(incoming())
+        && request.resource.data.companyId == resource.data.companyId
+        && isImmutableField('createdAt')
+        && isImmutableField('createdBy')
+        && (
+          // Tier 1: Supervisors & Admins can manage operational task fields within the same company
+          (
+            canManageOperations(resource.data.companyId)
+            && assigneeMatchesCompany(request.resource.data.assignedTo, resource.data.companyId)
+            && projectMatchesCompanyIfPresent(request.resource.data)
+            && clientMatchesCompanyIfPresent(request.resource.data)
+          )
+          // Tier 2: Assigned Employee can ONLY progress non-terminal tasks (no self-approval or completion skip)
+          || (
+            belongsToCompany(resource.data.companyId)
+            && resource.data.assignedTo == request.auth.uid
+            && !(resource.data.status in ['Completed', 'Cancelled'])
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+              'status', 'completionPercentage', 'updatedAt', 'attachments', 'reviewStatus'
+            ])
+            && (
+              request.resource.data.status == resource.data.status
+              || request.resource.data.status in ['In Progress', 'Review']
+            )
+            && (!('reviewStatus' in request.resource.data.diff(resource.data).affectedKeys())
+                || request.resource.data.reviewStatus in ['none', 'pending_review'])
+          )
+        );
+
+      allow delete: if isVerifiedUser()
+        && isValidId(taskId)
+        && canManageCompanyData(resource.data.companyId);
+
+      // Master Gate Subcollection: Always verify parent task exists and matches companyId
       match /comments/{commentId} {
-        allow read: if canReadCompanyResource(get(/databases/$(database)/documents/tasks/$(taskId)).data.companyId);
-        allow create: if isValidId(commentId)
-          && isActiveUser()
-          && canReadCompanyResource(get(/databases/$(database)/documents/tasks/$(taskId)).data.companyId)
+        allow get: if isValidId(taskId)
+          && isValidId(commentId)
+          && exists(/databases/$(database)/documents/tasks/$(taskId))
+          && canReadCompanyResource(get(/databases/$(database)/documents/tasks/$(taskId)).data.companyId);
+
+        allow list: if isValidId(taskId)
+          && exists(/databases/$(database)/documents/tasks/$(taskId))
+          && canReadCompanyResource(get(/databases/$(database)/documents/tasks/$(taskId)).data.companyId);
+
+        allow create: if isVerifiedUser()
+          && isValidId(taskId)
+          && isValidId(commentId)
+          && isValidComment(incoming())
           && request.resource.data.userId == request.auth.uid
-          && request.resource.data.companyId == get(/databases/$(database)/documents/tasks/$(taskId)).data.companyId
-          && request.resource.data.message is string
-          && request.resource.data.message.size() >= 1
-          && request.resource.data.message.size() <= 3000;
-        allow update: if isValidId(commentId)
+          && (!('taskId' in request.resource.data) || request.resource.data.taskId == taskId)
           && isActiveUser()
+          && exists(/databases/$(database)/documents/tasks/$(taskId))
+          && canReadCompanyResource(get(/databases/$(database)/documents/tasks/$(taskId)).data.companyId)
+          && request.resource.data.companyId == get(/databases/$(database)/documents/tasks/$(taskId)).data.companyId;
+
+        allow update: if isVerifiedUser()
+          && isValidId(taskId)
+          && isValidId(commentId)
+          && isValidComment(incoming())
+          && isActiveUser()
+          && exists(/databases/$(database)/documents/tasks/$(taskId))
+          && canReadCompanyResource(get(/databases/$(database)/documents/tasks/$(taskId)).data.companyId)
           && resource.data.userId == request.auth.uid
           && request.resource.data.companyId == resource.data.companyId
           && request.resource.data.userId == resource.data.userId
-          && request.resource.data.message is string
-          && request.resource.data.message.size() <= 3000;
-        allow delete: if isValidId(commentId)
+          && isImmutableField('createdAt')
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['message', 'updatedAt']);
+
+        allow delete: if isVerifiedUser()
+          && isValidId(taskId)
+          && isValidId(commentId)
+          && exists(/databases/$(database)/documents/tasks/$(taskId))
           && (canManageCompanyData(get(/databases/$(database)/documents/tasks/$(taskId)).data.companyId)
-              || (isActiveUser() && resource.data.userId == request.auth.uid));
+              || (isActiveUser()
+                  && canReadCompanyResource(get(/databases/$(database)/documents/tasks/$(taskId)).data.companyId)
+                  && resource.data.userId == request.auth.uid));
       }
     }
 
     // =========================================================================
-    // 10. NOTIFICATIONS (Company-Scoped & Recipient-Restricted)
+    // 11. NOTIFICATIONS (Company-Scoped & Recipient-Restricted)
     // =========================================================================
     match /notifications/{notificationId} {
-      allow read: if isSignedIn() && (
+      allow get: if isValidId(notificationId) && isSignedIn() && (
         resource.data.userId == request.auth.uid
         || isSuperAdmin()
         || isCompanyAdmin(resource.data.companyId)
       );
 
-      allow create: if isValidId(notificationId)
-        && isActiveUser()
-        && isValidCompanyId(request.resource.data.companyId)
-        && canReadCompanyResource(request.resource.data.companyId)
-        && request.resource.data.userId is string
-        && request.resource.data.userId.size() <= 128
-        && request.resource.data.title is string
-        && request.resource.data.title.size() <= 200
-        && (!('message' in request.resource.data) || (request.resource.data.message is string && request.resource.data.message.size() <= 2000));
-
-      allow update: if isValidId(notificationId) && isSignedIn() && (
-        (
-          resource.data.userId == request.auth.uid
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read'])
-        )
-        || (
-          canManageCompanyData(resource.data.companyId)
-          && request.resource.data.companyId == resource.data.companyId
-        )
+      allow list: if isSignedIn() && (
+        resource.data.userId == request.auth.uid
+        || isSuperAdmin()
+        || isCompanyAdmin(resource.data.companyId)
       );
 
-      allow delete: if isValidId(notificationId) && isSignedIn() && (
+      allow create: if isVerifiedUser()
+        && isValidId(notificationId)
+        && isValidNotification(incoming())
+        && request.resource.data.read == false
+        && isActiveUser()
+        && canReadCompanyResource(request.resource.data.companyId)
+        && recipientMatchesCompanyOrSuperAdmin(request.resource.data.userId, request.resource.data.companyId);
+
+      allow update: if isVerifiedUser()
+        && isValidId(notificationId)
+        && isValidNotification(incoming())
+        && request.resource.data.companyId == resource.data.companyId
+        && request.resource.data.userId == resource.data.userId
+        && isImmutableField('createdAt')
+        && (
+          (
+            resource.data.userId == request.auth.uid
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read'])
+          )
+          || (
+            canManageCompanyData(resource.data.companyId)
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read'])
+          )
+        );
+
+      allow delete: if isVerifiedUser() && isValidId(notificationId) && (
         resource.data.userId == request.auth.uid
         || canManageCompanyData(resource.data.companyId)
       );
     }
 
     // =========================================================================
-    // 11. ACTIVITY LOGS (Company-Scoped & Strictly Immutable)
+    // 12. ACTIVITY LOGS (Company-Scoped & Strictly Immutable)
     // =========================================================================
     match /activity_logs/{logId} {
-      allow read: if isSuperAdmin()
+      allow get: if isValidId(logId) && (
+        isSuperAdmin()
+        || isCompanyAdmin(resource.data.companyId)
+        || isManager(resource.data.companyId)
+      );
+
+      allow list: if isSuperAdmin()
         || isCompanyAdmin(resource.data.companyId)
         || isManager(resource.data.companyId);
 
-      allow create: if isValidId(logId)
-        && isActiveUser()
-        && isValidCompanyId(request.resource.data.companyId)
-        && canReadCompanyResource(request.resource.data.companyId)
+      allow create: if isVerifiedUser()
+        && isValidId(logId)
+        && isValidActivityLog(incoming())
         && request.resource.data.actorId == request.auth.uid
-        && request.resource.data.action is string
-        && request.resource.data.action.size() <= 120;
+        && isActiveUser()
+        && canReadCompanyResource(request.resource.data.companyId);
 
       allow update, delete: if false; // Strictly Immutable Audit Trail
     }
 
     // =========================================================================
-    // 12. EQUIPMENT & EQUIPMENT HISTORY (Company-Scoped)
+    // 13. EQUIPMENT & EQUIPMENT HISTORY (Company-Scoped)
     // =========================================================================
     match /equipment/{equipmentId} {
-      allow read: if canReadCompanyResource(resource.data.companyId);
+      allow get: if isValidId(equipmentId) && canReadCompanyResource(resource.data.companyId);
+      allow list: if canReadCompanyResource(resource.data.companyId);
 
-      allow create: if isValidId(equipmentId)
-        && canManageOperations(request.resource.data.companyId)
-        && isValidCompanyId(request.resource.data.companyId)
+      allow create: if isVerifiedUser()
+        && isValidId(equipmentId)
+        && isValidEquipment(incoming())
         && request.resource.data.companyId != 'lumere-group'
-        && request.resource.data.name is string
-        && request.resource.data.name.size() >= 1
-        && request.resource.data.name.size() <= 200
-        && request.resource.data.serialNumber is string
-        && request.resource.data.serialNumber.size() <= 120
-        && request.resource.data.status in ['available', 'assigned', 'in_maintenance', 'damaged', 'lost', 'inactive'];
+        && canManageOperations(request.resource.data.companyId)
+        && assigneeMatchesCompanyIfPresent(request.resource.data)
+        && projectMatchesCompanyIfPresent(request.resource.data);
 
-      allow update: if isValidId(equipmentId)
+      allow update: if isVerifiedUser()
+        && isValidId(equipmentId)
+        && isValidEquipment(incoming())
+        && isImmutableField('createdAt')
         && canManageOperations(resource.data.companyId)
         && request.resource.data.companyId == resource.data.companyId
-        && request.resource.data.name is string
-        && request.resource.data.name.size() <= 200;
+        && assigneeMatchesCompanyIfPresent(request.resource.data)
+        && projectMatchesCompanyIfPresent(request.resource.data);
 
-      allow delete: if isValidId(equipmentId) && canManageCompanyData(resource.data.companyId);
+      allow delete: if isVerifiedUser()
+        && isValidId(equipmentId)
+        && canManageCompanyData(resource.data.companyId);
     }
 
     match /equipmentHistory/{historyId} {
-      allow read: if canReadCompanyResource(resource.data.companyId);
+      allow get: if isValidId(historyId) && canReadCompanyResource(resource.data.companyId);
+      allow list: if canReadCompanyResource(resource.data.companyId);
 
-      allow create: if isValidId(historyId)
-        && isActiveUser()
-        && isValidCompanyId(request.resource.data.companyId)
-        && canReadCompanyResource(request.resource.data.companyId)
+      allow create: if isVerifiedUser()
+        && isValidId(historyId)
+        && isValidEquipmentHistory(incoming())
         && request.resource.data.actorId == request.auth.uid
-        && request.resource.data.equipmentId is string
-        && request.resource.data.equipmentId.size() <= 128
-        && request.resource.data.action is string
-        && request.resource.data.action.size() <= 120;
+        && isActiveUser()
+        && canReadCompanyResource(request.resource.data.companyId)
+        && equipmentMatchesCompany(request.resource.data.equipmentId, request.resource.data.companyId);
 
       allow update, delete: if false; // Strictly Immutable
     }
 
     // =========================================================================
-    // 13. STORED REPORTS (Company-Scoped)
+    // 14. STORED REPORTS (Company-Scoped)
     // =========================================================================
     match /reports/{reportId} {
-      allow read: if isSuperAdmin()
+      allow get: if isValidId(reportId) && (
+        isSuperAdmin()
+        || isCompanyAdmin(resource.data.companyId)
+        || isManager(resource.data.companyId)
+      );
+
+      allow list: if isSuperAdmin()
         || isCompanyAdmin(resource.data.companyId)
         || isManager(resource.data.companyId);
 
-      allow create: if isValidId(reportId)
-        && canManageOperations(request.resource.data.companyId)
-        && isValidCompanyId(request.resource.data.companyId)
+      allow create: if isVerifiedUser()
+        && isValidId(reportId)
+        && isValidReport(incoming())
         && request.resource.data.generatedBy == request.auth.uid
-        && request.resource.data.title is string
-        && request.resource.data.title.size() <= 200;
+        && canManageOperations(request.resource.data.companyId);
 
-      allow update, delete: if isSuperAdmin() && isValidId(reportId);
+      allow update: if isVerifiedUser()
+        && isValidId(reportId)
+        && isValidReport(incoming())
+        && isSuperAdmin()
+        && isImmutableField('createdAt')
+        && isImmutableField('generatedBy');
+
+      allow delete: if isVerifiedUser() && isValidId(reportId) && isSuperAdmin();
     }
   }
 }
