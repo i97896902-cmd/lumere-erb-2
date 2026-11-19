@@ -20,8 +20,13 @@ import { useAuth } from '../../context/AuthContext';
 import { useCompany } from '../../context/CompanyContext';
 import {
   canCreateTask,
+  canViewActivityLogs,
+  canViewReports,
   getRoleArabicLabel,
   isActiveStatus,
+  scopeDepartmentsForUser,
+  scopeEmployeesForUser,
+  scopeTasksForUser,
 } from '../../utils/rbac';
 
 interface DashboardViewProps {
@@ -31,7 +36,7 @@ interface DashboardViewProps {
   activityLogs: ActivityLog[];
   onSelectTask: (taskId: string) => void;
   onOpenCreateTask: () => void;
-  onNavigateToTab: (tab: 'tasks' | 'employees' | 'reports' | 'activity') => void;
+  onNavigateToTab: (tab: 'tasks' | 'employees' | 'reports' | 'activity' | 'departments') => void;
 }
 
 export function DashboardView({
@@ -47,16 +52,17 @@ export function DashboardView({
   const { activeCompany, defaultWriteCompanyId, isGroupView } = useCompany();
   const isSupervisor = isSuperAdmin || isCompanyAdmin || isManager;
   const allowCreateTask = canCreateTask(currentUser, defaultWriteCompanyId);
+  const allowReports = canViewReports(currentUser, defaultWriteCompanyId);
+  const allowActivity = canViewActivityLogs(currentUser, defaultWriteCompanyId);
 
-  // Filter tasks if Employee
-  const relevantTasks =
-    role === 'EMPLOYEE'
-      ? tasks.filter(t => t.assignedTo === currentUser?.id)
-      : tasks;
+  // Scope tasks, team members, and departments strictly by canonical role
+  const relevantTasks = scopeTasksForUser(currentUser, tasks, employees);
+  const relevantEmployees = scopeEmployeesForUser(currentUser, employees);
+  const relevantDepartments = scopeDepartmentsForUser(currentUser, departments);
 
   // Metric calculations
-  const totalEmployees = employees.length;
-  const activeEmployees = employees.filter(e => isActiveStatus(e.status)).length;
+  const totalEmployees = relevantEmployees.length;
+  const activeEmployees = relevantEmployees.filter(e => isActiveStatus(e.status)).length;
 
   const totalTasks = relevantTasks.length;
   const pendingTasks = relevantTasks.filter(t => t.status === 'Pending').length;
@@ -70,6 +76,11 @@ export function DashboardView({
   );
   const overdueCount = overdueTasksList.length;
 
+  const upcomingEmployeeTasks = relevantTasks
+    .filter(t => t.status !== 'Completed' && t.status !== 'Cancelled')
+    .sort((a, b) => a.deadline.localeCompare(b.deadline))
+    .slice(0, 5);
+
   const completionRate =
     totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
 
@@ -81,15 +92,33 @@ export function DashboardView({
     Low: relevantTasks.filter(t => t.priority === 'Low').length,
   };
 
+  const dashboardRoleBadge =
+    role === 'SUPER_ADMIN'
+      ? isGroupView
+        ? `${activeCompany.name} • عرض المجموعة`
+        : `${activeCompany.name} • لوحة الشركة`
+      : role === 'COMPANY_ADMIN'
+      ? `${activeCompany.name} • لوحة تحكم الشركة`
+      : role === 'MANAGER'
+      ? `${currentUser?.department || activeCompany.name} • إدارة القسم`
+      : `${activeCompany.name} • لوحة الموظف`;
+
+  const dashboardSubtitle =
+    role === 'MANAGER'
+      ? `لوحة متابعة قسم ${currentUser?.department || activeCompany.name} — متابعة فريق القسم والمهام التنفيذية ومؤشرات الإنجاز.`
+      : isSupervisor
+      ? `لوحة الرقابة التشغيلية لـ ${activeCompany.name} — متابعة الموظفين والمشاريع والمهام ومؤشرات الأداء اللحظية.`
+      : 'لوحة الموظف الشخصية — متابعة مهامك المسندة، نسب الإنجاز، مواعيد التسليم، وإرسال المخرجات للاعتماد.';
+
   return (
     <div className="space-y-6" dir="rtl">
       {/* Welcome Banner */}
       <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-neutral-900 via-neutral-950 to-neutral-900 p-6 text-white border border-neutral-800 shadow-xl">
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <span className="text-xs font-bold tracking-wider text-emerald-400 bg-emerald-950/60 px-2.5 py-0.5 rounded-full border border-emerald-500/20">
-                {activeCompany.name} {isGroupView ? '• عرض المجموعة' : ''}
+                {dashboardRoleBadge}
               </span>
               <span className="text-xs text-neutral-400">
                 {new Date().toLocaleDateString('ar-SA', {
@@ -104,23 +133,33 @@ export function DashboardView({
               أهلاً بعودتك، {currentUser?.displayName}
             </h1>
             <p className="mt-1 text-xs text-neutral-300 max-w-xl leading-relaxed">
-              {isSupervisor
-                ? `لوحة الرقابة التشغيلية لـ ${activeCompany.name} — متابعة الأقسام والمشاريع ومؤشرات الأداء اللحظية.`
-                : 'لوحة المهام الشخصية. متابعة مراحل التنفيذ، رفع المخرجات، وإرسالها للمراجعة والاعتماد.'}
+              {dashboardSubtitle}
             </p>
           </div>
 
-          {allowCreateTask && (
-            <div className="flex items-center gap-2.5 shrink-0">
-              <Button
-                id="btn-quick-create-task"
-                onClick={onOpenCreateTask}
-                variant="primary"
-                leftIcon={<Plus className="w-4 h-4" />}
-                className="bg-emerald-500 hover:bg-emerald-600 text-neutral-950 font-bold border-emerald-400"
-              >
-                إنشاء مهمة جديدة
-              </Button>
+          {(allowCreateTask || isManager) && (
+            <div className="flex items-center gap-2.5 shrink-0 flex-wrap">
+              {isManager && (
+                <Button
+                  id="btn-go-department-management"
+                  onClick={() => onNavigateToTab('departments')}
+                  variant="outline"
+                  className="bg-white/10 hover:bg-white/15 text-white border-white/20"
+                >
+                  إدارة القسم
+                </Button>
+              )}
+              {allowCreateTask && (
+                <Button
+                  id="btn-quick-create-task"
+                  onClick={onOpenCreateTask}
+                  variant="primary"
+                  leftIcon={<Plus className="w-4 h-4" />}
+                  className="bg-emerald-500 hover:bg-emerald-600 text-neutral-950 font-bold border-emerald-400"
+                >
+                  إنشاء مهمة جديدة
+                </Button>
+              )}
             </div>
           )}
         </div>
@@ -393,61 +432,118 @@ export function DashboardView({
           </div>
         </Card>
 
-        {/* Chart 3: Department Performance */}
-        <Card className="lg:col-span-1">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h3 className="text-sm font-bold text-neutral-900">إنتاجية الأقسام</h3>
-              <p className="text-xs text-neutral-500">معدل الإنجاز لكل إدارة</p>
+        {/* Chart 3: Department Performance (Supervisors) OR Upcoming Deadlines (Employee) */}
+        {allowReports ? (
+          <Card className="lg:col-span-1">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="text-sm font-bold text-neutral-900">
+                  {isManager ? 'أداء القسم' : 'إنتاجية الأقسام'}
+                </h3>
+                <p className="text-xs text-neutral-500">معدل الإنجاز لكل إدارة</p>
+              </div>
+              <button
+                onClick={() => onNavigateToTab('reports')}
+                className="text-xs text-emerald-700 hover:text-emerald-800 font-semibold cursor-pointer"
+              >
+                التفاصيل
+              </button>
             </div>
-            <button
-              onClick={() => onNavigateToTab('reports')}
-              className="text-xs text-emerald-700 hover:text-emerald-800 font-semibold"
-            >
-              التفاصيل
-            </button>
-          </div>
 
-          <div className="space-y-3 max-h-60 overflow-y-auto pl-1">
-            {departments.slice(0, 5).map(dept => {
-              const deptTasks = tasks.filter(t => t.department === dept.name);
-              const deptCompleted = deptTasks.filter(t => t.status === 'Completed').length;
-              const rate = deptTasks.length > 0 ? Math.round((deptCompleted / deptTasks.length) * 100) : 0;
+            <div className="space-y-3 max-h-60 overflow-y-auto pl-1">
+              {relevantDepartments.slice(0, 5).map(dept => {
+                const deptTasks = relevantTasks.filter(t => t.department === dept.name);
+                const deptCompleted = deptTasks.filter(t => t.status === 'Completed').length;
+                const rate = deptTasks.length > 0 ? Math.round((deptCompleted / deptTasks.length) * 100) : 0;
 
-              return (
-                <div key={dept.id} className="p-2.5 rounded-xl border border-neutral-100 bg-neutral-50/50 space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span
-                        className="w-2.5 h-2.5 rounded-full shrink-0"
-                        style={{ backgroundColor: dept.color || '#059669' }}
-                      />
-                      <span className="text-xs font-bold text-neutral-800">{dept.name}</span>
+                return (
+                  <div key={dept.id} className="p-2.5 rounded-xl border border-neutral-100 bg-neutral-50/50 space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span
+                          className="w-2.5 h-2.5 rounded-full shrink-0"
+                          style={{ backgroundColor: dept.color || '#059669' }}
+                        />
+                        <span className="text-xs font-bold text-neutral-800">{dept.name}</span>
+                      </div>
+                      <span className="text-xs font-mono font-semibold text-neutral-700">
+                        {deptCompleted}/{deptTasks.length} ({rate}%)
+                      </span>
                     </div>
-                    <span className="text-xs font-mono font-semibold text-neutral-700">
-                      {deptCompleted}/{deptTasks.length} ({rate}%)
-                    </span>
+                    <div className="h-1.5 w-full bg-neutral-200 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-emerald-600 rounded-full"
+                        style={{ width: `${rate}%` }}
+                      />
+                    </div>
                   </div>
-                  <div className="h-1.5 w-full bg-neutral-200 rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-emerald-600 rounded-full"
-                      style={{ width: `${rate}%` }}
-                    />
-                  </div>
+                );
+              })}
+            </div>
+          </Card>
+        ) : (
+          <Card className="lg:col-span-1">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="text-sm font-bold text-neutral-900">مواعيد التسليم القادمة</h3>
+                <p className="text-xs text-neutral-500">أقرب مهامك المسندة</p>
+              </div>
+              <button
+                onClick={() => onNavigateToTab('tasks')}
+                className="text-xs text-emerald-700 hover:text-emerald-800 font-semibold cursor-pointer"
+              >
+                كل مهامي
+              </button>
+            </div>
+
+            <div className="space-y-2.5 max-h-60 overflow-y-auto pl-1">
+              {upcomingEmployeeTasks.length > 0 ? (
+                upcomingEmployeeTasks.map(task => {
+                  const isOverdue = task.deadline < nowStr;
+                  return (
+                    <button
+                      key={task.id}
+                      type="button"
+                      onClick={() => onSelectTask(task.id)}
+                      className="w-full text-right p-2.5 rounded-xl border border-neutral-100 bg-neutral-50/60 hover:bg-emerald-50/40 transition-colors flex items-center justify-between gap-2 cursor-pointer"
+                    >
+                      <div className="min-w-0">
+                        <p className="text-xs font-bold text-neutral-900 truncate">{task.title}</p>
+                        <p className="text-[11px] text-neutral-500 truncate">{task.taskId}</p>
+                      </div>
+                      <span
+                        className={`text-[11px] font-mono font-bold shrink-0 ${
+                          isOverdue ? 'text-rose-600' : 'text-neutral-600'
+                        }`}
+                      >
+                        {task.deadline}
+                      </span>
+                    </button>
+                  );
+                })
+              ) : (
+                <div className="py-8 text-center text-xs text-neutral-400">
+                  لا توجد مهام نشطة قريبة الموعد حالياً
                 </div>
-              );
-            })}
-          </div>
-        </Card>
+              )}
+            </div>
+          </Card>
+        )}
       </div>
 
-      {/* Bottom Grid: Recent Tasks & Recent Activity */}
+      {/* Bottom Grid: Recent Tasks & Recent Activity (Activity hidden for Employee) */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Recent Tasks (2 cols) */}
-        <div className="lg:col-span-2 space-y-4">
+        {/* Recent Tasks */}
+        <div className={`${allowActivity ? 'lg:col-span-2' : 'lg:col-span-3'} space-y-4`}>
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="text-base font-bold text-neutral-900">أحدث المهام التنفيذية</h3>
+              <h3 className="text-base font-bold text-neutral-900">
+                {role === 'EMPLOYEE'
+                  ? 'أحدث مهامي التنفيذية'
+                  : isManager
+                  ? 'أحدث مهام القسم'
+                  : 'أحدث المهام التنفيذية'}
+              </h3>
               <p className="text-xs text-neutral-500">آخر التكليفات والمخرجات المرفوعة</p>
             </div>
             <Button
@@ -537,58 +633,60 @@ export function DashboardView({
           </Card>
         </div>
 
-        {/* Live Recent Activity Feed (1 col) */}
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-base font-bold text-neutral-900">سجل العمليات المباشر</h3>
-              <p className="text-xs text-neutral-500">التحديثات والأنشطة اللحظية</p>
-            </div>
-            <button
-              onClick={() => onNavigateToTab('activity')}
-              className="text-xs font-semibold text-emerald-700 hover:text-emerald-800"
-            >
-              كامل السجل
-            </button>
-          </div>
-
-          <Card className="p-4 space-y-4 max-h-[380px] overflow-y-auto">
-            {activityLogs.length > 0 ? (
-              activityLogs.slice(0, 7).map((log, idx) => (
-                <div key={log.id || idx} className="flex gap-3 text-xs">
-                  <div className="w-7 h-7 rounded-lg bg-neutral-100 flex items-center justify-center text-neutral-700 shrink-0 mt-0.5">
-                    <Activity className="w-3.5 h-3.5" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-neutral-800">
-                      <span className="font-bold text-neutral-900">{log.actorName}</span>{' '}
-                      <span className="text-neutral-500 font-normal">
-                        ({getRoleArabicLabel(log.actorRole)})
-                      </span>{' '}
-                      قام بـ {log.action}:{' '}
-                      <span className="font-semibold text-neutral-800 truncate">
-                        &quot;{log.target}&quot;
-                      </span>
-                    </p>
-                    {log.metadata && (
-                      <p className="text-[11px] text-neutral-500 mt-0.5">{log.metadata}</p>
-                    )}
-                    <p className="text-[10px] text-neutral-400 mt-1 font-mono">
-                      {new Date(log.timestamp).toLocaleTimeString('ar-SA', {
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
-                    </p>
-                  </div>
-                </div>
-              ))
-            ) : (
-              <div className="text-center py-8 text-neutral-400 text-xs">
-                لا توجد عمليات مسجلة حتى الآن
+        {/* Live Recent Activity Feed (Supervisors Only) */}
+        {allowActivity && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-base font-bold text-neutral-900">سجل العمليات المباشر</h3>
+                <p className="text-xs text-neutral-500">التحديثات والأنشطة اللحظية</p>
               </div>
-            )}
-          </Card>
-        </div>
+              <button
+                onClick={() => onNavigateToTab('activity')}
+                className="text-xs font-semibold text-emerald-700 hover:text-emerald-800 cursor-pointer"
+              >
+                كامل السجل
+              </button>
+            </div>
+
+            <Card className="p-4 space-y-4 max-h-[380px] overflow-y-auto">
+              {activityLogs.length > 0 ? (
+                activityLogs.slice(0, 7).map((log, idx) => (
+                  <div key={log.id || idx} className="flex gap-3 text-xs">
+                    <div className="w-7 h-7 rounded-lg bg-neutral-100 flex items-center justify-center text-neutral-700 shrink-0 mt-0.5">
+                      <Activity className="w-3.5 h-3.5" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-neutral-800">
+                        <span className="font-bold text-neutral-900">{log.actorName}</span>{' '}
+                        <span className="text-neutral-500 font-normal">
+                          ({getRoleArabicLabel(log.actorRole)})
+                        </span>{' '}
+                        قام بـ {log.action}:{' '}
+                        <span className="font-semibold text-neutral-800 truncate">
+                          &quot;{log.target}&quot;
+                        </span>
+                      </p>
+                      {log.metadata && (
+                        <p className="text-[11px] text-neutral-500 mt-0.5">{log.metadata}</p>
+                      )}
+                      <p className="text-[10px] text-neutral-400 mt-1 font-mono">
+                        {new Date(log.timestamp).toLocaleTimeString('ar-SA', {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}
+                      </p>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="text-center py-8 text-neutral-400 text-xs">
+                  لا توجد عمليات مسجلة حتى الآن
+                </div>
+              )}
+            </Card>
+          </div>
+        )}
       </div>
     </div>
   );

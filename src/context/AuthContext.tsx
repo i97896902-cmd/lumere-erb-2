@@ -144,13 +144,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
-  useEffect(() => {
-    async function init() {
-      await testConnection();
-    }
-    init();
-  }, []);
-
   const refreshCurrentUser = async () => {
     if (!firebaseUser) return;
     try {
@@ -179,6 +172,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setFirebaseUser(fUser);
       if (fUser) {
         try {
+          await testConnection();
           const tokenClaims = await readUserClaims(fUser);
           if (active) setClaims(tokenClaims);
 
@@ -249,9 +243,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           }
         } catch (err) {
           console.error('Failed to load user profile from Firestore:', err);
+          const errMessage = err instanceof Error ? err.message : String(err);
+          const errCode = (err as { code?: string })?.code;
+          const isFirestoreOfflineOrDisabled =
+            errCode === 'unavailable' ||
+            errMessage.includes('the client is offline') ||
+            errMessage.includes('Cloud Firestore API has not been used');
+
           if (active) {
             setAuthError(
-              'تم تسجيل الدخول إلى Google، لكن تعذر تحميل ملفك من Firestore. تحقق من نشر Firestore Rules وإعدادات Firebase.'
+              isFirestoreOfflineOrDisabled
+                ? 'خدمة Cloud Firestore غير مفعّلة بعد في مشروع lumere-erb. يرجى فتح Firebase Console ← Firestore Database ← Create database ثم إعادة المحاولة.'
+                : 'تم تسجيل الدخول إلى Google، لكن تعذر تحميل ملفك من Firestore. تحقق من تفعيل Firestore ونشر Firestore Rules في مشروع lumere-erb.'
             );
             setCurrentUser(null);
             setIsProfileIncomplete(false);

@@ -1,7 +1,13 @@
 import { initializeApp } from 'firebase/app';
 import { Analytics, getAnalytics, isSupported as isAnalyticsSupported } from 'firebase/analytics';
 import { getAuth, GoogleAuthProvider } from 'firebase/auth';
-import { getFirestore, doc, getDocFromServer } from 'firebase/firestore';
+import {
+  getFirestore,
+  initializeFirestore,
+  doc,
+  getDocFromServer,
+  Firestore,
+} from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 import { getFunctions } from 'firebase/functions';
 
@@ -21,8 +27,18 @@ const firestoreDatabaseId = import.meta.env.VITE_FIRESTORE_DATABASE_ID?.trim() |
 
 export const app = initializeApp(firebaseConfig);
 
+function createFirestoreClient(): Firestore {
+  try {
+    return firestoreDatabaseId
+      ? initializeFirestore(app, { experimentalAutoDetectLongPolling: true }, firestoreDatabaseId)
+      : initializeFirestore(app, { experimentalAutoDetectLongPolling: true });
+  } catch {
+    return firestoreDatabaseId ? getFirestore(app, firestoreDatabaseId) : getFirestore(app);
+  }
+}
+
 // Connect to the project's default Firestore database unless a named database ID is explicitly provided
-export const db = firestoreDatabaseId ? getFirestore(app, firestoreDatabaseId) : getFirestore(app);
+export const db = createFirestoreClient();
 export const auth = getAuth(app);
 export const storage = getStorage(app);
 export const functions = getFunctions(app);
@@ -98,13 +114,20 @@ export function handleFirestoreError(
   throw new Error(JSON.stringify(errInfo));
 }
 
-// Test connection on boot per Firebase guidelines
-export async function testConnection() {
+// Validate Firestore connectivity once authenticated
+export async function testConnection(): Promise<boolean> {
   try {
     await getDocFromServer(doc(db, 'test', 'connection'));
+    return true;
   } catch (error) {
-    if (error instanceof Error && error.message.includes('the client is offline')) {
-      console.error('Please check your Firebase configuration.');
+    const msg = error instanceof Error ? error.message : String(error);
+    if (msg.includes('the client is offline') || msg.includes('unavailable')) {
+      console.warn(
+        `Firestore unreachable for project "${firebaseConfig.projectId}". Ensure Cloud Firestore API and the (default) database are created in Firebase Console.`
+      );
+      return false;
     }
+    // Permission-denied on test/connection confirms Firestore API is reachable and rules are active
+    return true;
   }
 }

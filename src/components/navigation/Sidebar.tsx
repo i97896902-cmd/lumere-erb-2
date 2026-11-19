@@ -24,24 +24,9 @@ import { useCompany } from '../../context/CompanyContext';
 import { CompanySwitcher } from './CompanySwitcher';
 import { getCompanyInitials, PARENT_COMPANY_ID } from '../../config/companies';
 import { getRoleArabicLabel } from '../../utils/rbac';
+import type { TabType } from '../../types';
 
-export type TabType =
-  | 'group_dashboard'
-  | 'companies'
-  | 'dashboard'
-  | 'tasks'
-  | 'projects'
-  | 'clients'
-  | 'equipment'
-  | 'join_requests'
-  | 'calendar'
-  | 'employees'
-  | 'departments'
-  | 'reports'
-  | 'activity'
-  | 'notifications'
-  | 'settings'
-  | 'profile';
+export type { TabType };
 
 interface NavItem {
   id: TabType;
@@ -74,7 +59,7 @@ export function Sidebar({
   const groupNavItems: NavItem[] = isSuperAdmin
     ? [
         { id: 'group_dashboard', label: 'لوحة المجموعة المركزية', icon: Layers },
-        { id: 'companies', label: 'إدارة الشركات التابعة', icon: Globe },
+        { id: 'companies', label: 'جميع الشركات التابعة', icon: Globe },
       ]
     : [];
 
@@ -86,8 +71,10 @@ export function Sidebar({
           label: isGroupView ? 'ملخص العمليات الموحد' : 'لوحة تحكم الشركة',
           icon: LayoutDashboard,
         },
-        { id: 'tasks', label: 'المهام التنفيذية', icon: CheckSquare },
+        { id: 'employees', label: 'فريق العمل', icon: Users },
         { id: 'projects', label: 'المشاريع', icon: FolderKanban },
+        { id: 'tasks', label: 'المهام التنفيذية', icon: CheckSquare },
+        { id: 'departments', label: 'الأقسام المؤسسية', icon: Building2 },
         { id: 'clients', label: 'العملاء والشركاء', icon: Building },
         { id: 'equipment', label: 'المعدات والأصول', icon: Package },
         {
@@ -98,8 +85,6 @@ export function Sidebar({
           badgeColor: 'bg-amber-500',
         },
         { id: 'calendar', label: 'التقويم الزمني', icon: CalendarIcon },
-        { id: 'employees', label: 'فريق العمل', icon: Users },
-        { id: 'departments', label: 'الأقسام المؤسسية', icon: Building2 },
         { id: 'reports', label: 'التقارير والمؤشرات', icon: BarChart3 },
         { id: 'activity', label: 'سجل العمليات', icon: History },
         {
@@ -114,14 +99,15 @@ export function Sidebar({
 
     if (isManager) {
       return [
-        { id: 'dashboard', label: 'لوحة تحكم الشركة', icon: LayoutDashboard },
-        { id: 'tasks', label: 'المهام التنفيذية', icon: CheckSquare },
+        { id: 'departments', label: 'إدارة القسم', icon: Building2 },
+        { id: 'dashboard', label: 'لوحة القسم', icon: LayoutDashboard },
+        { id: 'tasks', label: 'مهام القسم', icon: CheckSquare },
         { id: 'projects', label: 'المشاريع', icon: FolderKanban },
+        { id: 'employees', label: 'فريق القسم', icon: Users },
         { id: 'clients', label: 'العملاء والشركاء', icon: Building },
         { id: 'equipment', label: 'المعدات والأصول', icon: Package },
         { id: 'calendar', label: 'التقويم الزمني', icon: CalendarIcon },
-        { id: 'employees', label: 'فريق العمل', icon: Users },
-        { id: 'reports', label: 'التقارير والمؤشرات', icon: BarChart3 },
+        { id: 'reports', label: 'تقارير القسم', icon: BarChart3 },
         { id: 'activity', label: 'سجل العمليات', icon: History },
         {
           id: 'notifications',
@@ -135,10 +121,8 @@ export function Sidebar({
 
     // EMPLOYEE
     return [
-      { id: 'dashboard', label: 'لوحة التحكم', icon: LayoutDashboard },
+      { id: 'dashboard', label: 'لوحة الموظف', icon: LayoutDashboard },
       { id: 'tasks', label: 'مهامي التنفيذية', icon: CheckSquare },
-      { id: 'projects', label: 'المشاريع', icon: FolderKanban },
-      { id: 'clients', label: 'العملاء والشركاء', icon: Building },
       { id: 'calendar', label: 'التقويم الزمني', icon: CalendarIcon },
       {
         id: 'notifications',

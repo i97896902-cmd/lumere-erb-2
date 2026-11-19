@@ -23,6 +23,12 @@ import {
   validateTaskAssignment,
   resolveQueryCompanyId,
   getRoleArabicLabel,
+  getDefaultTabForRole,
+  getAllowedTabsForRole,
+  canAccessTab,
+  scopeEmployeesForUser,
+  scopeDepartmentsForUser,
+  scopeTasksForUser,
 } from './rbac';
 import { DEFAULT_SUBSIDIARY_ID, PARENT_COMPANY_ID } from '../config/companies';
 
@@ -305,6 +311,185 @@ test('resolveQueryCompanyId locks non-super-admins to own company and allows gro
 test('getRoleArabicLabel returns distinct Arabic labels for all 4 roles', () => {
   assert.equal(getRoleArabicLabel('SUPER_ADMIN'), 'مدير المجموعة الأعلى');
   assert.equal(getRoleArabicLabel('COMPANY_ADMIN'), 'مدير الشركة');
-  assert.equal(getRoleArabicLabel('MANAGER'), 'مدير قسم / مشاريع');
+  assert.equal(getRoleArabicLabel('MANAGER'), 'مدير القسم');
   assert.equal(getRoleArabicLabel('EMPLOYEE'), 'موظف');
+});
+
+test('PRIMARY_SUPER_ADMIN_EMAIL is strictly lumerecompany@gmail.com and always resolves to SUPER_ADMIN', () => {
+  assert.equal(PRIMARY_SUPER_ADMIN_EMAIL, 'lumerecompany@gmail.com');
+  assert.equal(
+    isSuperAdmin({
+      role: 'EMPLOYEE',
+      email: 'lumerecompany@gmail.com',
+      status: 'active',
+    }),
+    true
+  );
+  assert.equal(
+    isSuperAdmin({
+      role: 'EMPLOYEE',
+      email: 'LUMERECOMPANY@GMAIL.COM',
+      status: 'active',
+    }),
+    true
+  );
+});
+
+test('getDefaultTabForRole lands each role on its exact hierarchy hub', () => {
+  assert.equal(getDefaultTabForRole('SUPER_ADMIN', true), 'group_dashboard');
+  assert.equal(getDefaultTabForRole('SUPER_ADMIN', false), 'dashboard');
+  assert.equal(getDefaultTabForRole('COMPANY_ADMIN', false), 'dashboard');
+  assert.equal(getDefaultTabForRole('MANAGER', false), 'departments');
+  assert.equal(getDefaultTabForRole('EMPLOYEE', false), 'dashboard');
+});
+
+test('getAllowedTabsForRole and canAccessTab enforce strict 4-tier route isolation', () => {
+  // Super Admin: full group + subsidiary access
+  assert.equal(canAccessTab(superAdmin, 'group_dashboard'), true);
+  assert.equal(canAccessTab(superAdmin, 'companies'), true);
+  assert.equal(canAccessTab(superAdmin, 'settings'), true);
+
+  // Company Admin: full company workspace, no group management
+  assert.equal(canAccessTab(lumereAdmin, 'dashboard'), true);
+  assert.equal(canAccessTab(lumereAdmin, 'departments'), true);
+  assert.equal(canAccessTab(lumereAdmin, 'employees'), true);
+  assert.equal(canAccessTab(lumereAdmin, 'settings'), true);
+  assert.equal(canAccessTab(lumereAdmin, 'group_dashboard'), false);
+  assert.equal(canAccessTab(lumereAdmin, 'companies'), false);
+
+  // Manager: Department Management + department operations, no company settings/join requests/group
+  assert.equal(canAccessTab(nexAuraManager, 'departments'), true);
+  assert.equal(canAccessTab(nexAuraManager, 'dashboard'), true);
+  assert.equal(canAccessTab(nexAuraManager, 'tasks'), true);
+  assert.equal(canAccessTab(nexAuraManager, 'employees'), true);
+  assert.equal(canAccessTab(nexAuraManager, 'group_dashboard'), false);
+  assert.equal(canAccessTab(nexAuraManager, 'companies'), false);
+  assert.equal(canAccessTab(nexAuraManager, 'join_requests'), false);
+  assert.equal(canAccessTab(nexAuraManager, 'settings'), false);
+
+  // Employee: Employee Dashboard + own tasks + calendar + notifications + profile ONLY
+  assert.deepEqual(getAllowedTabsForRole('EMPLOYEE'), [
+    'dashboard',
+    'tasks',
+    'calendar',
+    'notifications',
+    'profile',
+  ]);
+  assert.equal(canAccessTab(ordarkEmployee, 'dashboard'), true);
+  assert.equal(canAccessTab(ordarkEmployee, 'tasks'), true);
+  assert.equal(canAccessTab(ordarkEmployee, 'reports'), false);
+  assert.equal(canAccessTab(ordarkEmployee, 'activity'), false);
+  assert.equal(canAccessTab(ordarkEmployee, 'employees'), false);
+  assert.equal(canAccessTab(ordarkEmployee, 'departments'), false);
+  assert.equal(canAccessTab(ordarkEmployee, 'settings'), false);
+  assert.equal(canAccessTab(ordarkEmployee, 'group_dashboard'), false);
+  assert.equal(canAccessTab(pendingUser, 'dashboard'), false);
+});
+
+test('scopeEmployeesForUser, scopeDepartmentsForUser, and scopeTasksForUser enforce role-level data scoping', () => {
+  const manager = {
+    ...nexAuraManager,
+    displayName: 'مدير الهندسة',
+    department: 'الهندسة',
+  };
+  const employee = {
+    ...ordarkEmployee,
+    id: 'u-emp-1',
+    companyId: 'nex-aura',
+    department: 'الهندسة',
+  };
+
+  const allEmployees = [
+    { ...manager, position: 'Manager', joinedDate: '2025-01-01' },
+    { ...employee, displayName: 'مطور 1', position: 'Dev', joinedDate: '2025-01-01', managerId: manager.id },
+    {
+      id: 'u-emp-other',
+      email: 'ops@nexaura.com',
+      displayName: 'عمليات',
+      role: 'EMPLOYEE' as const,
+      status: 'active' as const,
+      companyId: 'nex-aura',
+      department: 'المبيعات',
+      position: 'Sales',
+      joinedDate: '2025-01-01',
+    },
+  ];
+
+  const allDepartments = [
+    { id: 'd-eng', companyId: 'nex-aura', name: 'الهندسة', description: 'فريق البرمجيات' },
+    { id: 'd-sales', companyId: 'nex-aura', name: 'المبيعات', description: 'فريق المبيعات' },
+  ];
+
+  const allTasks = [
+    {
+      id: 't-1',
+      companyId: 'nex-aura',
+      taskId: 'NEX-1',
+      title: 'تطوير واجهة',
+      description: 'desc',
+      createdBy: manager.id,
+      createdByName: 'مدير الهندسة',
+      assignedTo: 'u-emp-1',
+      assignedToName: 'مطور 1',
+      assignedToEmail: 'driver@ordark.com',
+      department: 'الهندسة',
+      priority: 'High' as const,
+      status: 'In Progress' as const,
+      startDate: '2025-01-01',
+      deadline: '2025-02-01',
+      completionPercentage: 40,
+      reviewStatus: 'none' as const,
+      createdAt: '2025-01-01T00:00:00Z',
+      updatedAt: '2025-01-01T00:00:00Z',
+    },
+    {
+      id: 't-2',
+      companyId: 'nex-aura',
+      taskId: 'NEX-2',
+      title: 'صفقة مبيعات',
+      description: 'desc',
+      createdBy: 'u-lumere-admin',
+      createdByName: 'Admin',
+      assignedTo: 'u-emp-other',
+      assignedToName: 'عمليات',
+      assignedToEmail: 'ops@nexaura.com',
+      department: 'المبيعات',
+      priority: 'Medium' as const,
+      status: 'Pending' as const,
+      startDate: '2025-01-01',
+      deadline: '2025-02-05',
+      completionPercentage: 0,
+      reviewStatus: 'none' as const,
+      createdAt: '2025-01-01T00:00:00Z',
+      updatedAt: '2025-01-01T00:00:00Z',
+    },
+  ];
+
+  // SUPER_ADMIN & COMPANY_ADMIN see full list
+  assert.equal(scopeTasksForUser(superAdmin, allTasks, allEmployees).length, 2);
+  assert.equal(scopeTasksForUser(lumereAdmin, allTasks, allEmployees).length, 2);
+
+  // MANAGER sees only their department / team members & tasks
+  assert.deepEqual(
+    scopeDepartmentsForUser(manager, allDepartments).map(d => d.id),
+    ['d-eng']
+  );
+  assert.deepEqual(
+    scopeEmployeesForUser(manager, allEmployees).map(e => e.id),
+    [manager.id, 'u-emp-1']
+  );
+  assert.deepEqual(
+    scopeTasksForUser(manager, allTasks, allEmployees).map(t => t.id),
+    ['t-1']
+  );
+
+  // EMPLOYEE sees only own tasks & self
+  assert.deepEqual(
+    scopeEmployeesForUser(employee, allEmployees).map(e => e.id),
+    ['u-emp-1']
+  );
+  assert.deepEqual(
+    scopeTasksForUser(employee, allTasks, allEmployees).map(t => t.id),
+    ['t-1']
+  );
 });

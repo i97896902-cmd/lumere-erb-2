@@ -18,7 +18,7 @@ import { StatusBadge, PriorityBadge } from '../ui/Badge';
 import { Task, User, Department, TaskPriority } from '../../types';
 import { useAuth } from '../../context/AuthContext';
 import { useCompany } from '../../context/CompanyContext';
-import { canCreateTask } from '../../utils/rbac';
+import { canCreateTask, scopeTasksForUser } from '../../utils/rbac';
 
 interface TasksViewProps {
   tasks: Task[];
@@ -51,13 +51,11 @@ export function TasksView({
 
   const nowStr = new Date().toISOString().split('T')[0];
 
-  // Restrict tasks for Employee role by default
-  const baseTasks = useMemo(() => {
-    if (role === 'EMPLOYEE') {
-      return tasks.filter(t => t.assignedTo === currentUser?.id);
-    }
-    return tasks;
-  }, [tasks, role, currentUser]);
+  // Restrict tasks strictly by canonical role (Employee: own tasks, Manager: department/team tasks)
+  const baseTasks = useMemo(
+    () => scopeTasksForUser(currentUser, tasks, employees),
+    [tasks, employees, currentUser]
+  );
 
   // Filtered and sorted tasks
   const filteredTasks = useMemo(() => {
@@ -141,11 +139,17 @@ export function TasksView({
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-xl font-bold text-neutral-900">
-            {role === 'EMPLOYEE' ? 'مهامي المسندة' : `دليل المهام — ${activeCompany.name}`}
+            {role === 'EMPLOYEE'
+              ? 'مهامي التنفيذية'
+              : role === 'MANAGER'
+              ? `مهام القسم — ${currentUser?.department || activeCompany.name}`
+              : `دليل المهام — ${activeCompany.name}`}
           </h2>
           <p className="text-xs text-neutral-500">
             {role === 'EMPLOYEE'
               ? 'المهام والتكليفات المسندة إليك. حدّث نسب الإنجاز وارفع المخرجات للاعتماد.'
+              : role === 'MANAGER'
+              ? 'متابعة مهام فريق القسم، اعتماد المخرجات، ومراقبة مواعيد التسليم.'
               : 'نظرة شاملة ومفصلة على كافة المهام التشغيلية عبر الأقسام والمشاريع.'}
           </p>
         </div>
@@ -214,19 +218,21 @@ export function TasksView({
             />
           </div>
 
-          {/* Department Filter */}
-          <select
-            value={departmentFilter}
-            onChange={e => setDepartmentFilter(e.target.value)}
-            className="px-3 py-1.5 text-xs bg-neutral-50 rounded-xl border border-neutral-200 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
-          >
-            <option value="All">كافة الأقسام</option>
-            {departments.map(d => (
-              <option key={d.id} value={d.name}>
-                {d.name}
-              </option>
-            ))}
-          </select>
+          {/* Department Filter (Supervisors only) */}
+          {role !== 'EMPLOYEE' && (
+            <select
+              value={departmentFilter}
+              onChange={e => setDepartmentFilter(e.target.value)}
+              className="px-3 py-1.5 text-xs bg-neutral-50 rounded-xl border border-neutral-200 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+            >
+              <option value="All">كافة الأقسام</option>
+              {departments.map(d => (
+                <option key={d.id} value={d.name}>
+                  {d.name}
+                </option>
+              ))}
+            </select>
+          )}
 
           {/* Priority Filter */}
           <select

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { AUTH_DISABLED, AuthProvider, useAuth } from './context/AuthContext';
 import { CompanyProvider, useCompany } from './context/CompanyContext';
 import { ToastProvider, useToast } from './context/ToastContext';
@@ -40,13 +40,18 @@ import { DataService } from './services/dataService';
 import { DeadlinePushService } from './services/deadlinePushService';
 import { getFirestoreSubscriptionScope } from './utils/appGuards';
 import {
+  canAccessTab,
   canManageCompanies,
   canManageCompanyUsers,
   canViewActivityLogs,
   canViewReports,
+  getDefaultTabForRole,
   isPendingStatus,
   isRejectedStatus,
   isSuspendedStatus,
+  scopeDepartmentsForUser,
+  scopeEmployeesForUser,
+  scopeTasksForUser,
 } from './utils/rbac';
 import { AlertCircle } from 'lucide-react';
 
@@ -56,7 +61,7 @@ type BeforeInstallPromptEvent = Event & {
 };
 
 function LumereAppContent() {
-  const { currentUser, firebaseUser, loading, isProfileIncomplete, isSuperAdmin, logout } = useAuth();
+  const { currentUser, firebaseUser, role, loading, isProfileIncomplete, logout } = useAuth();
   const {
     companies,
     activeCompany,
@@ -69,34 +74,33 @@ function LumereAppContent() {
   const { showToast } = useToast();
 
   const [currentTab, setCurrentTab] = useState<TabType>('dashboard');
-  const didInitSuperAdminTabRef = useRef(false);
+  const initializedRoleKeyRef = useRef<string | null>(null);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [globalSearchQuery, setGlobalSearchQuery] = useState('');
   const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [isInstalled, setIsInstalled] = useState(false);
 
-  // Land SUPER_ADMIN on Group Dashboard on first entry when in Group View
+  // Land each role on its exact hierarchy hub on login / role resolution:
+  // SUPER_ADMIN -> Group Dashboard | COMPANY_ADMIN -> Company Dashboard | MANAGER -> Department Management | EMPLOYEE -> Employee Dashboard
   useEffect(() => {
     if (!currentUser) {
-      didInitSuperAdminTabRef.current = false;
+      initializedRoleKeyRef.current = null;
       setCurrentTab('dashboard');
       return;
     }
-    if (!didInitSuperAdminTabRef.current && isSuperAdmin && isGroupView) {
-      didInitSuperAdminTabRef.current = true;
-      setCurrentTab('group_dashboard');
+    const roleKey = `${currentUser.id}:${role}`;
+    if (initializedRoleKeyRef.current !== roleKey) {
+      initializedRoleKeyRef.current = roleKey;
+      setCurrentTab(getDefaultTabForRole(role, isGroupView));
     }
-  }, [currentUser, isSuperAdmin, isGroupView]);
+  }, [currentUser, role, isGroupView]);
 
-  // Prevent non-SUPER_ADMIN users from staying on group-only tabs
+  // Enforce strict route-level RBAC for every role
   useEffect(() => {
-    if (
-      !canManageCompanies(currentUser) &&
-      (currentTab === 'group_dashboard' || currentTab === 'companies')
-    ) {
-      setCurrentTab('dashboard');
+    if (currentUser && !canAccessTab(currentUser, currentTab)) {
+      setCurrentTab(getDefaultTabForRole(role, isGroupView));
     }
-  }, [currentUser, currentTab]);
+  }, [currentUser, currentTab, role, isGroupView]);
 
   useEffect(() => {
     const standalone =
@@ -211,9 +215,11 @@ function LumereAppContent() {
       setTasks(fetchedTasks);
     }, queryCompanyId);
 
-    const unsubLogs = DataService.subscribeActivityLogs(fetchedLogs => {
-      setActivityLogs(fetchedLogs);
-    }, queryCompanyId);
+    const unsubLogs = canViewActivityLogs(currentUser, queryCompanyId || activeCompanyId)
+      ? DataService.subscribeActivityLogs(fetchedLogs => {
+          setActivityLogs(fetchedLogs);
+        }, queryCompanyId)
+      : () => {};
 
     const unsubClients = DataService.subscribeClients(fetchedClients => {
       setClients(fetchedClients);
@@ -342,7 +348,31 @@ function LumereAppContent() {
     }
   };
 
-  const selectedTask = tasks.find(t => t.id === selectedTaskId) || null;
+  const scopedEmployees = useMemo(
+    () => scopeEmployeesForUser(currentUser, employees),
+    [currentUser, employees]
+  );
+
+  const scopedDepartments = useMemo(
+    () => scopeDepartmentsForUser(currentUser, departments),
+    [currentUser, departments]
+  );
+
+  const scopedTasks = useMemo(
+    () => scopeTasksForUser(currentUser, tasks, employees),
+    [currentUser, tasks, employees]
+  );
+
+  const handleSelectTabSafe = (tab: TabType) => {
+    if (currentUser && !canAccessTab(currentUser, tab)) {
+      setCurrentTab(getDefaultTabForRole(role, isGroupView));
+      return;
+    }
+    setCurrentTab(tab);
+    setGlobalSearchQuery('');
+  };
+
+  const selectedTask = scopedTasks.find(t => t.id === selectedTaskId) || null;
 
   if (loading) {
     return (
@@ -427,10 +457,7 @@ function LumereAppContent() {
       {/* Sidebar Navigation */}
       <Sidebar
         currentTab={currentTab}
-        onSelectTab={tab => {
-          setCurrentTab(tab);
-          setGlobalSearchQuery('');
-        }}
+        onSelectTab={handleSelectTabSafe}
         isOpenMobile={isMobileSidebarOpen}
         onCloseMobile={() => setIsMobileSidebarOpen(false)}
         unreadNotificationsCount={notifications.filter(n => !n.read).length}
@@ -446,10 +473,10 @@ function LumereAppContent() {
           onMarkNotificationRead={handleMarkNotificationRead}
           onMarkAllNotificationsRead={handleMarkAllNotificationsRead}
           onSelectTask={handleSelectTask}
-          onOpenNotificationsTab={() => setCurrentTab('notifications')}
+          onOpenNotificationsTab={() => handleSelectTabSafe('notifications')}
           searchQuery={globalSearchQuery}
           onSearchChange={setGlobalSearchQuery}
-          tasks={tasks}
+          tasks={scopedTasks}
         />
 
         <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto">
@@ -463,8 +490,8 @@ function LumereAppContent() {
               tasks={tasks}
               activityLogs={activityLogs}
               onEnterCompany={handleEnterCompanyWorkspace}
-              onOpenCompaniesManagement={() => setCurrentTab('companies')}
-              onOpenReports={() => setCurrentTab('reports')}
+              onOpenCompaniesManagement={() => handleSelectTabSafe('companies')}
+              onOpenReports={() => handleSelectTabSafe('reports')}
             />
           )}
 
@@ -481,34 +508,34 @@ function LumereAppContent() {
             />
           )}
 
-          {currentTab === 'dashboard' && (
+          {currentTab === 'dashboard' && canAccessTab(currentUser, 'dashboard') && (
             <DashboardView
-              tasks={tasks}
-              employees={employees}
-              departments={departments}
+              tasks={scopedTasks}
+              employees={scopedEmployees}
+              departments={scopedDepartments}
               activityLogs={activityLogs}
               onSelectTask={handleSelectTask}
               onOpenCreateTask={() => handleOpenCreateTaskWithContext()}
-              onNavigateToTab={tab => setCurrentTab(tab as TabType)}
+              onNavigateToTab={tab => handleSelectTabSafe(tab as TabType)}
             />
           )}
 
-          {currentTab === 'tasks' && (
+          {currentTab === 'tasks' && canAccessTab(currentUser, 'tasks') && (
             <TasksView
-              tasks={tasks}
-              employees={employees}
-              departments={departments}
+              tasks={scopedTasks}
+              employees={scopedEmployees}
+              departments={scopedDepartments}
               onSelectTask={handleSelectTask}
               onOpenCreateTask={() => handleOpenCreateTaskWithContext()}
               initialSearchQuery={globalSearchQuery}
             />
           )}
 
-          {currentTab === 'projects' && (
+          {currentTab === 'projects' && canAccessTab(currentUser, 'projects') && (
             <ProjectsView
               projects={projects}
               clients={clients}
-              tasks={tasks}
+              tasks={scopedTasks}
               users={employees}
               departments={departments}
               onRefresh={handleRefreshAllCollections}
@@ -517,16 +544,16 @@ function LumereAppContent() {
             />
           )}
 
-          {currentTab === 'clients' && (
+          {currentTab === 'clients' && canAccessTab(currentUser, 'clients') && (
             <ClientsView
               clients={clients}
               projects={projects}
-              tasks={tasks}
+              tasks={scopedTasks}
               onRefresh={handleRefreshAllCollections}
             />
           )}
 
-          {currentTab === 'equipment' && (
+          {currentTab === 'equipment' && canAccessTab(currentUser, 'equipment') && (
             <EquipmentView
               equipment={equipment}
               employees={employees}
@@ -535,7 +562,7 @@ function LumereAppContent() {
             />
           )}
 
-          {currentTab === 'join_requests' && (
+          {currentTab === 'join_requests' && canAccessTab(currentUser, 'join_requests') && (
             <JoinRequestsView
               pendingUsers={pendingUsers}
               departments={departments}
@@ -543,41 +570,44 @@ function LumereAppContent() {
             />
           )}
 
-          {currentTab === 'calendar' && (
-            <CalendarView tasks={tasks} onSelectTask={handleSelectTask} />
+          {currentTab === 'calendar' && canAccessTab(currentUser, 'calendar') && (
+            <CalendarView tasks={scopedTasks} onSelectTask={handleSelectTask} />
           )}
 
-          {currentTab === 'employees' && (
+          {currentTab === 'employees' && canAccessTab(currentUser, 'employees') && (
             <EmployeesView
-              employees={employees}
-              tasks={tasks}
-              departments={departments}
+              employees={scopedEmployees}
+              tasks={scopedTasks}
+              departments={scopedDepartments}
               onSelectTask={handleSelectTask}
               onRefreshEmployees={handleRefreshAllCollections}
             />
           )}
 
-          {currentTab === 'departments' && (
+          {currentTab === 'departments' && canAccessTab(currentUser, 'departments') && (
             <DepartmentsView
-              departments={departments}
-              tasks={tasks}
-              employees={employees}
+              departments={scopedDepartments}
+              tasks={scopedTasks}
+              employees={scopedEmployees}
               onRefreshDepartments={handleRefreshAllCollections}
+              onOpenCreateTask={() => handleOpenCreateTaskWithContext()}
+              onSelectTask={handleSelectTask}
+              onNavigateToTab={tab => handleSelectTabSafe(tab)}
             />
           )}
 
           {currentTab === 'reports' && canViewReports(currentUser) && (
-            <ReportsView tasks={tasks} employees={employees} departments={departments} />
+            <ReportsView tasks={scopedTasks} employees={scopedEmployees} departments={scopedDepartments} />
           )}
 
           {currentTab === 'activity' && canViewActivityLogs(currentUser) && (
             <ActivityLogView activityLogs={activityLogs} />
           )}
 
-          {currentTab === 'notifications' && (
+          {currentTab === 'notifications' && canAccessTab(currentUser, 'notifications') && (
             <NotificationsView
               notifications={notifications}
-              tasks={tasks}
+              tasks={scopedTasks}
               currentUser={currentUser}
               onMarkRead={handleMarkNotificationRead}
               onMarkAllRead={handleMarkAllNotificationsRead}
@@ -585,7 +615,7 @@ function LumereAppContent() {
             />
           )}
 
-          {currentTab === 'settings' && (
+          {currentTab === 'settings' && canAccessTab(currentUser, 'settings') && (
             <SettingsView
               onRefreshAllData={() => {
                 handleRefreshAllCollections();
@@ -593,7 +623,7 @@ function LumereAppContent() {
             />
           )}
 
-          {currentTab === 'profile' && <ProfileView />}
+          {currentTab === 'profile' && canAccessTab(currentUser, 'profile') && <ProfileView />}
         </main>
       </div>
 

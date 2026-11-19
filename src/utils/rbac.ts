@@ -1,4 +1,4 @@
-import { CanonicalRole, Project, Role, User } from '../types';
+import { CanonicalRole, Department, Project, Role, TabType, Task, User } from '../types';
 import { DEFAULT_SUBSIDIARY_ID, PARENT_COMPANY_ID } from '../config/companies';
 
 export const PRIMARY_SUPER_ADMIN_EMAIL = 'lumerecompany@gmail.com';
@@ -268,7 +268,7 @@ export function getRoleArabicLabel(role?: Role | string | null, email?: string |
     case 'COMPANY_ADMIN':
       return 'مدير الشركة';
     case 'MANAGER':
-      return 'مدير قسم / مشاريع';
+      return 'مدير القسم';
     case 'EMPLOYEE':
     default:
       return 'موظف';
@@ -287,4 +287,189 @@ export function getAssignableRoles(
     return ['MANAGER', 'EMPLOYEE'];
   }
   return [];
+}
+
+/**
+ * Role-based default landing screen matching the 4-tier hierarchy:
+ * - SUPER_ADMIN -> Group Dashboard (group_dashboard) when in Group View, or Company Dashboard inside a subsidiary
+ * - COMPANY_ADMIN -> Company Dashboard (dashboard)
+ * - MANAGER -> Department Management (departments)
+ * - EMPLOYEE -> Employee Dashboard (dashboard)
+ */
+export function getDefaultTabForRole(role: CanonicalRole, isGroupView = true): TabType {
+  switch (role) {
+    case 'SUPER_ADMIN':
+      return isGroupView ? 'group_dashboard' : 'dashboard';
+    case 'COMPANY_ADMIN':
+      return 'dashboard';
+    case 'MANAGER':
+      return 'departments';
+    case 'EMPLOYEE':
+    default:
+      return 'dashboard';
+  }
+}
+
+const ALLOWED_TABS_BY_ROLE: Record<CanonicalRole, TabType[]> = {
+  SUPER_ADMIN: [
+    'group_dashboard',
+    'companies',
+    'dashboard',
+    'tasks',
+    'projects',
+    'clients',
+    'equipment',
+    'join_requests',
+    'calendar',
+    'employees',
+    'departments',
+    'reports',
+    'activity',
+    'notifications',
+    'settings',
+    'profile',
+  ],
+  COMPANY_ADMIN: [
+    'dashboard',
+    'tasks',
+    'projects',
+    'clients',
+    'equipment',
+    'join_requests',
+    'calendar',
+    'employees',
+    'departments',
+    'reports',
+    'activity',
+    'notifications',
+    'settings',
+    'profile',
+  ],
+  MANAGER: [
+    'departments',
+    'dashboard',
+    'tasks',
+    'projects',
+    'clients',
+    'equipment',
+    'calendar',
+    'employees',
+    'reports',
+    'activity',
+    'notifications',
+    'profile',
+  ],
+  EMPLOYEE: ['dashboard', 'tasks', 'calendar', 'notifications', 'profile'],
+};
+
+export function getAllowedTabsForRole(role: CanonicalRole): TabType[] {
+  return [...ALLOWED_TABS_BY_ROLE[role]];
+}
+
+export function canAccessTab(
+  user: Pick<User, 'role' | 'email' | 'status'> | null | undefined,
+  tab: TabType
+): boolean {
+  if (!user || !isActiveStatus(user.status)) return false;
+  const role = normalizeRole(user.role, user.email);
+  return ALLOWED_TABS_BY_ROLE[role].includes(tab);
+}
+
+/**
+ * Scopes employees visibility by canonical role:
+ * - SUPER_ADMIN / COMPANY_ADMIN: full company/group list
+ * - MANAGER: members in their department, their direct reports, or self (falls back to all if manager has no department)
+ * - EMPLOYEE: self only
+ */
+export function scopeEmployeesForUser(
+  user: (Pick<User, 'id' | 'role' | 'email' | 'status'> & { department?: string }) | null | undefined,
+  employees: User[]
+): User[] {
+  if (!user || !isActiveStatus(user.status)) return [];
+  const role = normalizeRole(user.role, user.email);
+  if (role === 'SUPER_ADMIN' || role === 'COMPANY_ADMIN') return employees;
+  if (role === 'MANAGER') {
+    const dept = (user.department || '').trim().toLowerCase();
+    const scoped = employees.filter(emp => {
+      if (emp.id === user.id) return true;
+      if (emp.managerId && emp.managerId === user.id) return true;
+      if (dept && (emp.department || '').trim().toLowerCase() === dept) return true;
+      return false;
+    });
+    return dept || scoped.length > 0 ? scoped : employees;
+  }
+  return employees.filter(emp => emp.id === user.id);
+}
+
+/**
+ * Scopes department visibility by canonical role:
+ * - SUPER_ADMIN / COMPANY_ADMIN: all departments in active scope
+ * - MANAGER: their managed/assigned department(s) (falls back to all if none explicitly matched)
+ * - EMPLOYEE: their assigned department only
+ */
+export function scopeDepartmentsForUser(
+  user:
+    | (Pick<User, 'id' | 'role' | 'email' | 'status'> & { department?: string; displayName?: string })
+    | null
+    | undefined,
+  departments: Department[]
+): Department[] {
+  if (!user || !isActiveStatus(user.status)) return [];
+  const role = normalizeRole(user.role, user.email);
+  if (role === 'SUPER_ADMIN' || role === 'COMPANY_ADMIN') return departments;
+
+  const deptName = (user.department || '').trim().toLowerCase();
+  const displayName = (user.displayName || '').trim().toLowerCase();
+
+  if (role === 'MANAGER') {
+    const matched = departments.filter(d => {
+      if (d.managerId && d.managerId === user.id) return true;
+      if (deptName && d.name.trim().toLowerCase() === deptName) return true;
+      if (displayName && d.headName && d.headName.trim().toLowerCase() === displayName) return true;
+      return false;
+    });
+    return matched.length > 0 ? matched : departments;
+  }
+
+  if (!deptName) return [];
+  return departments.filter(d => d.name.trim().toLowerCase() === deptName);
+}
+
+/**
+ * Scopes tasks visibility by canonical role:
+ * - SUPER_ADMIN / COMPANY_ADMIN: all tasks in active scope
+ * - MANAGER: tasks in their department, tasks assigned to their team/self, or created by self
+ * - EMPLOYEE: strictly tasks assigned to self (or co-assigned)
+ */
+export function scopeTasksForUser(
+  user: (Pick<User, 'id' | 'role' | 'email' | 'status'> & { department?: string }) | null | undefined,
+  tasks: Task[],
+  employees: User[] = []
+): Task[] {
+  if (!user || !isActiveStatus(user.status)) return [];
+  const role = normalizeRole(user.role, user.email);
+  if (role === 'SUPER_ADMIN' || role === 'COMPANY_ADMIN') return tasks;
+
+  if (role === 'MANAGER') {
+    const dept = (user.department || '').trim().toLowerCase();
+    const teamIds = new Set(
+      scopeEmployeesForUser(user, employees).map(emp => emp.id)
+    );
+    teamIds.add(user.id);
+
+    if (!dept && teamIds.size <= 1) return tasks;
+
+    return tasks.filter(task => {
+      if (task.assignedTo === user.id || task.createdBy === user.id) return true;
+      if (teamIds.has(task.assignedTo)) return true;
+      if (dept && (task.department || '').trim().toLowerCase() === dept) return true;
+      return false;
+    });
+  }
+
+  return tasks.filter(
+    task =>
+      task.assignedTo === user.id ||
+      (Array.isArray(task.coAssignees) && task.coAssignees.includes(user.id))
+  );
 }

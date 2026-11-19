@@ -1,22 +1,40 @@
 import React, { useState } from 'react';
-import { Building2, Plus, Users, CheckCircle2, TrendingUp, Edit2 } from 'lucide-react';
+import {
+  Building2,
+  Plus,
+  Users,
+  CheckCircle2,
+  Edit2,
+  Clock,
+  ArrowUpLeft,
+  ChevronLeft,
+} from 'lucide-react';
 import { Card } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { Modal } from '../ui/Modal';
 import { Input, Textarea, Select } from '../ui/Input';
+import { StatusBadge, PriorityBadge } from '../ui/Badge';
 import { Department, Task, User } from '../../types';
 import { useAuth } from '../../context/AuthContext';
 import { useCompany } from '../../context/CompanyContext';
 import { useToast } from '../../context/ToastContext';
 import { DataService } from '../../services/dataService';
-import { canManageDepartments as checkCanManageDepartments } from '../../utils/rbac';
+import {
+  canCreateTask,
+  canManageDepartments as checkCanManageDepartments,
+  scopeDepartmentsForUser,
+  scopeEmployeesForUser,
+  scopeTasksForUser,
+} from '../../utils/rbac';
 
 interface DepartmentsViewProps {
   departments: Department[];
   tasks: Task[];
   employees: User[];
   onRefreshDepartments: () => void;
-  onNavigateToTasksWithDept?: (deptName: string) => void;
+  onOpenCreateTask?: () => void;
+  onSelectTask?: (taskId: string) => void;
+  onNavigateToTab?: (tab: 'tasks' | 'employees' | 'reports') => void;
 }
 
 export function DepartmentsView({
@@ -24,12 +42,22 @@ export function DepartmentsView({
   tasks,
   employees,
   onRefreshDepartments,
+  onOpenCreateTask,
+  onSelectTask,
+  onNavigateToTab,
 }: DepartmentsViewProps) {
-  const { currentUser } = useAuth();
+  const { currentUser, isManager } = useAuth();
   const { activeCompany, isGroupView, subsidiaries, defaultWriteCompanyId, getCompanyById } = useCompany();
   const { showToast } = useToast();
 
   const canManageDepts = checkCanManageDepartments(currentUser, defaultWriteCompanyId);
+  const allowCreateTask = canCreateTask(currentUser, defaultWriteCompanyId);
+
+  const visibleDepartments = isManager
+    ? scopeDepartmentsForUser(currentUser, departments)
+    : departments;
+  const visibleEmployees = isManager ? scopeEmployeesForUser(currentUser, employees) : employees;
+  const visibleTasks = isManager ? scopeTasksForUser(currentUser, tasks, employees) : tasks;
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingDept, setEditingDept] = useState<Department | null>(null);
@@ -101,36 +129,54 @@ export function DepartmentsView({
     }
   };
 
+  const nowStr = new Date().toISOString().split('T')[0];
+
   return (
     <div className="space-y-5" dir="rtl">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-xl font-bold text-neutral-900">
-            الأقسام والوحدات التشغيلية — {activeCompany.name}
+            {isManager
+              ? `إدارة القسم — ${currentUser?.department || activeCompany.name}`
+              : `الأقسام والوحدات التشغيلية — ${activeCompany.name}`}
           </h2>
           <p className="text-xs text-neutral-500">
-            توزيع الإدارات، قيادات الفرق، حجم الضغط التشغيلي، ومعدلات إنجاز الأعمال.
+            {isManager
+              ? `مركز متابعة فريق القسم والمهام التنفيذية ومعدلات الإنجاز داخل ${activeCompany.name}.`
+              : 'توزيع الإدارات، قيادات الفرق، حجم الضغط التشغيلي، ومعدلات إنجاز الأعمال.'}
           </p>
         </div>
 
-        {canManageDepts && (
-          <Button
-            id="btn-add-department"
-            onClick={openAddModal}
-            variant="primary"
-            leftIcon={<Plus className="w-4 h-4" />}
-          >
-            إنشاء قسم جديد
-          </Button>
-        )}
+        <div className="flex items-center gap-2">
+          {isManager && allowCreateTask && onOpenCreateTask && (
+            <Button
+              id="btn-manager-create-dept-task"
+              onClick={onOpenCreateTask}
+              variant="primary"
+              leftIcon={<Plus className="w-4 h-4" />}
+            >
+              إنشاء مهمة للقسم
+            </Button>
+          )}
+          {canManageDepts && (
+            <Button
+              id="btn-add-department"
+              onClick={openAddModal}
+              variant="primary"
+              leftIcon={<Plus className="w-4 h-4" />}
+            >
+              إنشاء قسم جديد
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Department Cards Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-        {departments.map(dept => {
-          const deptTasks = tasks.filter(t => t.department === dept.name);
-          const deptEmps = employees.filter(e => e.department === dept.name);
+        {visibleDepartments.map(dept => {
+          const deptTasks = visibleTasks.filter(t => t.department === dept.name);
+          const deptEmps = visibleEmployees.filter(e => e.department === dept.name);
           const completedTasks = deptTasks.filter(t => t.status === 'Completed').length;
           const rate = deptTasks.length > 0 ? Math.round((completedTasks / deptTasks.length) * 100) : 0;
 
@@ -180,7 +226,7 @@ export function DepartmentsView({
 
               {/* Department Statistics */}
               <div className="pt-3 border-t border-neutral-100 space-y-3">
-                <div className="grid grid-cols-3 text-center text-xs">
+                <div className="grid grid-cols-3 text-center text-xs gap-1.5">
                   <div className="p-1.5 rounded-lg bg-neutral-50">
                     <p className="font-mono font-bold text-neutral-900">{deptEmps.length}</p>
                     <p className="text-[10px] text-neutral-400">الأعضاء</p>
@@ -213,6 +259,160 @@ export function DepartmentsView({
           );
         })}
       </div>
+
+      {/* Manager Operational Workspace: Department Team & Recent Tasks */}
+      {isManager && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 pt-2">
+          {/* Department Tasks (2 cols) */}
+          <div className="lg:col-span-2 space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-base font-bold text-neutral-900">مهام القسم الحالية</h3>
+                <p className="text-xs text-neutral-500">
+                  التكليفات النشطة وبانتظار الاعتماد ضمن نطاق إشرافك
+                </p>
+              </div>
+              {onNavigateToTab && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  leftIcon={<ChevronLeft className="w-4 h-4" />}
+                  onClick={() => onNavigateToTab('tasks')}
+                >
+                  عرض كل المهام
+                </Button>
+              )}
+            </div>
+
+            <Card className="p-0 overflow-hidden">
+              {visibleTasks.length === 0 ? (
+                <div className="p-8 text-center text-xs text-neutral-500">
+                  لا توجد مهام مسجلة حالياً ضمن هذا القسم.
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-right text-sm">
+                    <thead className="bg-neutral-50/80 border-b border-neutral-100 text-xs text-neutral-500 font-semibold">
+                      <tr>
+                        <th className="px-4 py-3">المهمة</th>
+                        <th className="px-4 py-3">المكلف</th>
+                        <th className="px-4 py-3">الأولوية</th>
+                        <th className="px-4 py-3">الحالة</th>
+                        <th className="px-4 py-3">الموعد</th>
+                        <th className="px-4 py-3 text-left">فتح</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-neutral-100">
+                      {visibleTasks.slice(0, 6).map(task => {
+                        const isOverdue =
+                          task.deadline < nowStr &&
+                          task.status !== 'Completed' &&
+                          task.status !== 'Cancelled';
+                        return (
+                          <tr
+                            key={task.id}
+                            className="hover:bg-neutral-50/80 transition-colors cursor-pointer group"
+                            onClick={() => onSelectTask?.(task.id)}
+                          >
+                            <td className="px-4 py-3 max-w-xs">
+                              <div className="flex items-center gap-2">
+                                <span className="font-mono text-xs font-bold text-emerald-800 bg-emerald-50 border border-emerald-200/50 px-1.5 py-0.5 rounded">
+                                  {task.taskId}
+                                </span>
+                                <span className="font-medium text-neutral-900 truncate">
+                                  {task.title}
+                                </span>
+                              </div>
+                            </td>
+                            <td className="px-4 py-3 text-xs text-neutral-700 font-medium">
+                              {task.assignedToName}
+                            </td>
+                            <td className="px-4 py-3">
+                              <PriorityBadge priority={task.priority} />
+                            </td>
+                            <td className="px-4 py-3">
+                              <StatusBadge status={task.status} isOverdue={isOverdue} />
+                            </td>
+                            <td className="px-4 py-3 text-xs font-mono text-neutral-600">
+                              <span className="inline-flex items-center gap-1">
+                                <Clock className="w-3 h-3 text-neutral-400" />
+                                {task.deadline}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-left">
+                              <ArrowUpLeft className="w-4 h-4 text-neutral-400 group-hover:text-emerald-700 inline" />
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </Card>
+          </div>
+
+          {/* Department Team Members (1 col) */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-base font-bold text-neutral-900">فريق القسم</h3>
+                <p className="text-xs text-neutral-500">الأعضاء والمرؤوسون المباشرون</p>
+              </div>
+              {onNavigateToTab && (
+                <button
+                  onClick={() => onNavigateToTab('employees')}
+                  className="text-xs font-semibold text-emerald-700 hover:text-emerald-800 cursor-pointer"
+                >
+                  كامل الفريق
+                </button>
+              )}
+            </div>
+
+            <Card className="p-4 space-y-3 max-h-[360px] overflow-y-auto">
+              {visibleEmployees.length === 0 ? (
+                <div className="py-8 text-center text-xs text-neutral-400">
+                  لا يوجد أعضاء مسجلون في هذا القسم حالياً
+                </div>
+              ) : (
+                visibleEmployees.map(member => {
+                  const memberTasks = visibleTasks.filter(t => t.assignedTo === member.id);
+                  const memberDone = memberTasks.filter(t => t.status === 'Completed').length;
+                  return (
+                    <div
+                      key={member.id}
+                      className="flex items-center justify-between gap-3 p-2.5 rounded-xl bg-neutral-50/70 border border-neutral-100"
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-800 flex items-center justify-center text-xs font-bold shrink-0">
+                          {member.displayName.slice(0, 2).toUpperCase()}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-xs font-bold text-neutral-900 truncate">
+                            {member.displayName}
+                          </p>
+                          <p className="text-[11px] text-neutral-500 truncate">
+                            {member.position || member.department || 'عضو فريق'}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="text-left shrink-0">
+                        <span className="inline-flex items-center gap-1 text-[11px] font-mono font-bold text-teal-700">
+                          <CheckCircle2 className="w-3 h-3" />
+                          {memberDone}/{memberTasks.length}
+                        </span>
+                        <p className="text-[10px] text-neutral-400 flex items-center gap-1">
+                          <Users className="w-3 h-3" /> مهام
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </Card>
+          </div>
+        </div>
+      )}
 
       {/* Add / Edit Department Modal */}
       <Modal

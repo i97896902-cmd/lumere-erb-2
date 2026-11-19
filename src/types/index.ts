@@ -3,6 +3,24 @@ export type CanonicalRole = 'SUPER_ADMIN' | 'COMPANY_ADMIN' | 'MANAGER' | 'EMPLO
 // Preserve legacy 'ADMIN' value in existing Firestore records; normalized via rbac.normalizeRole()
 export type Role = CanonicalRole | 'ADMIN';
 
+export type TabType =
+  | 'group_dashboard'
+  | 'companies'
+  | 'dashboard'
+  | 'tasks'
+  | 'projects'
+  | 'clients'
+  | 'equipment'
+  | 'join_requests'
+  | 'calendar'
+  | 'employees'
+  | 'departments'
+  | 'reports'
+  | 'activity'
+  | 'notifications'
+  | 'settings'
+  | 'profile';
+
 export type CompanyType = 'parent' | 'subsidiary';
 export type CompanyStatus = 'active' | 'inactive';
 
