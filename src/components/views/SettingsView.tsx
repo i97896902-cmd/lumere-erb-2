@@ -19,30 +19,48 @@ import { Input, Select } from '../ui/Input';
 import { useAuth } from '../../context/AuthContext';
 import { useCompany } from '../../context/CompanyContext';
 import { useToast } from '../../context/ToastContext';
+import { DataService } from '../../services/dataService';
 import { PrivilegedService } from '../../services/privilegedService';
 import {
   DeadlinePushService,
   DeadlineServiceSettings,
 } from '../../services/deadlinePushService';
 
+const PREFS_STORAGE_KEY = 'lumere_erp_company_prefs_v1';
+
 interface SettingsViewProps {
   onRefreshAllData: () => void;
 }
 
 export function SettingsView({ onRefreshAllData }: SettingsViewProps) {
-  const { isSuperAdmin, isCompanyAdmin, refreshCurrentUser } = useAuth();
-  const { activeCompany } = useCompany();
+  const { currentUser, isSuperAdmin, isCompanyAdmin, refreshCurrentUser } = useAuth();
+  const { activeCompany, refreshCompanies } = useCompany();
   const { showToast } = useToast();
 
   const [companyName, setCompanyName] = useState(activeCompany.name);
   const [defaultDeadlineDays, setDefaultDeadlineDays] = useState('7');
   const [requireReview, setRequireReview] = useState(true);
+  const [isSavingGeneral, setIsSavingGeneral] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
   const [isSyncingClaims, setIsSyncingClaims] = useState(false);
 
   useEffect(() => {
     setCompanyName(activeCompany.name);
-  }, [activeCompany.name]);
+    try {
+      const raw = localStorage.getItem(`${PREFS_STORAGE_KEY}_${activeCompany.id}`);
+      if (raw) {
+        const parsed = JSON.parse(raw) as { defaultDeadlineDays?: string; requireReview?: boolean };
+        setDefaultDeadlineDays(parsed.defaultDeadlineDays || '7');
+        setRequireReview(parsed.requireReview ?? true);
+      } else {
+        setDefaultDeadlineDays('7');
+        setRequireReview(true);
+      }
+    } catch {
+      setDefaultDeadlineDays('7');
+      setRequireReview(true);
+    }
+  }, [activeCompany.id, activeCompany.name]);
 
   // Deadline Push Settings
   const [deadlineSettings, setDeadlineSettings] = useState<DeadlineServiceSettings>(
@@ -60,9 +78,27 @@ export function SettingsView({ onRefreshAllData }: SettingsViewProps) {
     return () => unsub();
   }, []);
 
-  const handleSaveGeneral = (e: React.FormEvent) => {
+  const handleSaveGeneral = async (e: React.FormEvent) => {
     e.preventDefault();
-    showToast('تم حفظ إعدادات وتفضيلات المنشأة بنجاح', 'success');
+    setIsSavingGeneral(true);
+    try {
+      localStorage.setItem(
+        `${PREFS_STORAGE_KEY}_${activeCompany.id}`,
+        JSON.stringify({
+          defaultDeadlineDays: String(Math.max(1, Number(defaultDeadlineDays) || 7)),
+          requireReview,
+        })
+      );
+      if (isSuperAdmin && currentUser && companyName.trim() && companyName.trim() !== activeCompany.name) {
+        await DataService.updateCompany(activeCompany.id, { name: companyName.trim() }, currentUser);
+        await refreshCompanies();
+      }
+      showToast('تم حفظ إعدادات وتفضيلات المنشأة بنجاح', 'success');
+    } catch {
+      showToast('تعذر حفظ إعدادات المنشأة', 'error');
+    } finally {
+      setIsSavingGeneral(false);
+    }
   };
 
   const handleUpdateDeadlineSetting = <K extends keyof DeadlineServiceSettings>(
@@ -175,7 +211,7 @@ export function SettingsView({ onRefreshAllData }: SettingsViewProps) {
           </div>
 
           <div className="flex justify-end pt-2">
-            <Button type="submit" size="sm" variant="primary">
+            <Button type="submit" size="sm" variant="primary" isLoading={isSavingGeneral}>
               حفظ التفضيلات
             </Button>
           </div>

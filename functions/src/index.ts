@@ -23,8 +23,8 @@ interface CallerContext {
   companyId: string;
 }
 
-function normalizeRole(role?: string, email?: string): CanonicalRole {
-  if (email && email.toLowerCase() === PRIMARY_SUPER_ADMIN_EMAIL) return 'SUPER_ADMIN';
+function normalizeRole(role?: string, email?: string, emailVerified?: boolean): CanonicalRole {
+  if (emailVerified && email && email.toLowerCase() === PRIMARY_SUPER_ADMIN_EMAIL) return 'SUPER_ADMIN';
   if (role === 'SUPER_ADMIN' || role === 'ADMIN') return 'SUPER_ADMIN';
   if (role === 'COMPANY_ADMIN') return 'COMPANY_ADMIN';
   if (role === 'MANAGER') return 'MANAGER';
@@ -42,6 +42,7 @@ async function requireCaller(request: CallableRequest): Promise<CallerContext> {
 
   const uid = request.auth.uid;
   const email = (request.auth.token.email || '').toLowerCase();
+  const emailVerified = request.auth.token.email_verified === true;
   const userSnap = await db.collection('users').doc(uid).get();
 
   if (!userSnap.exists) {
@@ -49,9 +50,9 @@ async function requireCaller(request: CallableRequest): Promise<CallerContext> {
   }
 
   const data = userSnap.data() || {};
-  const role = normalizeRole(data.role, email);
+  const role = normalizeRole(data.role, email, emailVerified);
 
-  if (!isActiveStatus(data.status) && email !== PRIMARY_SUPER_ADMIN_EMAIL) {
+  if (!isActiveStatus(data.status) && !(emailVerified && email === PRIMARY_SUPER_ADMIN_EMAIL)) {
     throw new HttpsError('permission-denied', 'Caller account is not active.');
   }
 
@@ -113,7 +114,7 @@ export const createCompany = onCall(async request => {
     throw new HttpsError('permission-denied', 'Only SUPER_ADMIN can create companies.');
   }
 
-  const { name, arabicName, slug, description, businessSector, logo } = request.data || {};
+  const { name, arabicName, slug, description, businessSector, logo, seedSuggestedDepartments } = request.data || {};
   if (typeof name !== 'string' || name.trim().length < 2 || name.trim().length > 150) {
     throw new HttpsError('invalid-argument', 'Valid company name is required.');
   }
@@ -148,6 +149,23 @@ export const createCompany = onCall(async request => {
   };
 
   await companyRef.set(companyDoc);
+
+  if (seedSuggestedDepartments === true) {
+    await db
+      .collection('departments')
+      .doc(`${cleanSlug}-operations`)
+      .set(
+        {
+          companyId: cleanSlug,
+          name: 'العمليات والإدارة',
+          description: 'إدارة العمليات اليومية وتنسيق فرق العمل.',
+          color: 'bg-emerald-600',
+          createdAt: now,
+        },
+        { merge: true }
+      );
+  }
+
   await writeAuditLog({
     companyId: cleanSlug,
     caller,
@@ -264,8 +282,14 @@ export const updateUserRoleAndCompany = onCall(async request => {
   }
 
   if (caller.role === 'SUPER_ADMIN') {
-    // Full authority across all companies
+    // Full authority across all companies, except non-SUPER_ADMIN cannot belong to parent company
+    if (role !== 'SUPER_ADMIN' && companyId === PARENT_COMPANY_ID) {
+      throw new HttpsError('invalid-argument', 'Only SUPER_ADMIN may be assigned to LUMERE GROUP.');
+    }
   } else if (caller.role === 'COMPANY_ADMIN') {
+    if (userId === caller.uid) {
+      throw new HttpsError('permission-denied', 'COMPANY_ADMIN cannot modify their own role or company.');
+    }
     if (caller.companyId !== companyId) {
       throw new HttpsError('permission-denied', 'COMPANY_ADMIN cannot manage users of another company.');
     }
@@ -282,9 +306,21 @@ export const updateUserRoleAndCompany = onCall(async request => {
     throw new HttpsError('not-found', 'Target user does not exist.');
   }
 
-  // Prevent COMPANY_ADMIN from hijacking a user currently belonging to a different company
-  if (caller.role === 'COMPANY_ADMIN' && targetSnap.data()?.companyId !== caller.companyId) {
-    throw new HttpsError('permission-denied', 'Target user does not belong to your company.');
+  const targetData = targetSnap.data() || {};
+  const targetCurrentRole = normalizeRole(
+    typeof targetData.role === 'string' ? targetData.role : undefined,
+    typeof targetData.email === 'string' ? targetData.email : undefined,
+    true
+  );
+
+  // Prevent COMPANY_ADMIN from hijacking a user in another company OR modifying a SUPER_ADMIN / peer COMPANY_ADMIN
+  if (caller.role === 'COMPANY_ADMIN') {
+    if (targetData.companyId !== caller.companyId) {
+      throw new HttpsError('permission-denied', 'Target user does not belong to your company.');
+    }
+    if (targetCurrentRole === 'SUPER_ADMIN' || targetCurrentRole === 'COMPANY_ADMIN') {
+      throw new HttpsError('permission-denied', 'COMPANY_ADMIN cannot modify a SUPER_ADMIN or another COMPANY_ADMIN.');
+    }
   }
 
   const now = new Date().toISOString();

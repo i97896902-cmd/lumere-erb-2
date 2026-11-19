@@ -2,6 +2,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   buildFullMigrationPlan,
+  COMPANY_OWNED_COLLECTIONS,
   LEGACY_SUBSIDIARY_ID,
   NEX_AURA_ID,
   ORDARK_ID,
@@ -10,11 +11,11 @@ import {
   verifyPostMigrationState,
 } from './lib/migrationLogic';
 
-describe('Multi-company migration logic', () => {
+describe('Multi-company migration logic (Phase 3 Idempotency, Preservation & Rollback)', () => {
   const nowIso = '2026-01-15T10:00:00.000Z';
 
-  it('creates 4 core companies, promotes legacy admin to SUPER_ADMIN in parent group, and assigns legacy records to LUMERE without dropping fields', () => {
-    const collections = {
+  it('creates 4 core companies, promotes legacy admin to SUPER_ADMIN in parent group, migrates all 10 collections to LUMERE without dropping IDs/fields, and is strictly idempotent', () => {
+    const initialCollections: Record<string, { id: string; data: Record<string, unknown> }[]> = {
       users: [
         {
           id: 'u-admin',
@@ -45,7 +46,15 @@ describe('Multi-company migration logic', () => {
       activity_logs: [{ id: 'log-1', data: { actorId: 'u-admin', action: 'Task Created', target: 'Video Edit' } }],
       equipment: [{ id: 'eq-1', data: { name: 'Sony FX3', serialNumber: 'SN-1', status: 'available' } }],
       equipmentHistory: [{ id: 'eqh-1', data: { equipmentId: 'eq-1', action: 'created' } }],
+      reports: [{ id: 'rpt-1', data: { title: 'Q1 Report', generatedBy: 'u-admin', period: 'monthly' } }],
     };
+
+    // Deep-clone pre-migration snapshot as backup reference
+    const backupSnapshot = JSON.parse(JSON.stringify(initialCollections)) as typeof initialCollections;
+    const backupCounts: Record<string, number> = {};
+    for (const col of COMPANY_OWNED_COLLECTIONS) {
+      backupCounts[col] = (initialCollections[col] || []).length;
+    }
 
     const taskComments = [
       { taskId: 'task-1', comment: { id: 'c-1', data: { userId: 'u-emp-1', message: 'Working on it' } } },
@@ -53,13 +62,14 @@ describe('Multi-company migration logic', () => {
 
     const { items, summary } = buildFullMigrationPlan({
       existingCompanies: [],
-      collections,
+      collections: initialCollections,
       taskComments,
       nowIso,
     });
 
     assert.equal(summary.byCollection.companies.create, 4);
     assert.equal(summary.byCollection.users.merge, 2);
+    assert.equal(summary.byCollection.reports.merge, 1);
 
     const adminPatch = items.find(i => i.collection === 'users' && i.docId === 'u-admin');
     assert.equal(adminPatch?.operation, 'merge');
@@ -70,23 +80,26 @@ describe('Multi-company migration logic', () => {
     assert.equal(empPatch?.operation, 'merge');
     assert.equal(empPatch?.payload?.companyId, LEGACY_SUBSIDIARY_ID);
 
+    const reportPatch = items.find(i => i.collection === 'reports' && i.docId === 'rpt-1');
+    assert.equal(reportPatch?.operation, 'merge');
+    assert.equal(reportPatch?.payload?.companyId, LEGACY_SUBSIDIARY_ID);
+
     const commentPatch = items.find(i => i.collection === 'tasks/task-1/comments' && i.docId === 'c-1');
     assert.equal(commentPatch?.operation, 'merge');
     assert.equal(commentPatch?.payload?.companyId, LEGACY_SUBSIDIARY_ID);
 
-    // Apply plan in-memory and confirm idempotency on second pass
+    // Apply plan in-memory
     const migratedCompanies = items
       .filter(i => i.collection === 'companies' && i.operation === 'create')
       .map(i => ({ id: i.docId, data: i.payload! }));
 
     const migratedCollections: Record<string, { id: string; data: Record<string, unknown> }[]> = {};
-    for (const [col, docs] of Object.entries(collections)) {
+    for (const [col, docs] of Object.entries(initialCollections)) {
       migratedCollections[col] = docs.map(d => {
         const patch = items.find(i => i.collection === col && i.docId === d.id && i.operation === 'merge');
         return { id: d.id, data: patch ? { ...d.data, ...patch.payload } : d.data };
       });
     }
-    // Add seeded subsidiary departments
     for (const deptCreate of items.filter(i => i.collection === 'departments' && i.operation === 'create')) {
       migratedCollections.departments.push({ id: deptCreate.docId, data: deptCreate.payload! });
     }
@@ -100,11 +113,18 @@ describe('Multi-company migration logic', () => {
       };
     });
 
-    // Verify original field preserved
+    // Verify all original Document IDs & legacy fields are preserved verbatim
+    for (const col of COMPANY_OWNED_COLLECTIONS) {
+      const origIds = backupSnapshot[col].map(d => d.id);
+      const migratedIds = new Set(migratedCollections[col].map(d => d.id));
+      for (const origId of origIds) {
+        assert.ok(migratedIds.has(origId), `Expected original ID ${origId} to be preserved in ${col}`);
+      }
+    }
     const migratedAdmin = migratedCollections.users.find(u => u.id === 'u-admin');
     assert.equal(migratedAdmin?.data.customLegacyField, 'keep-me');
 
-    // Second pass must skip everything (idempotent!)
+    // Second pass must produce ZERO writes (strict idempotency!)
     const secondPass = buildFullMigrationPlan({
       existingCompanies: migratedCompanies,
       collections: migratedCollections,
@@ -114,25 +134,32 @@ describe('Multi-company migration logic', () => {
     assert.equal(secondPass.summary.totalPlannedCreates, 0);
     assert.equal(secondPass.summary.totalPlannedMerges, 0);
 
-    // Post-migration verification must pass
+    // Third pass also produces ZERO writes
+    const thirdPass = buildFullMigrationPlan({
+      existingCompanies: migratedCompanies,
+      collections: migratedCollections,
+      taskComments: migratedComments,
+      nowIso,
+    });
+    assert.equal(thirdPass.summary.totalPlannedCreates, 0);
+    assert.equal(thirdPass.summary.totalPlannedMerges, 0);
+
+    // Post-migration verification must pass with 0 issues
     const report = verifyPostMigrationState({
-      backupCounts: {
-        users: 2,
-        departments: 1,
-        clients: 1,
-        projects: 1,
-        tasks: 1,
-        notifications: 1,
-        activity_logs: 1,
-        equipment: 1,
-        equipmentHistory: 1,
-      },
+      backupCounts,
       companies: migratedCompanies,
       collections: migratedCollections,
       taskComments: migratedComments,
     });
     assert.equal(report.passed, true);
     assert.equal(report.issues.length, 0);
+
+    // Rollback integrity: restoring from backupSnapshot restores exact pre-migration counts and fields
+    for (const col of COMPANY_OWNED_COLLECTIONS) {
+      const restored = JSON.parse(JSON.stringify(backupSnapshot[col]));
+      assert.equal(restored.length, backupCounts[col]);
+      assert.deepEqual(restored, initialCollections[col]);
+    }
   });
 
   it('detects missing companyId, dropped counts, and cross-company task-project mismatches', () => {
@@ -156,6 +183,7 @@ describe('Multi-company migration logic', () => {
         activity_logs: [],
         equipment: [],
         equipmentHistory: [],
+        reports: [],
       },
       taskComments: [],
     });

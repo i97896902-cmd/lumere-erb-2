@@ -1,6 +1,22 @@
 import React from 'react';
 import { TaskPriority, TaskStatus } from '../../types';
 
+const PRIORITY_LABELS: Record<TaskPriority, string> = {
+  Urgent: 'عاجلة',
+  High: 'عالية',
+  Medium: 'متوسطة',
+  Low: 'منخفضة',
+};
+
+const STATUS_LABELS: Record<TaskStatus, string> = {
+  Pending: 'قيد الانتظار',
+  'In Progress': 'قيد التنفيذ',
+  Review: 'بانتظار الاعتماد',
+  Completed: 'مكتملة',
+  Rejected: 'تحتاج تعديل',
+  Cancelled: 'ملغاة',
+};
+
 export function PriorityBadge({ priority }: { priority: TaskPriority }) {
   const styles: Record<TaskPriority, string> = {
     Urgent: 'bg-rose-50 text-rose-700 border-rose-200 ring-rose-500/20',
@@ -11,10 +27,10 @@ export function PriorityBadge({ priority }: { priority: TaskPriority }) {
 
   return (
     <span
-      className={`inline-flex items-center px-2 py-0.5 text-xs font-semibold rounded-md border ring-1 ${styles[priority]}`}
+      className={`inline-flex items-center px-2 py-0.5 text-xs font-semibold rounded-md border ring-1 whitespace-nowrap ${styles[priority]}`}
     >
       <span
-        className={`w-1.5 h-1.5 rounded-full mr-1.5 ${
+        className={`w-1.5 h-1.5 rounded-full ml-1.5 ${
           priority === 'Urgent'
             ? 'bg-rose-500'
             : priority === 'High'
@@ -24,7 +40,7 @@ export function PriorityBadge({ priority }: { priority: TaskPriority }) {
             : 'bg-neutral-400'
         }`}
       />
-      {priority}
+      {PRIORITY_LABELS[priority] || priority}
     </span>
   );
 }
@@ -32,9 +48,9 @@ export function PriorityBadge({ priority }: { priority: TaskPriority }) {
 export function StatusBadge({ status, isOverdue }: { status: TaskStatus; isOverdue?: boolean }) {
   if (isOverdue && status !== 'Completed' && status !== 'Cancelled') {
     return (
-      <span className="inline-flex items-center px-2.5 py-0.5 text-xs font-medium rounded-full bg-rose-100 text-rose-800 border border-rose-200 animate-pulse">
-        <span className="w-1.5 h-1.5 rounded-full bg-rose-600 mr-1.5" />
-        Overdue
+      <span className="inline-flex items-center px-2.5 py-0.5 text-xs font-medium rounded-full bg-rose-100 text-rose-800 border border-rose-200 animate-pulse whitespace-nowrap">
+        <span className="w-1.5 h-1.5 rounded-full bg-rose-600 ml-1.5" />
+        متأخرة
       </span>
     );
   }
@@ -82,10 +98,10 @@ export function StatusBadge({ status, isOverdue }: { status: TaskStatus; isOverd
 
   return (
     <span
-      className={`inline-flex items-center px-2.5 py-0.5 text-xs font-medium rounded-full border ${current.bg} ${current.text} ${current.border}`}
+      className={`inline-flex items-center px-2.5 py-0.5 text-xs font-medium rounded-full border whitespace-nowrap ${current.bg} ${current.text} ${current.border}`}
     >
-      <span className={`w-1.5 h-1.5 rounded-full mr-1.5 ${current.dot}`} />
-      {status}
+      <span className={`w-1.5 h-1.5 rounded-full ml-1.5 ${current.dot}`} />
+      {STATUS_LABELS[status] || status}
     </span>
   );
 }

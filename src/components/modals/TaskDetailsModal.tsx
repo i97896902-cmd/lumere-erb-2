@@ -53,12 +53,14 @@ export function TaskDetailsModal({
   const [loadingComments, setLoadingComments] = useState(false);
   const [isSubmittingComment, setIsSubmittingComment] = useState(false);
   const [isActionLoading, setIsActionLoading] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [progressVal, setProgressVal] = useState(task?.completionPercentage || 0);
 
   // Sync progress if task changes
   useEffect(() => {
     if (task) {
       setProgressVal(task.completionPercentage || 0);
+      setConfirmingDelete(false);
       loadComments(task.id);
     }
   }, [task]);
@@ -120,7 +122,11 @@ export function TaskDetailsModal({
     if (!currentUser) return;
     setIsActionLoading(true);
     try {
-      await DataService.updateTask(task.id, { completionPercentage: progressVal }, currentUser);
+      await DataService.updateTask(
+        task.id,
+        { companyId: taskCompanyId, completionPercentage: progressVal },
+        currentUser
+      );
       onTaskUpdated({ ...task, completionPercentage: progressVal });
       showToast(`تم تحديث نسبة الإنجاز إلى ${progressVal}%`, 'success');
     } catch {
@@ -162,12 +168,16 @@ export function TaskDetailsModal({
 
   const handleDelete = async () => {
     if (!currentUser || !canDelete) return;
-    if (!window.confirm(`هل أنت متأكد من حذف المهمة ${task.taskId} نهائياً؟`)) return;
+    if (!confirmingDelete) {
+      setConfirmingDelete(true);
+      return;
+    }
 
     setIsActionLoading(true);
     try {
       await DataService.deleteTask(task.id, task.title, currentUser, taskCompanyId);
       showToast(`تم حذف المهمة ${task.taskId}`, 'info');
+      setConfirmingDelete(false);
       if (onTaskDeleted) onTaskDeleted(task.id);
       onClose();
     } catch {
@@ -204,7 +214,11 @@ export function TaskDetailsModal({
     }
 
     try {
-      await DataService.updateTask(task.id, { attachments: newAttachments }, currentUser);
+      await DataService.updateTask(
+        task.id,
+        { companyId: taskCompanyId, attachments: newAttachments },
+        currentUser
+      );
       onTaskUpdated({ ...task, attachments: newAttachments });
       showToast('تم رفع المرفق بنجاح', 'success');
     } catch {
@@ -323,13 +337,33 @@ export function TaskDetailsModal({
 
             {/* Admin Delete */}
             {canDelete && (
-              <button
-                onClick={handleDelete}
-                className="p-2 rounded-lg text-neutral-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
-                title="حذف المهمة"
-              >
-                <Trash2 className="w-4 h-4" />
-              </button>
+              confirmingDelete ? (
+                <div className="flex items-center gap-1.5">
+                  <Button
+                    size="sm"
+                    variant="danger"
+                    onClick={handleDelete}
+                    isLoading={isActionLoading}
+                  >
+                    تأكيد الحذف
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setConfirmingDelete(false)}
+                  >
+                    إلغاء
+                  </Button>
+                </div>
+              ) : (
+                <button
+                  onClick={handleDelete}
+                  className="p-2 rounded-lg text-neutral-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                  title="حذف المهمة"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              )
             )}
           </div>
         </div>

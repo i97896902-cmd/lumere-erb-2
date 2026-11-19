@@ -8,6 +8,7 @@ import {
   UserCheck,
   UserX,
   Layers,
+  UserCog,
 } from 'lucide-react';
 import { Card, EmptyState } from '../ui/Card';
 import { Button } from '../ui/Button';
@@ -68,6 +69,7 @@ export function EmployeesView({
   const [formCompanyId, setFormCompanyId] = useState(defaultWriteCompanyId);
   const [formDept, setFormDept] = useState('');
   const [formPosition, setFormPosition] = useState('');
+  const [formManagerId, setFormManagerId] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const canManageCurrentScope = canManageCompanyUsers(currentUser, defaultWriteCompanyId);
@@ -76,6 +78,17 @@ export function EmployeesView({
   const scopedFormDepartments = useMemo(
     () => departments.filter(d => (d.companyId || DEFAULT_SUBSIDIARY_ID) === formCompanyId),
     [departments, formCompanyId]
+  );
+
+  const scopedManagers = useMemo(
+    () =>
+      employees.filter(u => {
+        if (editingEmp && u.id === editingEmp.id) return false;
+        const r = normalizeRole(u.role, u.email);
+        const sameCompany = getUserCompanyId(u) === formCompanyId;
+        return isActiveStatus(u.status) && (r === 'SUPER_ADMIN' || (sameCompany && (r === 'COMPANY_ADMIN' || r === 'MANAGER')));
+      }),
+    [employees, formCompanyId, editingEmp]
   );
 
   const filteredEmployees = employees.filter(emp => {
@@ -106,6 +119,7 @@ export function EmployeesView({
     setFormCompanyId(initialCompany);
     setFormDept(companyDepts[0]?.name || departments[0]?.name || 'عام');
     setFormPosition('');
+    setFormManagerId('');
     setIsModalOpen(true);
   };
 
@@ -117,6 +131,7 @@ export function EmployeesView({
     setFormCompanyId(getUserCompanyId(emp));
     setFormDept(emp.department || '');
     setFormPosition(emp.position || '');
+    setFormManagerId(emp.managerId || '');
     setIsModalOpen(true);
   };
 
@@ -126,6 +141,7 @@ export function EmployeesView({
 
     const targetCompany = getCompanyById(formCompanyId);
     const chosenRole: CanonicalRole = assignableRoles.includes(formRole) ? formRole : 'EMPLOYEE';
+    const selectedManager = employees.find(u => u.id === formManagerId);
 
     setIsSubmitting(true);
     try {
@@ -143,13 +159,15 @@ export function EmployeesView({
               companyName: targetCompany?.name,
               department: formDept,
               position: formPosition.trim(),
+              managerId: selectedManager?.id || '',
+              managerName: selectedManager?.displayName || '',
             },
             currentUser
           );
           if (editingEmp.displayName !== formName.trim()) {
             await DataService.updateUser(
               editingEmp.id,
-              { displayName: formName.trim(), fullName: formName.trim() },
+              { companyId: formCompanyId, displayName: formName.trim(), fullName: formName.trim() },
               currentUser
             );
           }
@@ -157,10 +175,13 @@ export function EmployeesView({
           await DataService.updateUser(
             editingEmp.id,
             {
+              companyId: formCompanyId,
               displayName: formName.trim(),
               fullName: formName.trim(),
               department: formDept,
               position: formPosition.trim(),
+              managerId: selectedManager?.id || '',
+              managerName: selectedManager?.displayName || '',
             },
             currentUser
           );
@@ -177,6 +198,9 @@ export function EmployeesView({
             role: chosenRole,
             department: formDept || 'عام',
             position: formPosition.trim(),
+            ...(selectedManager
+              ? { managerId: selectedManager.id, managerName: selectedManager.displayName }
+              : {}),
             status: 'active',
             joinedDate: new Date().toISOString().split('T')[0],
           },
@@ -195,11 +219,12 @@ export function EmployeesView({
   };
 
   const toggleStatus = async (emp: User) => {
-    if (!currentUser || !canManageCompanyUsers(currentUser, getUserCompanyId(emp))) return;
+    const empCompanyId = getUserCompanyId(emp);
+    if (!currentUser || !canManageCompanyUsers(currentUser, empCompanyId)) return;
     const currentlyActive = isActiveStatus(emp.status);
     const newStatus = currentlyActive ? 'suspended' : 'active';
     try {
-      await DataService.updateUser(emp.id, { status: newStatus }, currentUser);
+      await DataService.updateUser(emp.id, { companyId: empCompanyId, status: newStatus }, currentUser);
       showToast(`تم تغيير حالة العضو إلى ${newStatus === 'active' ? 'نشط' : 'موقوف'}`, 'info');
       onRefreshEmployees();
     } catch {
@@ -349,6 +374,12 @@ export function EmployeesView({
                       <Building2 className="w-3.5 h-3.5 text-neutral-400 shrink-0" />
                       <span>{emp.department || 'عام'}</span>
                     </div>
+                    {emp.managerName && (
+                      <div className="flex items-center gap-2">
+                        <UserCog className="w-3.5 h-3.5 text-neutral-400 shrink-0" />
+                        <span>المدير المباشر: {emp.managerName}</span>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -458,7 +489,17 @@ export function EmployeesView({
               <Select
                 label="الشركة *"
                 value={formCompanyId}
-                onChange={e => setFormCompanyId(e.target.value)}
+                onChange={e => {
+                  const nextCid = e.target.value;
+                  setFormCompanyId(nextCid);
+                  const nextDepts = departments.filter(
+                    d => (d.companyId || DEFAULT_SUBSIDIARY_ID) === nextCid
+                  );
+                  if (nextDepts.length > 0 && !nextDepts.some(d => d.name === formDept)) {
+                    setFormDept(nextDepts[0].name);
+                  }
+                  setFormManagerId('');
+                }}
                 options={(formRole === 'SUPER_ADMIN' ? companies : subsidiaries).map(c => ({
                   label: c.name,
                   value: c.id,
@@ -483,21 +524,36 @@ export function EmployeesView({
             />
           </div>
 
-          <Select
-            label="القسم *"
-            value={formDept}
-            onChange={e => setFormDept(e.target.value)}
-            options={
-              scopedFormDepartments.length > 0
-                ? scopedFormDepartments.map(d => ({ label: d.name, value: d.name }))
-                : departments.length > 0
-                ? Array.from(new Set(departments.map(d => d.name))).map(n => ({
-                    label: n,
-                    value: n,
-                  }))
-                : [{ label: 'عام', value: 'عام' }]
-            }
-          />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <Select
+              label="القسم *"
+              value={formDept}
+              onChange={e => setFormDept(e.target.value)}
+              options={
+                scopedFormDepartments.length > 0
+                  ? scopedFormDepartments.map(d => ({ label: d.name, value: d.name }))
+                  : departments.length > 0
+                  ? Array.from(new Set(departments.map(d => d.name))).map(n => ({
+                      label: n,
+                      value: n,
+                    }))
+                  : [{ label: 'عام', value: 'عام' }]
+              }
+            />
+
+            <Select
+              label="المدير المباشر (اختياري)"
+              value={formManagerId}
+              onChange={e => setFormManagerId(e.target.value)}
+              options={[
+                { label: '-- بدون مدير مباشر --', value: '' },
+                ...scopedManagers.map(m => ({
+                  label: `${m.displayName} (${getRoleArabicLabel(m.role)})`,
+                  value: m.id,
+                })),
+              ]}
+            />
+          </div>
 
           <div className="flex items-center justify-end gap-3 pt-3 border-t border-neutral-100">
             <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)}>

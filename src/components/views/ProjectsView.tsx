@@ -202,13 +202,19 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({
     }
   };
 
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+
   const handleDeleteProject = async (project: Project) => {
     if (!currentUser || !canManageProjects) return;
-    if (!window.confirm('هل أنت متأكد من رغبتك في حذف هذا المشروع؟')) return;
+    if (confirmDeleteId !== project.id) {
+      setConfirmDeleteId(project.id);
+      return;
+    }
 
     setIsDeletingId(project.id);
     try {
       await DataService.deleteProject(project.id, currentUser, project.companyId);
+      setConfirmDeleteId(null);
       if (selectedProjectForDetails?.id === project.id) {
         setSelectedProjectForDetails(null);
       }
@@ -467,14 +473,32 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({
                         >
                           <Edit2 className="w-3.5 h-3.5" />
                         </button>
-                        <button
-                          onClick={() => handleDeleteProject(project)}
-                          disabled={isDeletingId === project.id}
-                          className="p-1.5 rounded-lg text-neutral-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
-                          title="حذف المشروع"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
+                        {confirmDeleteId === project.id ? (
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={() => handleDeleteProject(project)}
+                              disabled={isDeletingId === project.id}
+                              className="px-2 py-1 rounded-lg bg-rose-600 text-white text-[11px] font-semibold hover:bg-rose-700 transition-colors cursor-pointer"
+                            >
+                              تأكيد الحذف
+                            </button>
+                            <button
+                              onClick={() => setConfirmDeleteId(null)}
+                              className="px-2 py-1 rounded-lg bg-neutral-100 text-neutral-600 text-[11px] font-medium hover:bg-neutral-200 transition-colors cursor-pointer"
+                            >
+                              إلغاء
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => handleDeleteProject(project)}
+                            disabled={isDeletingId === project.id}
+                            className="p-1.5 rounded-lg text-neutral-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                            title="حذف المشروع"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
                       </>
                     )}
                   </div>

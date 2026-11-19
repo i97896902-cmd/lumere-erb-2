@@ -17,7 +17,7 @@ import { getFirestore } from 'firebase-admin/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
 import { COMPANY_OWNED_COLLECTIONS } from './lib/migrationLogic';
 
-const ALL_COLLECTIONS = ['companies', 'admins', ...COMPANY_OWNED_COLLECTIONS];
+const ALL_COLLECTIONS = ['companies', 'admins', ...COMPANY_OWNED_COLLECTIONS, 'attendance'];
 
 function initAdminFirestore() {
   const saPath = process.env.GOOGLE_APPLICATION_CREDENTIALS;

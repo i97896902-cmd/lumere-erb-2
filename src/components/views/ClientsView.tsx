@@ -154,13 +154,19 @@ export const ClientsView: React.FC<ClientsViewProps> = ({
     }
   };
 
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+
   const handleDeleteClient = async (client: Client) => {
     if (!currentUser || !canManageClients) return;
-    if (!window.confirm('هل أنت متأكد من رغبتك في حذف هذا العميل؟')) return;
+    if (confirmDeleteId !== client.id) {
+      setConfirmDeleteId(client.id);
+      return;
+    }
 
     setIsDeletingId(client.id);
     try {
       await DataService.deleteClient(client.id, currentUser, client.companyId);
+      setConfirmDeleteId(null);
       if (selectedClientForDetails?.id === client.id) {
         setSelectedClientForDetails(null);
       }
@@ -398,14 +404,32 @@ export const ClientsView: React.FC<ClientsViewProps> = ({
                       >
                         <Edit2 className="w-3.5 h-3.5" />
                       </button>
-                      <button
-                        onClick={() => handleDeleteClient(client)}
-                        disabled={isDeletingId === client.id}
-                        className="p-1.5 rounded-lg text-neutral-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
-                        title="حذف العميل"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
+                      {confirmDeleteId === client.id ? (
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => handleDeleteClient(client)}
+                            disabled={isDeletingId === client.id}
+                            className="px-2 py-1 rounded-lg bg-rose-600 text-white text-[11px] font-semibold hover:bg-rose-700 transition-colors cursor-pointer"
+                          >
+                            تأكيد الحذف
+                          </button>
+                          <button
+                            onClick={() => setConfirmDeleteId(null)}
+                            className="px-2 py-1 rounded-lg bg-neutral-100 text-neutral-600 text-[11px] font-medium hover:bg-neutral-200 transition-colors cursor-pointer"
+                          >
+                            إلغاء
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => handleDeleteClient(client)}
+                          disabled={isDeletingId === client.id}
+                          className="p-1.5 rounded-lg text-neutral-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                          title="حذف العميل"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
                     </div>
                   )}
                 </div>

@@ -30,7 +30,8 @@ import {
 import { DEFAULT_SUBSIDIARY_ID, PARENT_COMPANY_ID } from '../config/companies';
 import { DEFAULT_DIRECT_ACCESS_USER } from '../services/localDataService';
 
-export const AUTH_DISABLED = true;
+// Direct access preview flag: set VITE_DISABLE_AUTH=false in production builds to enforce full Firebase Authentication
+export const AUTH_DISABLED = import.meta.env.VITE_DISABLE_AUTH !== 'false';
 
 export interface AuthCustomClaims {
   role?: CanonicalRole;

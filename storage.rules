@@ -10,6 +10,13 @@ service firebase.storage {
       return request.auth != null;
     }
 
+    function isValidId(id) {
+      return id is string
+        && id.size() >= 1
+        && id.size() <= 128
+        && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
     function isSuperAdmin() {
       return isSignedIn() && (
         request.auth.token.role == 'SUPER_ADMIN'
@@ -19,6 +26,7 @@ service firebase.storage {
 
     function belongsToCompany(companyId) {
       return isSignedIn()
+        && isValidId(companyId)
         && request.auth.token.companyId is string
         && request.auth.token.companyId == companyId;
     }
@@ -28,12 +36,14 @@ service firebase.storage {
     }
 
     function isSafeImage() {
-      return request.resource.size < 5 * 1024 * 1024
+      return request.resource != null
+        && request.resource.size < 5 * 1024 * 1024
         && request.resource.contentType.matches('image/.*');
     }
 
     function isSafeAttachment() {
-      return request.resource.size < 15 * 1024 * 1024
+      return request.resource != null
+        && request.resource.size < 15 * 1024 * 1024
         && (
           request.resource.contentType.matches('image/.*')
           || request.resource.contentType == 'application/pdf'
@@ -44,28 +54,32 @@ service firebase.storage {
         );
     }
 
-    // Company Logos: readable by authenticated users in that company (or SUPER_ADMIN); writable by SUPER_ADMIN / COMPANY_ADMIN
+    // Company Logos: strictly isolated to the company and SUPER_ADMIN
     match /companies/{companyId}/logos/{fileName} {
-      allow read: if isSignedIn();
-      allow write: if (isSuperAdmin() || isCompanyAdmin(companyId)) && isSafeImage();
+      allow read: if isValidId(companyId) && (isSuperAdmin() || belongsToCompany(companyId));
+      allow create, update: if isValidId(companyId) && (isSuperAdmin() || isCompanyAdmin(companyId)) && isSafeImage();
+      allow delete: if isValidId(companyId) && (isSuperAdmin() || isCompanyAdmin(companyId));
     }
 
     // Task attachments: strictly isolated to the company
     match /companies/{companyId}/tasks/{taskId}/{fileName} {
-      allow read: if isSuperAdmin() || belongsToCompany(companyId);
-      allow write: if (isSuperAdmin() || belongsToCompany(companyId)) && isSafeAttachment();
+      allow read: if isValidId(companyId) && isValidId(taskId) && (isSuperAdmin() || belongsToCompany(companyId));
+      allow create, update: if isValidId(companyId) && isValidId(taskId) && (isSuperAdmin() || belongsToCompany(companyId)) && isSafeAttachment();
+      allow delete: if isValidId(companyId) && isValidId(taskId) && (isSuperAdmin() || isCompanyAdmin(companyId));
     }
 
     // Project files: strictly isolated to the company
     match /companies/{companyId}/projects/{projectId}/{fileName} {
-      allow read: if isSuperAdmin() || belongsToCompany(companyId);
-      allow write: if (isSuperAdmin() || belongsToCompany(companyId)) && isSafeAttachment();
+      allow read: if isValidId(companyId) && isValidId(projectId) && (isSuperAdmin() || belongsToCompany(companyId));
+      allow create, update: if isValidId(companyId) && isValidId(projectId) && (isSuperAdmin() || belongsToCompany(companyId)) && isSafeAttachment();
+      allow delete: if isValidId(companyId) && isValidId(projectId) && (isSuperAdmin() || isCompanyAdmin(companyId));
     }
 
     // User avatars: isolated by companyId and userId
     match /companies/{companyId}/avatars/{userId}/{fileName} {
-      allow read: if isSuperAdmin() || belongsToCompany(companyId);
-      allow write: if (isSuperAdmin() || (belongsToCompany(companyId) && request.auth.uid == userId)) && isSafeImage();
+      allow read: if isValidId(companyId) && isValidId(userId) && (isSuperAdmin() || belongsToCompany(companyId));
+      allow create, update: if isValidId(companyId) && isValidId(userId) && (isSuperAdmin() || (belongsToCompany(companyId) && request.auth.uid == userId)) && isSafeImage();
+      allow delete: if isValidId(companyId) && isValidId(userId) && (isSuperAdmin() || isCompanyAdmin(companyId) || (belongsToCompany(companyId) && request.auth.uid == userId));
     }
   }
 }

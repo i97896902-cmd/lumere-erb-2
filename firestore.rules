@@ -15,6 +15,13 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    function isValidId(id) {
+      return id is string
+        && id.size() >= 1
+        && id.size() <= 128
+        && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
     function isCurrentUser(userId) {
       return isSignedIn() && request.auth.uid == userId;
     }
@@ -40,6 +47,10 @@ service cloud.firestore {
     function isActiveUser() {
       return isBootstrapSuperAdmin()
         || (hasUserDoc() && currentUserData().status in ['active', 'Active']);
+    }
+
+    function isPendingUser() {
+      return isSignedIn() && hasUserDoc() && currentUserData().status == 'pending';
     }
 
     function currentUserRole() {
@@ -92,11 +103,12 @@ service cloud.firestore {
     }
 
     function isValidCompanyId(companyId) {
-      return companyId is string && companyId.size() >= 2 && companyId.size() <= 128;
+      return isValidId(companyId) && companyId.size() >= 2;
     }
 
     function assigneeMatchesCompany(assigneeUid, companyId) {
       return assigneeUid is string
+        && isValidId(assigneeUid)
         && exists(userDocPath(assigneeUid))
         && get(userDocPath(assigneeUid)).data.companyId == companyId;
     }
@@ -105,8 +117,18 @@ service cloud.firestore {
       return !('projectId' in data)
         || data.projectId == null
         || data.projectId == ''
-        || (exists(/databases/$(database)/documents/projects/$(data.projectId))
+        || (isValidId(data.projectId)
+            && exists(/databases/$(database)/documents/projects/$(data.projectId))
             && get(/databases/$(database)/documents/projects/$(data.projectId)).data.companyId == data.companyId);
+    }
+
+    function clientMatchesCompanyIfPresent(data) {
+      return !('clientId' in data)
+        || data.clientId == null
+        || data.clientId == ''
+        || (isValidId(data.clientId)
+            && (!exists(/databases/$(database)/documents/clients/$(data.clientId))
+                || get(/databases/$(database)/documents/clients/$(data.clientId)).data.companyId == data.companyId));
     }
 
     // =========================================================================
@@ -121,21 +143,31 @@ service cloud.firestore {
     // 4. COMPANIES (Parent LUMERE GROUP + Subsidiaries)
     // =========================================================================
     match /companies/{companyId} {
-      allow get: if isSuperAdmin() || belongsToCompany(companyId) || (isSignedIn() && resource.data.type == 'subsidiary' && resource.data.status == 'active');
-      allow list: if isSuperAdmin() || (isSignedIn() && resource.data.type == 'subsidiary' && resource.data.status == 'active');
+      allow get: if isSuperAdmin()
+        || belongsToCompany(companyId)
+        || (isPendingUser() && resource.data.type == 'subsidiary' && resource.data.status == 'active');
+
+      allow list: if isSuperAdmin()
+        || (isPendingUser() && resource.data.type == 'subsidiary' && resource.data.status == 'active');
 
       allow create: if isSuperAdmin()
+        && isValidCompanyId(companyId)
         && request.resource.data.name is string
         && request.resource.data.name.size() >= 2
         && request.resource.data.name.size() <= 150
         && request.resource.data.slug is string
+        && request.resource.data.slug.size() >= 2
+        && request.resource.data.slug.size() <= 128
         && request.resource.data.type in ['parent', 'subsidiary']
         && request.resource.data.status in ['active', 'inactive'];
 
       allow update: if isSuperAdmin()
+        && isValidCompanyId(companyId)
         && request.resource.data.name is string
+        && request.resource.data.name.size() >= 2
         && request.resource.data.name.size() <= 150
-        && request.resource.data.status in ['active', 'inactive'];
+        && request.resource.data.status in ['active', 'inactive']
+        && !(companyId == 'lumere-group' && request.resource.data.status == 'inactive');
 
       allow delete: if false; // Archive/deactivate instead of destructive deletion
     }
@@ -152,12 +184,13 @@ service cloud.firestore {
         || belongsToCompany(resource.data.companyId);
 
       // Self-registration locked strictly to EMPLOYEE + pending (except bootstrap SUPER_ADMIN)
-      allow create: if isSignedIn() && (
+      allow create: if isSignedIn() && isValidId(userId) && (
         (
           isCurrentUser(userId)
           && request.resource.data.uid == userId
           && request.resource.data.email == request.auth.token.email
           && request.resource.data.displayName is string
+          && request.resource.data.displayName.size() >= 1
           && request.resource.data.displayName.size() <= 128
           && isValidCompanyId(request.resource.data.companyId)
           && (
@@ -171,43 +204,55 @@ service cloud.firestore {
         || (
           isSuperAdmin()
           && isValidCompanyId(request.resource.data.companyId)
+          && request.resource.data.displayName is string
+          && request.resource.data.displayName.size() <= 128
           && request.resource.data.role in ['SUPER_ADMIN', 'COMPANY_ADMIN', 'MANAGER', 'EMPLOYEE']
         )
         || (
           isCompanyAdmin(request.resource.data.companyId)
           && request.resource.data.companyId != 'lumere-group'
+          && request.resource.data.displayName is string
+          && request.resource.data.displayName.size() <= 128
           && request.resource.data.role in ['MANAGER', 'EMPLOYEE']
         )
       );
 
-      allow update: if isSignedIn() && (
+      allow update: if isSignedIn() && isValidId(userId) && (
         // 1. SUPER_ADMIN can manage any user across any company
         (
           isSuperAdmin()
           && isValidCompanyId(request.resource.data.companyId)
           && request.resource.data.role in ['SUPER_ADMIN', 'COMPANY_ADMIN', 'MANAGER', 'EMPLOYEE', 'ADMIN']
         )
-        // 2. COMPANY_ADMIN can manage ONLY users within their own company and assign MANAGER/EMPLOYEE only
+        // 2. COMPANY_ADMIN can manage ONLY MANAGER/EMPLOYEE users within their own company (never self, SUPER_ADMIN, or another COMPANY_ADMIN)
         || (
           isCompanyAdmin(resource.data.companyId)
+          && resource.data.role in ['MANAGER', 'EMPLOYEE']
           && request.resource.data.companyId == resource.data.companyId
           && request.resource.data.role in ['MANAGER', 'EMPLOYEE']
+          && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['uid', 'email', 'companyId'])
           && userId != request.auth.uid
         )
-        // 3. Self profile update: cannot alter role, status, approval metadata, or jump companies once active
+        // 3. Self profile update: cannot alter uid, email, role, status, approval metadata, or jump companies once active
         || (
           isCurrentUser(userId)
           && request.resource.data.role == resource.data.role
           && request.resource.data.status == resource.data.status
-          && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'status', 'approvedBy', 'approvedAt', 'rejectionReason'])
+          && !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+            'uid', 'email', 'role', 'status', 'approvedBy', 'approvedByName', 'approvedAt', 'rejectionReason'
+          ])
+          && (!('displayName' in request.resource.data)
+              || (request.resource.data.displayName is string && request.resource.data.displayName.size() <= 128))
           && (
             request.resource.data.companyId == resource.data.companyId
-            || (resource.data.status == 'pending' && isValidCompanyId(request.resource.data.companyId) && request.resource.data.companyId != 'lumere-group')
+            || (resource.data.status == 'pending'
+                && isValidCompanyId(request.resource.data.companyId)
+                && request.resource.data.companyId != 'lumere-group')
           )
         )
       );
 
-      allow delete: if isSuperAdmin();
+      allow delete: if isSuperAdmin() && isValidId(userId);
     }
 
     // =========================================================================
@@ -217,17 +262,22 @@ service cloud.firestore {
       // Pending users completing profile can read subsidiary departments to choose their department
       allow read: if isSuperAdmin()
         || belongsToCompany(resource.data.companyId)
-        || (isSignedIn() && hasUserDoc() && currentUserData().status == 'pending');
+        || isPendingUser();
 
-      allow create: if canManageCompanyData(request.resource.data.companyId)
+      allow create: if isValidId(departmentId)
+        && canManageCompanyData(request.resource.data.companyId)
         && isValidCompanyId(request.resource.data.companyId)
+        && request.resource.data.name is string
+        && request.resource.data.name.size() >= 1
+        && request.resource.data.name.size() <= 120;
+
+      allow update: if isValidId(departmentId)
+        && canManageCompanyData(resource.data.companyId)
+        && request.resource.data.companyId == resource.data.companyId
         && request.resource.data.name is string
         && request.resource.data.name.size() <= 120;
 
-      allow update: if canManageCompanyData(resource.data.companyId)
-        && request.resource.data.companyId == resource.data.companyId;
-
-      allow delete: if canManageCompanyData(resource.data.companyId);
+      allow delete: if isValidId(departmentId) && canManageCompanyData(resource.data.companyId);
     }
 
     // =========================================================================
@@ -236,17 +286,25 @@ service cloud.firestore {
     match /clients/{clientId} {
       allow read: if canReadCompanyResource(resource.data.companyId);
 
-      allow create: if canManageOperations(request.resource.data.companyId)
+      allow create: if isValidId(clientId)
+        && canManageOperations(request.resource.data.companyId)
         && isValidCompanyId(request.resource.data.companyId)
+        && request.resource.data.companyId != 'lumere-group'
         && request.resource.data.name is string
-        && request.resource.data.name.size() <= 200;
+        && request.resource.data.name.size() >= 1
+        && request.resource.data.name.size() <= 200
+        && (!('email' in request.resource.data) || (request.resource.data.email is string && request.resource.data.email.size() <= 200))
+        && (!('phone' in request.resource.data) || (request.resource.data.phone is string && request.resource.data.phone.size() <= 50));
 
-      allow update: if canManageOperations(resource.data.companyId)
+      allow update: if isValidId(clientId)
+        && canManageOperations(resource.data.companyId)
         && request.resource.data.companyId == resource.data.companyId
         && request.resource.data.name is string
-        && request.resource.data.name.size() <= 200;
+        && request.resource.data.name.size() <= 200
+        && (!('email' in request.resource.data) || (request.resource.data.email is string && request.resource.data.email.size() <= 200))
+        && (!('phone' in request.resource.data) || (request.resource.data.phone is string && request.resource.data.phone.size() <= 50));
 
-      allow delete: if canManageCompanyData(resource.data.companyId);
+      allow delete: if isValidId(clientId) && canManageCompanyData(resource.data.companyId);
     }
 
     // =========================================================================
@@ -255,18 +313,25 @@ service cloud.firestore {
     match /projects/{projectId} {
       allow read: if canReadCompanyResource(resource.data.companyId);
 
-      allow create: if canManageOperations(request.resource.data.companyId)
+      allow create: if isValidId(projectId)
+        && canManageOperations(request.resource.data.companyId)
         && isValidCompanyId(request.resource.data.companyId)
+        && request.resource.data.companyId != 'lumere-group'
         && request.resource.data.name is string
+        && request.resource.data.name.size() >= 1
         && request.resource.data.name.size() <= 200
-        && request.resource.data.clientId is string;
+        && request.resource.data.clientId is string
+        && request.resource.data.clientId.size() <= 128
+        && clientMatchesCompanyIfPresent(request.resource.data);
 
-      allow update: if canManageOperations(resource.data.companyId)
+      allow update: if isValidId(projectId)
+        && canManageOperations(resource.data.companyId)
         && request.resource.data.companyId == resource.data.companyId
         && request.resource.data.name is string
-        && request.resource.data.name.size() <= 200;
+        && request.resource.data.name.size() <= 200
+        && clientMatchesCompanyIfPresent(request.resource.data);
 
-      allow delete: if canManageCompanyData(resource.data.companyId);
+      allow delete: if isValidId(projectId) && canManageCompanyData(resource.data.companyId);
     }
 
     // =========================================================================
@@ -275,14 +340,17 @@ service cloud.firestore {
     match /tasks/{taskId} {
       allow read: if canReadCompanyResource(resource.data.companyId);
 
-      allow create: if canManageOperations(request.resource.data.companyId)
+      allow create: if isValidId(taskId)
+        && canManageOperations(request.resource.data.companyId)
         && isValidCompanyId(request.resource.data.companyId)
         && request.resource.data.companyId != 'lumere-group'
         && request.resource.data.title is string
+        && request.resource.data.title.size() >= 1
         && request.resource.data.title.size() <= 256
         && request.resource.data.description is string
         && request.resource.data.description.size() <= 5000
         && request.resource.data.department is string
+        && request.resource.data.department.size() <= 120
         && request.resource.data.priority in ['Low', 'Medium', 'High', 'Urgent']
         && request.resource.data.status in ['Pending', 'In Progress', 'Review', 'Completed', 'Rejected', 'Cancelled']
         && request.resource.data.completionPercentage is number
@@ -292,12 +360,20 @@ service cloud.firestore {
         && projectMatchesCompanyIfPresent(request.resource.data);
 
       allow update: if isSignedIn()
+        && isValidId(taskId)
         && request.resource.data.companyId == resource.data.companyId
         && (
           (
             canManageOperations(resource.data.companyId)
+            && request.resource.data.title is string
+            && request.resource.data.title.size() <= 256
+            && request.resource.data.description is string
+            && request.resource.data.description.size() <= 5000
+            && request.resource.data.status in ['Pending', 'In Progress', 'Review', 'Completed', 'Rejected', 'Cancelled']
+            && request.resource.data.completionPercentage is number
             && request.resource.data.completionPercentage >= 0
             && request.resource.data.completionPercentage <= 100
+            && assigneeMatchesCompany(request.resource.data.assignedTo, resource.data.companyId)
             && projectMatchesCompanyIfPresent(request.resource.data)
           )
           || (
@@ -305,26 +381,34 @@ service cloud.firestore {
             && resource.data.assignedTo == request.auth.uid
             && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'completionPercentage', 'updatedAt', 'attachments', 'reviewStatus'])
             && request.resource.data.status in ['In Progress', 'Review']
+            && request.resource.data.completionPercentage is number
             && request.resource.data.completionPercentage >= 0
             && request.resource.data.completionPercentage <= 100
           )
         );
 
-      allow delete: if canManageCompanyData(resource.data.companyId);
+      allow delete: if isValidId(taskId) && canManageCompanyData(resource.data.companyId);
 
       match /comments/{commentId} {
         allow read: if canReadCompanyResource(get(/databases/$(database)/documents/tasks/$(taskId)).data.companyId);
-        allow create: if isActiveUser()
+        allow create: if isValidId(commentId)
+          && isActiveUser()
           && canReadCompanyResource(get(/databases/$(database)/documents/tasks/$(taskId)).data.companyId)
           && request.resource.data.userId == request.auth.uid
           && request.resource.data.companyId == get(/databases/$(database)/documents/tasks/$(taskId)).data.companyId
           && request.resource.data.message is string
+          && request.resource.data.message.size() >= 1
           && request.resource.data.message.size() <= 3000;
-        allow update: if isActiveUser()
+        allow update: if isValidId(commentId)
+          && isActiveUser()
           && resource.data.userId == request.auth.uid
-          && request.resource.data.companyId == resource.data.companyId;
-        allow delete: if canManageCompanyData(get(/databases/$(database)/documents/tasks/$(taskId)).data.companyId)
-          || (isActiveUser() && resource.data.userId == request.auth.uid);
+          && request.resource.data.companyId == resource.data.companyId
+          && request.resource.data.userId == resource.data.userId
+          && request.resource.data.message is string
+          && request.resource.data.message.size() <= 3000;
+        allow delete: if isValidId(commentId)
+          && (canManageCompanyData(get(/databases/$(database)/documents/tasks/$(taskId)).data.companyId)
+              || (isActiveUser() && resource.data.userId == request.auth.uid));
       }
     }
 
@@ -338,22 +422,28 @@ service cloud.firestore {
         || isCompanyAdmin(resource.data.companyId)
       );
 
-      allow create: if isActiveUser()
+      allow create: if isValidId(notificationId)
+        && isActiveUser()
         && isValidCompanyId(request.resource.data.companyId)
         && canReadCompanyResource(request.resource.data.companyId)
         && request.resource.data.userId is string
+        && request.resource.data.userId.size() <= 128
         && request.resource.data.title is string
-        && request.resource.data.title.size() <= 200;
+        && request.resource.data.title.size() <= 200
+        && (!('message' in request.resource.data) || (request.resource.data.message is string && request.resource.data.message.size() <= 2000));
 
-      allow update: if isSignedIn() && (
+      allow update: if isValidId(notificationId) && isSignedIn() && (
         (
           resource.data.userId == request.auth.uid
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read'])
         )
-        || canManageCompanyData(resource.data.companyId)
+        || (
+          canManageCompanyData(resource.data.companyId)
+          && request.resource.data.companyId == resource.data.companyId
+        )
       );
 
-      allow delete: if isSignedIn() && (
+      allow delete: if isValidId(notificationId) && isSignedIn() && (
         resource.data.userId == request.auth.uid
         || canManageCompanyData(resource.data.companyId)
       );
@@ -367,11 +457,13 @@ service cloud.firestore {
         || isCompanyAdmin(resource.data.companyId)
         || isManager(resource.data.companyId);
 
-      allow create: if isActiveUser()
+      allow create: if isValidId(logId)
+        && isActiveUser()
         && isValidCompanyId(request.resource.data.companyId)
         && canReadCompanyResource(request.resource.data.companyId)
         && request.resource.data.actorId == request.auth.uid
-        && request.resource.data.action is string;
+        && request.resource.data.action is string
+        && request.resource.data.action.size() <= 120;
 
       allow update, delete: if false; // Strictly Immutable Audit Trail
     }
@@ -382,28 +474,38 @@ service cloud.firestore {
     match /equipment/{equipmentId} {
       allow read: if canReadCompanyResource(resource.data.companyId);
 
-      allow create: if canManageOperations(request.resource.data.companyId)
+      allow create: if isValidId(equipmentId)
+        && canManageOperations(request.resource.data.companyId)
         && isValidCompanyId(request.resource.data.companyId)
+        && request.resource.data.companyId != 'lumere-group'
         && request.resource.data.name is string
+        && request.resource.data.name.size() >= 1
         && request.resource.data.name.size() <= 200
         && request.resource.data.serialNumber is string
+        && request.resource.data.serialNumber.size() <= 120
         && request.resource.data.status in ['available', 'assigned', 'in_maintenance', 'damaged', 'lost', 'inactive'];
 
-      allow update: if canManageOperations(resource.data.companyId)
-        && request.resource.data.companyId == resource.data.companyId;
+      allow update: if isValidId(equipmentId)
+        && canManageOperations(resource.data.companyId)
+        && request.resource.data.companyId == resource.data.companyId
+        && request.resource.data.name is string
+        && request.resource.data.name.size() <= 200;
 
-      allow delete: if canManageCompanyData(resource.data.companyId);
+      allow delete: if isValidId(equipmentId) && canManageCompanyData(resource.data.companyId);
     }
 
     match /equipmentHistory/{historyId} {
       allow read: if canReadCompanyResource(resource.data.companyId);
 
-      allow create: if isActiveUser()
+      allow create: if isValidId(historyId)
+        && isActiveUser()
         && isValidCompanyId(request.resource.data.companyId)
         && canReadCompanyResource(request.resource.data.companyId)
         && request.resource.data.actorId == request.auth.uid
         && request.resource.data.equipmentId is string
-        && request.resource.data.action is string;
+        && request.resource.data.equipmentId.size() <= 128
+        && request.resource.data.action is string
+        && request.resource.data.action.size() <= 120;
 
       allow update, delete: if false; // Strictly Immutable
     }
@@ -416,11 +518,14 @@ service cloud.firestore {
         || isCompanyAdmin(resource.data.companyId)
         || isManager(resource.data.companyId);
 
-      allow create: if canManageOperations(request.resource.data.companyId)
+      allow create: if isValidId(reportId)
+        && canManageOperations(request.resource.data.companyId)
         && isValidCompanyId(request.resource.data.companyId)
-        && request.resource.data.generatedBy == request.auth.uid;
+        && request.resource.data.generatedBy == request.auth.uid
+        && request.resource.data.title is string
+        && request.resource.data.title.size() <= 200;
 
-      allow update, delete: if isSuperAdmin();
+      allow update, delete: if isSuperAdmin() && isValidId(reportId);
     }
   }
 }

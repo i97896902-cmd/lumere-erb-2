@@ -14,6 +14,7 @@ export const COMPANY_OWNED_COLLECTIONS = [
   'activity_logs',
   'equipment',
   'equipmentHistory',
+  'reports',
 ] as const;
 
 export type CompanyOwnedCollection = (typeof COMPANY_OWNED_COLLECTIONS)[number];
