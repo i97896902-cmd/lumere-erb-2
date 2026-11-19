@@ -1,15 +1,18 @@
 import React, { useState } from 'react';
-import { User as UserIcon, Mail, Building2, Briefcase, Calendar, Shield, Save } from 'lucide-react';
+import { Save } from 'lucide-react';
 import { Card } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { RoleBadge } from '../ui/Badge';
 import { useAuth } from '../../context/AuthContext';
+import { useCompany } from '../../context/CompanyContext';
 import { useToast } from '../../context/ToastContext';
 import { DataService } from '../../services/dataService';
+import { getUserCompanyId } from '../../utils/rbac';
 
 export function ProfileView() {
   const { currentUser, role } = useAuth();
+  const { getCompanyById } = useCompany();
   const { showToast } = useToast();
 
   const [displayName, setDisplayName] = useState(currentUser?.displayName || '');
@@ -17,6 +20,10 @@ export function ProfileView() {
   const [isSaving, setIsSaving] = useState(false);
 
   if (!currentUser) return null;
+
+  const assignedCompanyId = getUserCompanyId(currentUser);
+  const assignedCompany = getCompanyById(assignedCompanyId);
+  const assignedCompanyLabel = assignedCompany?.name || currentUser.companyName || assignedCompanyId;
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -43,25 +50,31 @@ export function ProfileView() {
       <div>
         <h2 className="text-xl font-bold text-neutral-900">الملف الشخصي</h2>
         <p className="text-xs text-neutral-500">
-          إدارة بياناتك المهنية، المسمى الوظيفي، وهويتك المؤسسية في منظومة Luméré.
+          إدارة بياناتك المهنية، المسمى الوظيفي، وهويتك المؤسسية في منظومة LUMERE GROUP.
         </p>
       </div>
 
       <Card className="p-6 space-y-6">
         {/* Profile Header */}
         <div className="flex flex-col sm:flex-row items-center gap-5 border-b border-neutral-100 pb-6">
-          <img
-            src={currentUser.photoURL}
-            alt={currentUser.displayName}
-            className="w-20 h-20 rounded-full object-cover border-2 border-emerald-500 shadow-md"
-          />
+          {currentUser.photoURL ? (
+            <img
+              src={currentUser.photoURL}
+              alt={currentUser.displayName}
+              className="w-20 h-20 rounded-full object-cover border-2 border-emerald-500 shadow-md"
+            />
+          ) : (
+            <div className="w-20 h-20 rounded-full bg-emerald-100 text-emerald-800 border-2 border-emerald-500 flex items-center justify-center font-bold text-xl shadow-md">
+              {currentUser.displayName.slice(0, 2).toUpperCase()}
+            </div>
+          )}
           <div className="text-center sm:text-right space-y-1">
-            <div className="flex items-center justify-center sm:justify-start gap-2">
+            <div className="flex items-center justify-center sm:justify-start gap-2 flex-wrap">
               <h3 className="text-lg font-bold text-neutral-900">{currentUser.displayName}</h3>
               <RoleBadge role={role} />
             </div>
             <p className="text-xs text-neutral-500 font-medium">
-              {currentUser.position || 'عضو فريق'} • {currentUser.department}
+              {assignedCompanyLabel} • {currentUser.position || 'عضو فريق'} • {currentUser.department || 'عام'}
             </p>
             <p className="text-xs font-mono text-neutral-400">{currentUser.email}</p>
           </div>
@@ -82,11 +95,18 @@ export function ProfileView() {
               type="email"
               value={currentUser.email}
               disabled
-              helperText="مرتبط بحساب Google المؤسسي"
+              helperText="مرتبط بحساب Firebase Auth"
             />
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <Input
+              label="الشركة التابع لها"
+              value={assignedCompanyLabel}
+              disabled
+              helperText="تُدار من قِبل الإدارة المركزية"
+            />
+
             <Input
               label="المسمى الوظيفي"
               value={position}
@@ -96,9 +116,9 @@ export function ProfileView() {
 
             <Input
               label="القسم التابع له"
-              value={currentUser.department}
+              value={currentUser.department || 'عام'}
               disabled
-              helperText="معين من قِبل إدارة النظام"
+              helperText="معين من قِبل إدارة الشركة"
             />
           </div>
 

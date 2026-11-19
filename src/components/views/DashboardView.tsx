@@ -17,6 +17,12 @@ import { Button } from '../ui/Button';
 import { StatusBadge, PriorityBadge } from '../ui/Badge';
 import { Task, User, Department, ActivityLog } from '../../types';
 import { useAuth } from '../../context/AuthContext';
+import { useCompany } from '../../context/CompanyContext';
+import {
+  canCreateTask,
+  getRoleArabicLabel,
+  isActiveStatus,
+} from '../../utils/rbac';
 
 interface DashboardViewProps {
   tasks: Task[];
@@ -37,7 +43,10 @@ export function DashboardView({
   onOpenCreateTask,
   onNavigateToTab,
 }: DashboardViewProps) {
-  const { role, currentUser } = useAuth();
+  const { role, currentUser, isSuperAdmin, isCompanyAdmin, isManager } = useAuth();
+  const { activeCompany, defaultWriteCompanyId, isGroupView } = useCompany();
+  const isSupervisor = isSuperAdmin || isCompanyAdmin || isManager;
+  const allowCreateTask = canCreateTask(currentUser, defaultWriteCompanyId);
 
   // Filter tasks if Employee
   const relevantTasks =
@@ -47,7 +56,7 @@ export function DashboardView({
 
   // Metric calculations
   const totalEmployees = employees.length;
-  const activeEmployees = employees.filter(e => e.status === 'Active').length;
+  const activeEmployees = employees.filter(e => isActiveStatus(e.status)).length;
 
   const totalTasks = relevantTasks.length;
   const pendingTasks = relevantTasks.filter(t => t.status === 'Pending').length;
@@ -80,7 +89,7 @@ export function DashboardView({
           <div>
             <div className="flex items-center gap-2">
               <span className="text-xs font-bold tracking-wider text-emerald-400 bg-emerald-950/60 px-2.5 py-0.5 rounded-full border border-emerald-500/20">
-                منظومة Luméré المؤسسية
+                {activeCompany.name} {isGroupView ? '• عرض المجموعة' : ''}
               </span>
               <span className="text-xs text-neutral-400">
                 {new Date().toLocaleDateString('ar-SA', {
@@ -95,13 +104,13 @@ export function DashboardView({
               أهلاً بعودتك، {currentUser?.displayName}
             </h1>
             <p className="mt-1 text-xs text-neutral-300 max-w-xl leading-relaxed">
-              {role === 'ADMIN'
-                ? 'لوحة الرقابة الشاملة على كافة الأقسام والمشاريع التشغيلية، ومؤشرات الأداء اللحظية.'
+              {isSupervisor
+                ? `لوحة الرقابة التشغيلية لـ ${activeCompany.name} — متابعة الأقسام والمشاريع ومؤشرات الأداء اللحظية.`
                 : 'لوحة المهام الشخصية. متابعة مراحل التنفيذ، رفع المخرجات، وإرسالها للمراجعة والاعتماد.'}
             </p>
           </div>
 
-          {role === 'ADMIN' && (
+          {allowCreateTask && (
             <div className="flex items-center gap-2.5 shrink-0">
               <Button
                 id="btn-quick-create-task"
@@ -204,7 +213,7 @@ export function DashboardView({
         </Card>
 
         {/* Total Employees (or Pending for Employee) */}
-        {role === 'ADMIN' ? (
+        {isSupervisor ? (
           <Card className="p-4 border-r-4 border-r-blue-500 border-l-transparent">
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold text-neutral-500">
@@ -554,7 +563,7 @@ export function DashboardView({
                     <p className="text-neutral-800">
                       <span className="font-bold text-neutral-900">{log.actorName}</span>{' '}
                       <span className="text-neutral-500 font-normal">
-                        ({log.actorRole === 'ADMIN' ? 'مدير عام' : 'موظف'})
+                        ({getRoleArabicLabel(log.actorRole)})
                       </span>{' '}
                       قام بـ {log.action}:{' '}
                       <span className="font-semibold text-neutral-800 truncate">

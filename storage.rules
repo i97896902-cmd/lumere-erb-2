@@ -1,0 +1,71 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Global default deny
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isSuperAdmin() {
+      return isSignedIn() && (
+        request.auth.token.role == 'SUPER_ADMIN'
+        || (request.auth.token.email == 'lumerecompany@gmail.com' && request.auth.token.email_verified == true)
+      );
+    }
+
+    function belongsToCompany(companyId) {
+      return isSignedIn()
+        && request.auth.token.companyId is string
+        && request.auth.token.companyId == companyId;
+    }
+
+    function isCompanyAdmin(companyId) {
+      return belongsToCompany(companyId) && request.auth.token.role == 'COMPANY_ADMIN';
+    }
+
+    function isSafeImage() {
+      return request.resource.size < 5 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+    }
+
+    function isSafeAttachment() {
+      return request.resource.size < 15 * 1024 * 1024
+        && (
+          request.resource.contentType.matches('image/.*')
+          || request.resource.contentType == 'application/pdf'
+          || request.resource.contentType.matches('application/vnd\\..*')
+          || request.resource.contentType == 'application/msword'
+          || request.resource.contentType == 'text/plain'
+          || request.resource.contentType == 'text/csv'
+        );
+    }
+
+    // Company Logos: readable by authenticated users in that company (or SUPER_ADMIN); writable by SUPER_ADMIN / COMPANY_ADMIN
+    match /companies/{companyId}/logos/{fileName} {
+      allow read: if isSignedIn();
+      allow write: if (isSuperAdmin() || isCompanyAdmin(companyId)) && isSafeImage();
+    }
+
+    // Task attachments: strictly isolated to the company
+    match /companies/{companyId}/tasks/{taskId}/{fileName} {
+      allow read: if isSuperAdmin() || belongsToCompany(companyId);
+      allow write: if (isSuperAdmin() || belongsToCompany(companyId)) && isSafeAttachment();
+    }
+
+    // Project files: strictly isolated to the company
+    match /companies/{companyId}/projects/{projectId}/{fileName} {
+      allow read: if isSuperAdmin() || belongsToCompany(companyId);
+      allow write: if (isSuperAdmin() || belongsToCompany(companyId)) && isSafeAttachment();
+    }
+
+    // User avatars: isolated by companyId and userId
+    match /companies/{companyId}/avatars/{userId}/{fileName} {
+      allow read: if isSuperAdmin() || belongsToCompany(companyId);
+      allow write: if (isSuperAdmin() || (belongsToCompany(companyId) && request.auth.uid == userId)) && isSafeImage();
+    }
+  }
+}

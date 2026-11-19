@@ -17,7 +17,9 @@ import { Card } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { Input, Select } from '../ui/Input';
 import { useAuth } from '../../context/AuthContext';
+import { useCompany } from '../../context/CompanyContext';
 import { useToast } from '../../context/ToastContext';
+import { PrivilegedService } from '../../services/privilegedService';
 import {
   DeadlinePushService,
   DeadlineServiceSettings,
@@ -28,13 +30,19 @@ interface SettingsViewProps {
 }
 
 export function SettingsView({ onRefreshAllData }: SettingsViewProps) {
-  const { role } = useAuth();
+  const { isSuperAdmin, isCompanyAdmin, refreshCurrentUser } = useAuth();
+  const { activeCompany } = useCompany();
   const { showToast } = useToast();
 
-  const [companyName, setCompanyName] = useState('Luméré');
+  const [companyName, setCompanyName] = useState(activeCompany.name);
   const [defaultDeadlineDays, setDefaultDeadlineDays] = useState('7');
   const [requireReview, setRequireReview] = useState(true);
   const [isResetting, setIsResetting] = useState(false);
+  const [isSyncingClaims, setIsSyncingClaims] = useState(false);
+
+  useEffect(() => {
+    setCompanyName(activeCompany.name);
+  }, [activeCompany.name]);
 
   // Deadline Push Settings
   const [deadlineSettings, setDeadlineSettings] = useState<DeadlineServiceSettings>(
@@ -99,6 +107,21 @@ export function SettingsView({ onRefreshAllData }: SettingsViewProps) {
       showToast('فشل تحديث البيانات', 'error');
     } finally {
       setIsResetting(false);
+    }
+  };
+
+  const handleSyncClaims = async () => {
+    setIsSyncingClaims(true);
+    try {
+      const synced = await PrivilegedService.syncCurrentUserClaims();
+      await refreshCurrentUser();
+      if (synced) {
+        showToast('تمت مزامنة صلاحيات Firebase Auth Custom Claims بنجاح.', 'success');
+      } else {
+        showToast('لم يتم نشر Cloud Functions بعد؛ يعمل النظام حالياً عبر قواعد Firestore.', 'info');
+      }
+    } finally {
+      setIsSyncingClaims(false);
     }
   };
 
@@ -337,26 +360,38 @@ export function SettingsView({ onRefreshAllData }: SettingsViewProps) {
       </Card>
 
       {/* Database Maintenance */}
-      {role === 'ADMIN' && (
+      {(isSuperAdmin || isCompanyAdmin) && (
         <Card className="p-5 space-y-4 border-emerald-100 bg-emerald-50/20">
           <div className="flex items-center gap-2.5 border-b border-emerald-100 pb-3">
             <Database className="w-4 h-4 text-emerald-600" />
-            <h3 className="text-sm font-bold text-neutral-900">مزامنة وصيانة قاعدة البيانات</h3>
+            <h3 className="text-sm font-bold text-neutral-900">مزامنة وصيانة قاعدة البيانات والصلاحيات</h3>
           </div>
 
           <p className="text-xs text-neutral-600 leading-relaxed">
-            مزامنة البيانات الحية فوراً مع Firestore والتحقق من سلامة الاتصال مع خوادم النظام السحابية.
+            مزامنة بيانات {activeCompany.name} فوراً من Firestore وتحديث بطاقة صلاحيات Firebase Auth Custom Claims.
           </p>
 
-          <Button
-            size="sm"
-            variant="outline"
-            isLoading={isResetting}
-            leftIcon={<RefreshCw className="w-3.5 h-3.5 text-neutral-600" />}
-            onClick={handleRefreshDatabase}
-          >
-            تحديث ومزامنة البيانات الآن
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              isLoading={isResetting}
+              leftIcon={<RefreshCw className="w-3.5 h-3.5 text-neutral-600" />}
+              onClick={handleRefreshDatabase}
+            >
+              تحديث ومزامنة البيانات الآن
+            </Button>
+
+            <Button
+              size="sm"
+              variant="outline"
+              isLoading={isSyncingClaims}
+              leftIcon={<Shield className="w-3.5 h-3.5 text-emerald-700" />}
+              onClick={handleSyncClaims}
+            >
+              مزامنة صلاحيات الحساب (Custom Claims)
+            </Button>
+          </div>
         </Card>
       )}
     </div>

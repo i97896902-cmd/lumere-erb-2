@@ -1,8 +1,11 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Project, Client, Task, User } from '../../types';
 import { DataService } from '../../services/dataService';
 import { useAuth } from '../../context/AuthContext';
+import { useCompany } from '../../context/CompanyContext';
+import { DEFAULT_SUBSIDIARY_ID } from '../../config/companies';
+import { canManageProjects as checkCanManageProjects } from '../../utils/rbac';
 import {
   FolderKanban,
   Plus,
@@ -45,6 +48,7 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({
   onSelectTask,
 }) => {
   const { currentUser } = useAuth();
+  const { activeCompany, isGroupView, subsidiaries, defaultWriteCompanyId, getCompanyById } = useCompany();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | Project['status']>('all');
   const [clientFilter, setClientFilter] = useState<'all' | string>('all');
@@ -54,6 +58,7 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({
   const [isDeletingId, setIsDeletingId] = useState<string | null>(null);
 
   // Form State
+  const [formCompanyId, setFormCompanyId] = useState(defaultWriteCompanyId);
   const [formName, setFormName] = useState('');
   const [formDescription, setFormDescription] = useState('');
   const [formClientId, setFormClientId] = useState('');
@@ -66,7 +71,20 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({
   const [formManagerId, setFormManagerId] = useState('');
   const [isSaving, setIsSaving] = useState(false);
 
-  const canManageProjects = currentUser?.role === 'ADMIN';
+  const canManageProjects = checkCanManageProjects(currentUser, defaultWriteCompanyId);
+
+  const scopedFormClients = useMemo(
+    () => clients.filter(c => (c.companyId || DEFAULT_SUBSIDIARY_ID) === formCompanyId),
+    [clients, formCompanyId]
+  );
+
+  const scopedFormDepartments = useMemo(
+    () =>
+      departments.filter(
+        d => ((d as { companyId?: string }).companyId || DEFAULT_SUBSIDIARY_ID) === formCompanyId
+      ),
+    [departments, formCompanyId]
+  );
 
   const filteredProjects = projects.filter(p => {
     const term = searchTerm.toLowerCase();
@@ -83,11 +101,19 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({
   });
 
   const openAddModal = () => {
+    const initialCompany = defaultWriteCompanyId;
+    const companyClients = clients.filter(
+      c => (c.companyId || DEFAULT_SUBSIDIARY_ID) === initialCompany
+    );
+    const companyDepts = departments.filter(
+      d => ((d as { companyId?: string }).companyId || DEFAULT_SUBSIDIARY_ID) === initialCompany
+    );
     setEditingProject(null);
+    setFormCompanyId(initialCompany);
     setFormName('');
     setFormDescription('');
-    setFormClientId(clients[0]?.id || '');
-    setFormDepartment(departments[0]?.name || 'Development');
+    setFormClientId(companyClients[0]?.id || clients[0]?.id || '');
+    setFormDepartment(companyDepts[0]?.name || departments[0]?.name || 'عام');
     setFormStatus('in_progress');
     setFormPriority('High');
     setFormStartDate(new Date().toISOString().split('T')[0]);
@@ -101,12 +127,13 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({
 
   const openEditModal = (project: Project) => {
     setEditingProject(project);
+    setFormCompanyId(project.companyId || defaultWriteCompanyId);
     setFormName(project.name);
     setFormDescription(project.description || '');
     setFormClientId(project.clientId);
-    setFormDepartment(project.department || departments[0]?.name || 'Development');
+    setFormDepartment(project.department || departments[0]?.name || 'عام');
     setFormStatus(project.status);
-    setFormPriority((project.priority as any) || 'High');
+    setFormPriority((project.priority as Project['priority']) || 'High');
     setFormStartDate(project.startDate);
     setFormDeadline(project.deadline || project.deliveryDate || '');
     setFormBudget(project.budget ? String(project.budget) : '');
@@ -145,6 +172,7 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({
       } else {
         await DataService.createProject(
           {
+            companyId: formCompanyId,
             name: formName.trim(),
             description: formDescription.trim(),
             clientId: formClientId,
@@ -174,14 +202,14 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({
     }
   };
 
-  const handleDeleteProject = async (projectId: string) => {
+  const handleDeleteProject = async (project: Project) => {
     if (!currentUser || !canManageProjects) return;
     if (!window.confirm('هل أنت متأكد من رغبتك في حذف هذا المشروع؟')) return;
 
-    setIsDeletingId(projectId);
+    setIsDeletingId(project.id);
     try {
-      await DataService.deleteProject(projectId, currentUser);
-      if (selectedProjectForDetails?.id === projectId) {
+      await DataService.deleteProject(project.id, currentUser, project.companyId);
+      if (selectedProjectForDetails?.id === project.id) {
         setSelectedProjectForDetails(null);
       }
       if (onRefresh) onRefresh();
@@ -219,9 +247,11 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({
               <FolderKanban className="w-5 h-5" />
             </div>
             <div>
-              <h1 className="text-xl font-bold text-neutral-900 tracking-tight">إدارة المشاريع</h1>
+              <h1 className="text-xl font-bold text-neutral-900 tracking-tight">
+                إدارة المشاريع — {activeCompany.name}
+              </h1>
               <p className="text-xs text-neutral-500 mt-0.5">
-                متابعة مشاريع Luméré، توزيع المهام التابعة لها، ومراقبة نسب الإنجاز والمواعيد النهائية
+                متابعة المشاريع وتوزيع المهام التابعة لها ومراقبة نسب الإنجاز والمواعيد النهائية
               </p>
             </div>
           </div>
@@ -332,9 +362,16 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({
                 <div>
                   {/* Top Header */}
                   <div className="flex items-start justify-between gap-2 mb-2.5">
-                    <span className="text-[10px] font-semibold text-emerald-800 bg-emerald-50 border border-emerald-200/60 px-2 py-0.5 rounded-md">
-                      {project.department}
-                    </span>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="text-[10px] font-semibold text-emerald-800 bg-emerald-50 border border-emerald-200/60 px-2 py-0.5 rounded-md">
+                        {project.department}
+                      </span>
+                      {isGroupView && project.companyId && (
+                        <span className="text-[10px] font-bold text-neutral-600 bg-neutral-100 border border-neutral-200 px-2 py-0.5 rounded-md">
+                          {getCompanyById(project.companyId)?.name || project.companyId}
+                        </span>
+                      )}
+                    </div>
 
                     <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full border ${badge.bg}`}>
                       {badge.label}
@@ -431,7 +468,7 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({
                           <Edit2 className="w-3.5 h-3.5" />
                         </button>
                         <button
-                          onClick={() => handleDeleteProject(project.id)}
+                          onClick={() => handleDeleteProject(project)}
                           disabled={isDeletingId === project.id}
                           className="p-1.5 rounded-lg text-neutral-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
                           title="حذف المشروع"
@@ -474,6 +511,25 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({
               </div>
 
               <form onSubmit={handleSaveProject} className="space-y-4 text-xs">
+                {isGroupView && !editingProject && (
+                  <div>
+                    <label className="block font-semibold text-neutral-700 mb-1">
+                      الشركة التابعة <span className="text-rose-500">*</span>
+                    </label>
+                    <select
+                      value={formCompanyId}
+                      onChange={e => setFormCompanyId(e.target.value)}
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-neutral-300 text-neutral-900 bg-white focus:outline-none focus:border-emerald-500"
+                    >
+                      {subsidiaries.map(c => (
+                        <option key={c.id} value={c.id}>
+                          {c.name} {c.arabicName ? `— ${c.arabicName}` : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
                 <div>
                   <label className="block font-semibold text-neutral-700 mb-1">
                     اسم المشروع <span className="text-rose-500">*</span>
@@ -510,7 +566,7 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({
                       onChange={e => setFormClientId(e.target.value)}
                       className="w-full px-3.5 py-2.5 rounded-xl border border-neutral-300 text-neutral-900 bg-white focus:outline-none focus:border-emerald-500"
                     >
-                      {clients.map(c => (
+                      {(scopedFormClients.length > 0 ? scopedFormClients : clients).map(c => (
                         <option key={c.id} value={c.id}>
                           {c.name} {c.company ? `(${c.company})` : ''}
                         </option>
@@ -525,17 +581,11 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({
                       onChange={e => setFormDepartment(e.target.value)}
                       className="w-full px-3.5 py-2.5 rounded-xl border border-neutral-300 text-neutral-900 bg-white focus:outline-none focus:border-emerald-500"
                     >
-                      {departments.map(d => (
+                      {(scopedFormDepartments.length > 0 ? scopedFormDepartments : departments).map(d => (
                         <option key={d.id} value={d.name}>
                           {d.name}
                         </option>
                       ))}
-                      <option value="Development">Development</option>
-                      <option value="Design">Design</option>
-                      <option value="Marketing">Marketing</option>
-                      <option value="Media">Media</option>
-                      <option value="Sales">Sales</option>
-                      <option value="Photography">Photography</option>
                     </select>
                   </div>
                 </div>

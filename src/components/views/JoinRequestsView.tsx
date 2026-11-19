@@ -1,8 +1,10 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { User, Role, Department } from '../../types';
+import { User, CanonicalRole, Department } from '../../types';
 import { DataService } from '../../services/dataService';
 import { useAuth } from '../../context/AuthContext';
+import { useCompany } from '../../context/CompanyContext';
+import { getAssignableRoles, getRoleArabicLabel, getUserCompanyId } from '../../utils/rbac';
 import {
   UserCheck,
   UserX,
@@ -12,11 +14,10 @@ import {
   Phone,
   Mail,
   Calendar,
-  Shield,
   Search,
   CheckCircle2,
   X,
-  AlertCircle,
+  Layers,
 } from 'lucide-react';
 
 interface JoinRequestsViewProps {
@@ -25,15 +26,19 @@ interface JoinRequestsViewProps {
   onRefresh?: () => void;
 }
 
-export const JoinRequestsView: React.FC<JoinRequestsViewProps> = ({ pendingUsers, departments, onRefresh }) => {
-  const { currentUser } = useAuth();
+export const JoinRequestsView: React.FC<JoinRequestsViewProps> = ({ pendingUsers, onRefresh }) => {
+  const { currentUser, isSuperAdmin } = useAuth();
+  const { subsidiaries, defaultWriteCompanyId, activeCompany, getCompanyById } = useCompany();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedUserForApproval, setSelectedUserForApproval] = useState<User | null>(null);
-  const assignedRole: Role = 'EMPLOYEE';
+  const [assignedRole, setAssignedRole] = useState<CanonicalRole>('EMPLOYEE');
+  const [targetCompanyId, setTargetCompanyId] = useState(defaultWriteCompanyId);
   const [selectedUserForRejection, setSelectedUserForRejection] = useState<User | null>(null);
   const [rejectionReason, setRejectionReason] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
+
+  const assignableRoles = useMemo(() => getAssignableRoles(currentUser), [currentUser]);
 
   const filteredUsers = pendingUsers.filter(u => {
     const term = searchTerm.toLowerCase();
@@ -49,11 +54,22 @@ export const JoinRequestsView: React.FC<JoinRequestsViewProps> = ({ pendingUsers
     if (!selectedUserForApproval || !currentUser) return;
     setIsProcessing(true);
     try {
-      await DataService.approveUser(selectedUserForApproval.id, 'EMPLOYEE', currentUser);
-      setActionSuccess(`تمت الموافقة على انضمام ${selectedUserForApproval.displayName} بنجاح وتفعيله كموظف.`);
+      const resolvedCompanyId = isSuperAdmin
+        ? targetCompanyId
+        : getUserCompanyId(currentUser);
+      await DataService.approveUser(
+        selectedUserForApproval.id,
+        assignedRole,
+        currentUser,
+        resolvedCompanyId
+      );
+      const companyLabel = getCompanyById(resolvedCompanyId)?.name || resolvedCompanyId;
+      setActionSuccess(
+        `تمت الموافقة على انضمام ${selectedUserForApproval.displayName} برتبة ${getRoleArabicLabel(assignedRole)} في شركة ${companyLabel}.`
+      );
       setSelectedUserForApproval(null);
       if (onRefresh) onRefresh();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Approve error:', err);
     } finally {
       setIsProcessing(false);
@@ -65,12 +81,17 @@ export const JoinRequestsView: React.FC<JoinRequestsViewProps> = ({ pendingUsers
     if (!selectedUserForRejection || !currentUser) return;
     setIsProcessing(true);
     try {
-      await DataService.rejectUser(selectedUserForRejection.id, rejectionReason, currentUser);
+      await DataService.rejectUser(
+        selectedUserForRejection.id,
+        rejectionReason,
+        currentUser,
+        selectedUserForRejection.companyId
+      );
       setActionSuccess(`تم رفض طلب انضمام ${selectedUserForRejection.displayName}.`);
       setSelectedUserForRejection(null);
       setRejectionReason('');
       if (onRefresh) onRefresh();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Reject error:', err);
     } finally {
       setIsProcessing(false);
@@ -158,11 +179,17 @@ export const JoinRequestsView: React.FC<JoinRequestsViewProps> = ({ pendingUsers
                 {/* User Top Info */}
                 <div className="flex items-start justify-between gap-3 mb-4">
                   <div className="flex items-center gap-3">
-                    <img
-                      src={user.photoURL || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=256'}
-                      alt={user.displayName}
-                      className="w-12 h-12 rounded-xl object-cover border border-neutral-200 shadow-2xs"
-                    />
+                    {user.photoURL ? (
+                      <img
+                        src={user.photoURL}
+                        alt={user.displayName}
+                        className="w-12 h-12 rounded-xl object-cover border border-neutral-200 shadow-2xs"
+                      />
+                    ) : (
+                      <div className="w-12 h-12 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-center font-bold text-emerald-800 text-sm">
+                        {user.displayName.slice(0, 2).toUpperCase()}
+                      </div>
+                    )}
                     <div>
                       <h3 className="text-sm font-bold text-neutral-900">{user.displayName}</h3>
                       <div className="flex items-center gap-1.5 text-xs text-neutral-500 mt-0.5">
@@ -179,6 +206,15 @@ export const JoinRequestsView: React.FC<JoinRequestsViewProps> = ({ pendingUsers
 
                 {/* Details Grid */}
                 <div className="grid grid-cols-2 gap-2.5 p-3 rounded-xl bg-neutral-50 border border-neutral-100 mb-4 text-xs">
+                  <div className="flex items-center gap-2 text-neutral-600">
+                    <Layers className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
+                    <span className="truncate">
+                      الشركة:{' '}
+                      <strong className="text-neutral-900">
+                        {getCompanyById(user.companyId)?.name || user.companyName || 'LUMERE'}
+                      </strong>
+                    </span>
+                  </div>
                   <div className="flex items-center gap-2 text-neutral-600">
                     <Building2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
                     <span className="truncate">القسم: <strong className="text-neutral-900">{user.department || 'عام'}</strong></span>
@@ -206,6 +242,8 @@ export const JoinRequestsView: React.FC<JoinRequestsViewProps> = ({ pendingUsers
                   id={`btn-approve-user-${user.id}`}
                   onClick={() => {
                     setSelectedUserForApproval(user);
+                    setAssignedRole('EMPLOYEE');
+                    setTargetCompanyId(user.companyId || defaultWriteCompanyId);
                   }}
                   className="flex-1 py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white text-xs font-semibold transition-colors flex items-center justify-center gap-1.5 shadow-2xs"
                 >
@@ -254,17 +292,48 @@ export const JoinRequestsView: React.FC<JoinRequestsViewProps> = ({ pendingUsers
                 سيتم تفعيل حساب <strong className="text-neutral-900">{selectedUserForApproval.displayName}</strong> والسماح له بالدخول للنظام والوصول للمهام والمشاريع.
               </p>
 
-              {/* Role Selection */}
+              {/* Company & Role Selection */}
               <div className="space-y-3 mb-6">
-                <label className="block text-xs font-semibold text-neutral-700">
-                  الصلاحية الممنوحة:
-                </label>
-                <div className="grid grid-cols-1 gap-3">
-                  <div className="p-3 rounded-xl border-emerald-600 bg-emerald-50/80 text-center text-emerald-900 font-bold">
-                    <span className="block text-xs">موظف</span>
-                    <span className="block text-[10px] text-neutral-500 mt-0.5">Employee (تنفيذ المهام)</span>
-                  </div>
+                <div>
+                  <label className="block text-xs font-semibold text-neutral-700 mb-1.5">
+                    الشركة التابعة:
+                  </label>
+                  {isSuperAdmin ? (
+                    <select
+                      value={targetCompanyId}
+                      onChange={e => setTargetCompanyId(e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl border border-neutral-300 text-xs bg-white focus:outline-none focus:border-emerald-500"
+                    >
+                      {subsidiaries.map(c => (
+                        <option key={c.id} value={c.id}>
+                          {c.name} {c.arabicName ? `— ${c.arabicName}` : ''}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <div className="px-3 py-2 rounded-xl bg-neutral-50 border border-neutral-200 text-xs font-semibold text-neutral-800">
+                      {activeCompany.name}
+                    </div>
+                  )}
+                </div>
 
+                <div>
+                  <label className="block text-xs font-semibold text-neutral-700 mb-1.5">
+                    الصلاحية الممنوحة:
+                  </label>
+                  <select
+                    value={assignedRole}
+                    onChange={e => setAssignedRole(e.target.value as CanonicalRole)}
+                    className="w-full px-3 py-2 rounded-xl border border-neutral-300 text-xs bg-white focus:outline-none focus:border-emerald-500"
+                  >
+                    {(assignableRoles.length > 0 ? assignableRoles : (['EMPLOYEE'] as CanonicalRole[])).map(
+                      r => (
+                        <option key={r} value={r}>
+                          {getRoleArabicLabel(r)} ({r})
+                        </option>
+                      )
+                    )}
+                  </select>
                 </div>
               </div>
 

@@ -1,12 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { CompanyProvider, useCompany } from './context/CompanyContext';
 import { ToastProvider, useToast } from './context/ToastContext';
 import { Sidebar, TabType } from './components/navigation/Sidebar';
 import { Navbar } from './components/navigation/Navbar';
+import { GroupDashboardView } from './components/views/GroupDashboardView';
+import { CompaniesManagementView } from './components/views/CompaniesManagementView';
 import { DashboardView } from './components/views/DashboardView';
 import { TasksView } from './components/views/TasksView';
 import { ProjectsView } from './components/views/ProjectsView';
 import { ClientsView } from './components/views/ClientsView';
+import { EquipmentView } from './components/views/EquipmentView';
 import { JoinRequestsView } from './components/views/JoinRequestsView';
 import { CalendarView } from './components/views/CalendarView';
 import { EmployeesView } from './components/views/EmployeesView';
@@ -22,9 +26,28 @@ import { PendingApprovalView } from './components/views/PendingApprovalView';
 import { RejectedView } from './components/views/RejectedView';
 import { CreateTaskModal } from './components/modals/CreateTaskModal';
 import { TaskDetailsModal } from './components/modals/TaskDetailsModal';
-import { Task, User, Department, Notification, ActivityLog, Client, Project } from './types';
+import {
+  Task,
+  User,
+  Department,
+  Notification,
+  ActivityLog,
+  Client,
+  Project,
+  Equipment,
+} from './types';
 import { DataService } from './services/dataService';
 import { DeadlinePushService } from './services/deadlinePushService';
+import { getFirestoreSubscriptionScope } from './utils/appGuards';
+import {
+  canManageCompanies,
+  canManageCompanyUsers,
+  canViewActivityLogs,
+  canViewReports,
+  isPendingStatus,
+  isRejectedStatus,
+  isSuspendedStatus,
+} from './utils/rbac';
 import { AlertCircle } from 'lucide-react';
 
 type BeforeInstallPromptEvent = Event & {
@@ -33,17 +56,51 @@ type BeforeInstallPromptEvent = Event & {
 };
 
 function LumereAppContent() {
-  const { currentUser, loading, isProfileIncomplete, logout } = useAuth();
+  const { currentUser, firebaseUser, loading, isProfileIncomplete, isSuperAdmin, logout } = useAuth();
+  const {
+    companies,
+    activeCompany,
+    activeCompanyId,
+    isGroupView,
+    queryCompanyId,
+    switchCompany,
+    refreshCompanies,
+  } = useCompany();
   const { showToast } = useToast();
 
   const [currentTab, setCurrentTab] = useState<TabType>('dashboard');
+  const didInitSuperAdminTabRef = useRef(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [globalSearchQuery, setGlobalSearchQuery] = useState('');
   const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [isInstalled, setIsInstalled] = useState(false);
 
+  // Land SUPER_ADMIN on Group Dashboard on first entry when in Group View
   useEffect(() => {
-    const standalone = window.matchMedia('(display-mode: standalone)').matches ||
+    if (!currentUser) {
+      didInitSuperAdminTabRef.current = false;
+      setCurrentTab('dashboard');
+      return;
+    }
+    if (!didInitSuperAdminTabRef.current && isSuperAdmin && isGroupView) {
+      didInitSuperAdminTabRef.current = true;
+      setCurrentTab('group_dashboard');
+    }
+  }, [currentUser, isSuperAdmin, isGroupView]);
+
+  // Prevent non-SUPER_ADMIN users from staying on group-only tabs
+  useEffect(() => {
+    if (
+      !canManageCompanies(currentUser) &&
+      (currentTab === 'group_dashboard' || currentTab === 'companies')
+    ) {
+      setCurrentTab('dashboard');
+    }
+  }, [currentUser, currentTab]);
+
+  useEffect(() => {
+    const standalone =
+      window.matchMedia('(display-mode: standalone)').matches ||
       Boolean((window.navigator as Navigator & { standalone?: boolean }).standalone);
     setIsInstalled(standalone);
 
@@ -76,12 +133,13 @@ function LumereAppContent() {
     setInstallPrompt(null);
   };
 
-  // Core Data Collections (empty by default, loaded from Firestore)
+  // Core Data Collections (strictly scoped to queryCompanyId)
   const [tasks, setTasks] = useState<Task[]>([]);
   const [employees, setEmployees] = useState<User[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
+  const [equipment, setEquipment] = useState<Equipment[]>([]);
   const [pendingUsers, setPendingUsers] = useState<User[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
@@ -92,35 +150,88 @@ function LumereAppContent() {
   const [createTaskDefaultClientId, setCreateTaskDefaultClientId] = useState<string | undefined>();
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
 
-  // Subscriptions to real-time collections
+  const subscriptionScope = getFirestoreSubscriptionScope({
+    loading,
+    isAuthenticated: Boolean(firebaseUser && currentUser),
+    isProfileIncomplete,
+    status: currentUser?.status,
+  });
+
+  // Real-time subscriptions gated on auth + active company scope (resets state on company switch)
   useEffect(() => {
-    const unsubEmployees = DataService.subscribeEmployees(fetchedEmployees => {
-      setEmployees(fetchedEmployees);
-    });
+    setSelectedTaskId(null);
+
+    if (subscriptionScope === 'none') {
+      setEmployees([]);
+      setDepartments([]);
+      setTasks([]);
+      setActivityLogs([]);
+      setClients([]);
+      setProjects([]);
+      setEquipment([]);
+      setPendingUsers([]);
+      return;
+    }
+
+    if (subscriptionScope === 'departments_only') {
+      setEmployees([]);
+      setTasks([]);
+      setActivityLogs([]);
+      setClients([]);
+      setProjects([]);
+      setEquipment([]);
+      setPendingUsers([]);
+      const unsubDepartments = DataService.subscribeDepartments(fetchedDepts => {
+        setDepartments(fetchedDepts);
+      }, null);
+      return () => {
+        unsubDepartments();
+      };
+    }
+
+    // Clear prior company records immediately to prevent cross-company flash
+    setEmployees([]);
+    setDepartments([]);
+    setTasks([]);
+    setActivityLogs([]);
+    setClients([]);
+    setProjects([]);
+    setEquipment([]);
+    setPendingUsers([]);
 
     const unsubDepartments = DataService.subscribeDepartments(fetchedDepts => {
       setDepartments(fetchedDepts);
-    });
+    }, queryCompanyId);
+
+    const unsubEmployees = DataService.subscribeEmployees(fetchedEmployees => {
+      setEmployees(fetchedEmployees);
+    }, queryCompanyId);
 
     const unsubTasks = DataService.subscribeTasks(fetchedTasks => {
       setTasks(fetchedTasks);
-    });
+    }, queryCompanyId);
 
     const unsubLogs = DataService.subscribeActivityLogs(fetchedLogs => {
       setActivityLogs(fetchedLogs);
-    });
+    }, queryCompanyId);
 
     const unsubClients = DataService.subscribeClients(fetchedClients => {
       setClients(fetchedClients);
-    });
+    }, queryCompanyId);
 
     const unsubProjects = DataService.subscribeProjects(fetchedProjects => {
       setProjects(fetchedProjects);
-    });
+    }, queryCompanyId);
 
-    const unsubPendingUsers = DataService.subscribePendingUsers(fetchedPending => {
-      setPendingUsers(fetchedPending);
-    });
+    const unsubEquipment = DataService.subscribeEquipment(fetchedEquipment => {
+      setEquipment(fetchedEquipment);
+    }, queryCompanyId);
+
+    const unsubPendingUsers = canManageCompanyUsers(currentUser, queryCompanyId || activeCompanyId)
+      ? DataService.subscribePendingUsers(fetchedPending => {
+          setPendingUsers(fetchedPending);
+        }, queryCompanyId)
+      : () => {};
 
     return () => {
       unsubEmployees();
@@ -129,22 +240,32 @@ function LumereAppContent() {
       unsubLogs();
       unsubClients();
       unsubProjects();
+      unsubEquipment();
       unsubPendingUsers();
     };
-  }, []);
+  }, [subscriptionScope, queryCompanyId, activeCompanyId, currentUser]);
 
-  // Subscribe to Notifications for Current User
+  // Subscribe to Notifications for Current Active User
   useEffect(() => {
-    if (!currentUser) return;
+    if (subscriptionScope !== 'full' || !currentUser) {
+      setNotifications([]);
+      return;
+    }
     const unsubNotifs = DataService.subscribeNotifications(
       currentUser.id,
       currentUser.role,
       userNotifs => {
         setNotifications(userNotifs);
-      }
+      },
+      queryCompanyId
     );
     return () => unsubNotifs();
-  }, [currentUser]);
+  }, [subscriptionScope, currentUser, queryCompanyId]);
+
+  // Handler to open task modal
+  const handleSelectTask = (taskId: string) => {
+    setSelectedTaskId(taskId);
+  };
 
   // Start automated background deadline push notification service
   useEffect(() => {
@@ -154,7 +275,7 @@ function LumereAppContent() {
       DeadlinePushService.startAutoScheduler(
         () => tasks,
         () => currentUser,
-        60 // check every 60 seconds
+        60
       );
     }
 
@@ -163,9 +284,10 @@ function LumereAppContent() {
     };
   }, [tasks, currentUser]);
 
-  // Handler to open task modal
-  const handleSelectTask = (taskId: string) => {
-    setSelectedTaskId(taskId);
+  const handleEnterCompanyWorkspace = (companyId: string) => {
+    switchCompany(companyId);
+    setCurrentTab('dashboard');
+    setGlobalSearchQuery('');
   };
 
   const handleTaskUpdated = (updatedTask: Task) => {
@@ -178,7 +300,7 @@ function LumereAppContent() {
   };
 
   const handleTaskCreated = (newTask: Task) => {
-    setTasks(prev => [newTask, ...prev]);
+    setTasks(prev => (prev.some(t => t.id === newTask.id) ? prev : [newTask, ...prev]));
   };
 
   const handleMarkNotificationRead = async (id: string) => {
@@ -198,19 +320,23 @@ function LumereAppContent() {
   };
 
   const handleRefreshAllCollections = async () => {
+    if (subscriptionScope !== 'full') return;
     try {
-      const [emps, depts, clis, projs, tsks] = await Promise.all([
-        DataService.getEmployees(),
-        DataService.getDepartments(),
-        DataService.getClients(),
-        DataService.getProjects(),
-        DataService.getTasks(),
+      const [emps, depts, clis, projs, tsks, equip] = await Promise.all([
+        DataService.getEmployees(queryCompanyId),
+        DataService.getDepartments(queryCompanyId),
+        DataService.getClients(queryCompanyId),
+        DataService.getProjects(queryCompanyId),
+        DataService.getTasks(queryCompanyId),
+        DataService.getEquipment(queryCompanyId),
       ]);
+      await refreshCompanies();
       if (emps) setEmployees(emps);
       if (depts) setDepartments(depts);
       if (clis) setClients(clis);
       if (projs) setProjects(projs);
       if (tsks) setTasks(tsks);
+      if (equip) setEquipment(equip);
     } catch (err) {
       console.error('Failed to refresh collections:', err);
     }
@@ -225,34 +351,34 @@ function LumereAppContent() {
           L
         </div>
         <p className="mt-4 text-xs tracking-widest uppercase font-bold text-neutral-400">
-          جارِ تهيئة نظام Luméré المؤسسي...
+          جارِ تهيئة منظومة LUMERE GROUP المؤسسية...
         </p>
       </div>
     );
   }
 
-  // 1. If user is explicitly logged out, render the Login View
+  // 1. Logged out -> Login View
   if (!currentUser) {
     return <LoginView />;
   }
 
-  // 2. If new user needs to complete their profile (Department, Position, Phone)
+  // 2. Incomplete employee profile -> Onboarding with Company & Department selection
   if (isProfileIncomplete) {
     return <CompleteProfileView departments={departments} />;
   }
 
-  // 3. If user status is pending approval
-  if (currentUser.status === 'pending') {
+  // 3. Pending approval
+  if (isPendingStatus(currentUser.status)) {
     return <PendingApprovalView />;
   }
 
-  // 4. If user status was rejected by Admin
-  if (currentUser.status === 'rejected') {
+  // 4. Rejected
+  if (isRejectedStatus(currentUser.status)) {
     return <RejectedView />;
   }
 
-  // 5. If user status is suspended
-  if (currentUser.status === 'suspended') {
+  // 5. Suspended / Inactive
+  if (isSuspendedStatus(currentUser.status)) {
     return (
       <div className="min-h-screen bg-neutral-100 flex items-center justify-center p-4" dir="rtl">
         <div className="max-w-md w-full bg-white rounded-3xl border border-neutral-200 p-8 text-center shadow-xl">
@@ -261,7 +387,7 @@ function LumereAppContent() {
           </div>
           <h2 className="text-lg font-bold text-neutral-900 mb-2">الحساب موقوف مؤقتاً</h2>
           <p className="text-xs text-neutral-600 mb-6 leading-relaxed">
-            تم إيقاف صلاحيات الوصول لهذا الحساب من قِبل إدارة Luméré. يرجى التواصل مع مسؤول النظام لمعرفة التفاصيل وإعادة التفعيل.
+            تم إيقاف صلاحيات الوصول لهذا الحساب من قِبل إدارة {activeCompany.name}. يرجى التواصل مع مسؤول النظام لمعرفة التفاصيل وإعادة التفعيل.
           </p>
           <button
             onClick={() => logout()}
@@ -274,16 +400,28 @@ function LumereAppContent() {
     );
   }
 
-  // Normal Active Dashboard with RTL Support
+  // Active Multi-Company Workspace with RTL Support
   return (
     <div className="min-h-screen bg-neutral-100 flex" dir="rtl">
       {installPrompt && !isInstalled && (
-        <div className="fixed bottom-4 left-4 right-4 z-50 mx-auto flex max-w-lg items-center justify-between gap-4 rounded-2xl border-emerald-200 bg-white p-4 shadow-xl" role="status">
-          <p className="text-xs font-semibold text-neutral-800">ثبّت Luméré للوصول السريع والعمل كتطبيق.</p>
-          <button type="button" onClick={installApp} className="shrink-0 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-700">تثبيت التطبيق</button>
+        <div
+          className="fixed bottom-4 left-4 right-4 z-50 mx-auto flex max-w-lg items-center justify-between gap-4 rounded-2xl border-emerald-200 bg-white p-4 shadow-xl"
+          role="status"
+        >
+          <p className="text-xs font-semibold text-neutral-800">
+            ثبّت LUMERE GROUP للوصول السريع والعمل كتطبيق.
+          </p>
+          <button
+            type="button"
+            onClick={installApp}
+            className="shrink-0 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-700"
+          >
+            تثبيت التطبيق
+          </button>
         </div>
       )}
-      {/* Sidebar Navigation (Right-Aligned in RTL) */}
+
+      {/* Sidebar Navigation */}
       <Sidebar
         currentTab={currentTab}
         onSelectTab={tab => {
@@ -296,9 +434,8 @@ function LumereAppContent() {
         pendingRequestsCount={pendingUsers.length}
       />
 
-      {/* Main Content Area (lg:pr-64 for right-side sidebar) */}
+      {/* Main Content Area */}
       <div className="flex-1 flex flex-col lg:pr-64 min-w-0">
-        {/* Sticky Header Navbar */}
         <Navbar
           onOpenMobileSidebar={() => setIsMobileSidebarOpen(true)}
           onOpenCreateTask={() => handleOpenCreateTaskWithContext()}
@@ -312,8 +449,35 @@ function LumereAppContent() {
           tasks={tasks}
         />
 
-        {/* View Container */}
         <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto">
+          {currentTab === 'group_dashboard' && canManageCompanies(currentUser) && (
+            <GroupDashboardView
+              companies={companies}
+              employees={employees}
+              departments={departments}
+              clients={clients}
+              projects={projects}
+              tasks={tasks}
+              activityLogs={activityLogs}
+              onEnterCompany={handleEnterCompanyWorkspace}
+              onOpenCompaniesManagement={() => setCurrentTab('companies')}
+              onOpenReports={() => setCurrentTab('reports')}
+            />
+          )}
+
+          {currentTab === 'companies' && canManageCompanies(currentUser) && (
+            <CompaniesManagementView
+              companies={companies}
+              employees={employees}
+              departments={departments}
+              clients={clients}
+              projects={projects}
+              tasks={tasks}
+              onEnterCompany={handleEnterCompanyWorkspace}
+              onRefreshAll={handleRefreshAllCollections}
+            />
+          )}
+
           {currentTab === 'dashboard' && (
             <DashboardView
               tasks={tasks}
@@ -359,6 +523,15 @@ function LumereAppContent() {
             />
           )}
 
+          {currentTab === 'equipment' && (
+            <EquipmentView
+              equipment={equipment}
+              employees={employees}
+              projects={projects}
+              onRefresh={handleRefreshAllCollections}
+            />
+          )}
+
           {currentTab === 'join_requests' && (
             <JoinRequestsView
               pendingUsers={pendingUsers}
@@ -390,11 +563,13 @@ function LumereAppContent() {
             />
           )}
 
-          {currentTab === 'reports' && (
+          {currentTab === 'reports' && canViewReports(currentUser) && (
             <ReportsView tasks={tasks} employees={employees} departments={departments} />
           )}
 
-          {currentTab === 'activity' && <ActivityLogView activityLogs={activityLogs} />}
+          {currentTab === 'activity' && canViewActivityLogs(currentUser) && (
+            <ActivityLogView activityLogs={activityLogs} />
+          )}
 
           {currentTab === 'notifications' && (
             <NotificationsView
@@ -452,7 +627,9 @@ export default function App() {
   return (
     <ToastProvider>
       <AuthProvider>
-        <LumereAppContent />
+        <CompanyProvider>
+          <LumereAppContent />
+        </CompanyProvider>
       </AuthProvider>
     </ToastProvider>
   );

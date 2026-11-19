@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Client, Project, Task, Role } from '../../types';
+import { Client, Project, Task } from '../../types';
 import { DataService } from '../../services/dataService';
 import { useAuth } from '../../context/AuthContext';
+import { useCompany } from '../../context/CompanyContext';
+import { canManageClients as checkCanManageClients } from '../../utils/rbac';
 import {
   Building,
   Plus,
@@ -39,6 +41,7 @@ export const ClientsView: React.FC<ClientsViewProps> = ({
   onRefresh,
 }) => {
   const { currentUser } = useAuth();
+  const { activeCompany, isGroupView, subsidiaries, defaultWriteCompanyId, getCompanyById } = useCompany();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
   const [typeFilter, setTypeFilter] = useState<'all' | string>('all');
@@ -48,6 +51,7 @@ export const ClientsView: React.FC<ClientsViewProps> = ({
   const [isDeletingId, setIsDeletingId] = useState<string | null>(null);
 
   // Form State
+  const [formCompanyId, setFormCompanyId] = useState(defaultWriteCompanyId);
   const [formName, setFormName] = useState('');
   const [formEmail, setFormEmail] = useState('');
   const [formPhone, setFormPhone] = useState('');
@@ -58,7 +62,7 @@ export const ClientsView: React.FC<ClientsViewProps> = ({
   const [formNotes, setFormNotes] = useState('');
   const [isSaving, setIsSaving] = useState(false);
 
-  const canManageClients = currentUser?.role === 'ADMIN';
+  const canManageClients = checkCanManageClients(currentUser, defaultWriteCompanyId);
 
   const filteredClients = clients.filter(c => {
     const term = searchTerm.toLowerCase();
@@ -76,6 +80,7 @@ export const ClientsView: React.FC<ClientsViewProps> = ({
 
   const openAddModal = () => {
     setEditingClient(null);
+    setFormCompanyId(defaultWriteCompanyId);
     setFormName('');
     setFormEmail('');
     setFormPhone('');
@@ -89,6 +94,7 @@ export const ClientsView: React.FC<ClientsViewProps> = ({
 
   const openEditModal = (client: Client) => {
     setEditingClient(client);
+    setFormCompanyId(client.companyId || defaultWriteCompanyId);
     setFormName(client.name);
     setFormEmail(client.email || '');
     setFormPhone(client.phone || '');
@@ -124,6 +130,7 @@ export const ClientsView: React.FC<ClientsViewProps> = ({
       } else {
         await DataService.createClient(
           {
+            companyId: formCompanyId,
             name: formName.trim(),
             email: formEmail.trim(),
             phone: formPhone.trim(),
@@ -147,14 +154,14 @@ export const ClientsView: React.FC<ClientsViewProps> = ({
     }
   };
 
-  const handleDeleteClient = async (clientId: string) => {
+  const handleDeleteClient = async (client: Client) => {
     if (!currentUser || !canManageClients) return;
     if (!window.confirm('هل أنت متأكد من رغبتك في حذف هذا العميل؟')) return;
 
-    setIsDeletingId(clientId);
+    setIsDeletingId(client.id);
     try {
-      await DataService.deleteClient(clientId, currentUser);
-      if (selectedClientForDetails?.id === clientId) {
+      await DataService.deleteClient(client.id, currentUser, client.companyId);
+      if (selectedClientForDetails?.id === client.id) {
         setSelectedClientForDetails(null);
       }
       if (onRefresh) onRefresh();
@@ -190,9 +197,11 @@ export const ClientsView: React.FC<ClientsViewProps> = ({
               <Building className="w-5 h-5" />
             </div>
             <div>
-              <h1 className="text-xl font-bold text-neutral-900 tracking-tight">إدارة العملاء والشركاء</h1>
+              <h1 className="text-xl font-bold text-neutral-900 tracking-tight">
+                إدارة العملاء والشركاء — {activeCompany.name}
+              </h1>
               <p className="text-xs text-neutral-500 mt-0.5">
-                سجل عملاء ومؤسسات علامة Luméré وربطهم بالمشاريع والمهام التنفيذية
+                سجل العملاء والمؤسسات وربطهم بالمشاريع والمهام التنفيذية داخل الشركة
               </p>
             </div>
           </div>
@@ -320,11 +329,15 @@ export const ClientsView: React.FC<ClientsViewProps> = ({
                     </span>
                   </div>
 
-                  {/* Badge: Client Type */}
-                  <div className="mb-3.5">
+                  <div className="mb-3.5 flex items-center gap-1.5 flex-wrap">
                     <span className="text-[10px] font-medium text-amber-800 bg-amber-50 border border-amber-200/80 px-2 py-0.5 rounded-md">
                       {getClientTypeLabel(client.clientType)}
                     </span>
+                    {isGroupView && client.companyId && (
+                      <span className="text-[10px] font-bold text-neutral-600 bg-neutral-100 border border-neutral-200 px-2 py-0.5 rounded-md">
+                        {getCompanyById(client.companyId)?.name || client.companyId}
+                      </span>
+                    )}
                   </div>
 
                   {/* Contacts */}
@@ -386,7 +399,7 @@ export const ClientsView: React.FC<ClientsViewProps> = ({
                         <Edit2 className="w-3.5 h-3.5" />
                       </button>
                       <button
-                        onClick={() => handleDeleteClient(client.id)}
+                        onClick={() => handleDeleteClient(client)}
                         disabled={isDeletingId === client.id}
                         className="p-1.5 rounded-lg text-neutral-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
                         title="حذف العميل"
@@ -428,6 +441,25 @@ export const ClientsView: React.FC<ClientsViewProps> = ({
               </div>
 
               <form onSubmit={handleSaveClient} className="space-y-4 text-xs">
+                {isGroupView && !editingClient && (
+                  <div>
+                    <label className="block font-semibold text-neutral-700 mb-1">
+                      الشركة التابعة <span className="text-rose-500">*</span>
+                    </label>
+                    <select
+                      value={formCompanyId}
+                      onChange={e => setFormCompanyId(e.target.value)}
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-neutral-300 text-neutral-900 bg-white focus:outline-none focus:border-emerald-500"
+                    >
+                      {subsidiaries.map(c => (
+                        <option key={c.id} value={c.id}>
+                          {c.name} {c.arabicName ? `— ${c.arabicName}` : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
                 <div>
                   <label className="block font-semibold text-neutral-700 mb-1">
                     اسم العميل / جهة الاتصال الرئيسية <span className="text-rose-500">*</span>

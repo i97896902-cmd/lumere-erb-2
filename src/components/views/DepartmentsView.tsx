@@ -6,8 +6,10 @@ import { Modal } from '../ui/Modal';
 import { Input, Textarea, Select } from '../ui/Input';
 import { Department, Task, User } from '../../types';
 import { useAuth } from '../../context/AuthContext';
+import { useCompany } from '../../context/CompanyContext';
 import { useToast } from '../../context/ToastContext';
 import { DataService } from '../../services/dataService';
+import { canManageDepartments as checkCanManageDepartments } from '../../utils/rbac';
 
 interface DepartmentsViewProps {
   departments: Department[];
@@ -23,11 +25,15 @@ export function DepartmentsView({
   employees,
   onRefreshDepartments,
 }: DepartmentsViewProps) {
-  const { role, currentUser } = useAuth();
+  const { currentUser } = useAuth();
+  const { activeCompany, isGroupView, subsidiaries, defaultWriteCompanyId, getCompanyById } = useCompany();
   const { showToast } = useToast();
+
+  const canManageDepts = checkCanManageDepartments(currentUser, defaultWriteCompanyId);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingDept, setEditingDept] = useState<Department | null>(null);
+  const [companyId, setCompanyId] = useState(defaultWriteCompanyId);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [headName, setHeadName] = useState('');
@@ -36,6 +42,7 @@ export function DepartmentsView({
 
   const openAddModal = () => {
     setEditingDept(null);
+    setCompanyId(defaultWriteCompanyId);
     setName('');
     setDescription('');
     setHeadName(employees[0]?.displayName || currentUser?.displayName || '');
@@ -45,6 +52,7 @@ export function DepartmentsView({
 
   const openEditModal = (dept: Department) => {
     setEditingDept(dept);
+    setCompanyId(dept.companyId || defaultWriteCompanyId);
     setName(dept.name);
     setDescription(dept.description);
     setHeadName(dept.headName || '');
@@ -73,6 +81,7 @@ export function DepartmentsView({
       } else {
         await DataService.createDepartment(
           {
+            companyId,
             name: name.trim(),
             description: description.trim(),
             headName: headName.trim(),
@@ -97,13 +106,15 @@ export function DepartmentsView({
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl font-bold text-neutral-900">الأقسام والوحدات التشغيلية</h2>
+          <h2 className="text-xl font-bold text-neutral-900">
+            الأقسام والوحدات التشغيلية — {activeCompany.name}
+          </h2>
           <p className="text-xs text-neutral-500">
             توزيع الإدارات، قيادات الفرق، حجم الضغط التشغيلي، ومعدلات إنجاز الأعمال.
           </p>
         </div>
 
-        {role === 'ADMIN' && (
+        {canManageDepts && (
           <Button
             id="btn-add-department"
             onClick={openAddModal}
@@ -136,11 +147,16 @@ export function DepartmentsView({
                     </div>
                     <div>
                       <h3 className="text-base font-bold text-neutral-900">{dept.name}</h3>
-                      <p className="text-xs text-neutral-500">المسؤول: {dept.headName || 'قائد القسم'}</p>
+                      <p className="text-xs text-neutral-500">
+                        المسؤول: {dept.headName || 'قائد القسم'}
+                        {isGroupView && dept.companyId
+                          ? ` • ${getCompanyById(dept.companyId)?.name || dept.companyId}`
+                          : ''}
+                      </p>
                     </div>
                   </div>
 
-                  {role === 'ADMIN' && (
+                  {canManageDepts && (
                     <button
                       onClick={() => openEditModal(dept)}
                       className="p-1 text-neutral-400 hover:text-neutral-700 rounded-lg hover:bg-neutral-100 transition-colors cursor-pointer"
@@ -201,6 +217,15 @@ export function DepartmentsView({
         maxWidth="md"
       >
         <form onSubmit={handleSubmit} className="space-y-4" dir="rtl">
+          {isGroupView && !editingDept && (
+            <Select
+              label="الشركة التابعة *"
+              value={companyId}
+              onChange={e => setCompanyId(e.target.value)}
+              options={subsidiaries.map(c => ({ label: c.name, value: c.id }))}
+            />
+          )}
+
           <Input
             label="اسم القسم *"
             value={name}

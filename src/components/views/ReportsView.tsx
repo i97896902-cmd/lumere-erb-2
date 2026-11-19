@@ -1,19 +1,18 @@
 import React, { useState } from 'react';
 import {
-  BarChart3,
-  TrendingUp,
   Download,
   Printer,
-  Calendar,
-  Users,
   Building2,
-  CheckCircle2,
-  AlertTriangle,
   Award,
+  Save,
 } from 'lucide-react';
 import { Card } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { Task, User, Department } from '../../types';
+import { useAuth } from '../../context/AuthContext';
+import { useCompany } from '../../context/CompanyContext';
+import { useToast } from '../../context/ToastContext';
+import { DataService } from '../../services/dataService';
 
 interface ReportsViewProps {
   tasks: Task[];
@@ -22,7 +21,11 @@ interface ReportsViewProps {
 }
 
 export function ReportsView({ tasks, employees, departments }: ReportsViewProps) {
+  const { currentUser } = useAuth();
+  const { activeCompany, activeCompanyId, isGroupView } = useCompany();
+  const { showToast } = useToast();
   const [timeframe, setTimeframe] = useState<'all' | 'month' | 'quarter'>('all');
+  const [isSavingReport, setIsSavingReport] = useState(false);
 
   const nowStr = new Date().toISOString().split('T')[0];
 
@@ -108,10 +111,39 @@ export function ReportsView({ tasks, employees, departments }: ReportsViewProps)
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.setAttribute('href', url);
-    link.setAttribute('download', `lumere_tasks_report_${nowStr}.csv`);
+    link.setAttribute('download', `${activeCompany.slug || 'lumere'}_tasks_report_${nowStr}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+  };
+
+  const handleSaveSnapshotReport = async () => {
+    if (!currentUser) return;
+    setIsSavingReport(true);
+    try {
+      await DataService.saveReport(
+        {
+          companyId: activeCompanyId,
+          title: `تقرير الأداء — ${activeCompany.name} (${timeframe})`,
+          period: timeframe,
+          generatedBy: currentUser.id,
+          generatedByName: currentUser.displayName,
+          metrics: {
+            totalTasks,
+            completedTasks,
+            overdueTasks,
+            completionRate,
+            employeesCount: employees.length,
+          },
+        },
+        currentUser
+      );
+      showToast('تم حفظ نسخة التقرير في قاعدة بيانات التقارير بنجاح', 'success');
+    } catch {
+      showToast('تعذر حفظ نسخة التقرير في Firestore', 'error');
+    } finally {
+      setIsSavingReport(false);
+    }
   };
 
   const handlePrint = () => {
@@ -123,23 +155,36 @@ export function ReportsView({ tasks, employees, departments }: ReportsViewProps)
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl font-bold text-neutral-900">التقارير التحليلية والذكاء المؤسسي</h2>
+          <h2 className="text-xl font-bold text-neutral-900">
+            التقارير التحليلية — {activeCompany.name}
+          </h2>
           <p className="text-xs text-neutral-500">
-            مؤشرات الأداء الرئيسية، قياس الإنتاجية، وسرعة تسليم التكليفات في منظومة Luméré.
+            {isGroupView
+              ? 'مؤشرات الأداء المجمعة لكافة شركات المجموعة والأقسام.'
+              : `مؤشرات الأداء الرئيسية، قياس الإنتاجية، وسرعة تسليم التكليفات في ${activeCompany.name}.`}
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
-          {/* Timeframe selector */}
+        <div className="flex flex-wrap items-center gap-2">
           <select
             value={timeframe}
-            onChange={e => setTimeframe(e.target.value as any)}
+            onChange={e => setTimeframe(e.target.value as 'all' | 'month' | 'quarter')}
             className="px-3 py-1.5 text-xs bg-white rounded-xl border border-neutral-200 shadow-2xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
           >
             <option value="all">كامل البيانات التاريخية</option>
             <option value="quarter">هذا الربع السنوي</option>
             <option value="month">الشهر الحالي</option>
           </select>
+
+          <Button
+            size="sm"
+            variant="outline"
+            isLoading={isSavingReport}
+            leftIcon={<Save className="w-4 h-4" />}
+            onClick={handleSaveSnapshotReport}
+          >
+            حفظ التقرير
+          </Button>
 
           <Button
             size="sm"
@@ -242,11 +287,17 @@ export function ReportsView({ tasks, employees, departments }: ReportsViewProps)
                   >
                     {index + 1}
                   </span>
-                  <img
-                    src={emp.photoURL}
-                    alt={emp.displayName}
-                    className="w-8 h-8 rounded-full object-cover border"
-                  />
+                  {emp.photoURL ? (
+                    <img
+                      src={emp.photoURL}
+                      alt={emp.displayName}
+                      className="w-8 h-8 rounded-full object-cover border"
+                    />
+                  ) : (
+                    <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-800 text-[10px] flex items-center justify-center font-bold border border-emerald-200">
+                      {emp.displayName.slice(0, 2).toUpperCase()}
+                    </div>
+                  )}
                   <div>
                     <p className="font-bold text-neutral-900">{emp.displayName}</p>
                     <p className="text-[11px] text-neutral-500">{emp.department}</p>

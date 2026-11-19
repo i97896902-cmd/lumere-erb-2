@@ -1,12 +1,16 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // 1. Global Default Deny
+    // =========================================================================
+    // 1. GLOBAL DEFAULT DENY
+    // =========================================================================
     match /{document=**} {
       allow read, write: if false;
     }
 
-    // Helper functions
+    // =========================================================================
+    // 2. AUTHENTICATION, CUSTOM CLAIMS & MULTI-COMPANY RBAC HELPERS
+    // =========================================================================
     function isSignedIn() {
       return request.auth != null;
     }
@@ -15,157 +19,408 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == userId;
     }
 
-    function isSoleAdmin() {
-      return isSignedIn() && request.auth.token.email == 'lumerecompany@gmail.com';
+    function isBootstrapSuperAdmin() {
+      return isSignedIn()
+        && request.auth.token.email == 'lumerecompany@gmail.com'
+        && request.auth.token.email_verified == true;
     }
 
-    function isAdmin() {
-      return isSoleAdmin() &&
-        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'ADMIN' &&
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.status == 'active';
+    function userDocPath(uid) {
+      return /databases/$(database)/documents/users/$(uid);
     }
 
-    // 2. Admins collection
+    function hasUserDoc() {
+      return isSignedIn() && exists(userDocPath(request.auth.uid));
+    }
+
+    function currentUserData() {
+      return get(userDocPath(request.auth.uid)).data;
+    }
+
+    function isActiveUser() {
+      return isBootstrapSuperAdmin()
+        || (hasUserDoc() && currentUserData().status in ['active', 'Active']);
+    }
+
+    function currentUserRole() {
+      return isBootstrapSuperAdmin()
+        ? 'SUPER_ADMIN'
+        : (request.auth.token.role is string
+            ? request.auth.token.role
+            : (hasUserDoc() ? currentUserData().role : 'EMPLOYEE'));
+    }
+
+    function currentUserCompanyId() {
+      return request.auth.token.companyId is string
+        ? request.auth.token.companyId
+        : (hasUserDoc() && currentUserData().companyId is string
+            ? currentUserData().companyId
+            : '');
+    }
+
+    function isSuperAdmin() {
+      return isActiveUser()
+        && (currentUserRole() in ['SUPER_ADMIN', 'ADMIN']
+            || exists(/databases/$(database)/documents/admins/$(request.auth.uid)));
+    }
+
+    function belongsToCompany(companyId) {
+      return isActiveUser()
+        && companyId is string
+        && companyId.size() > 0
+        && currentUserCompanyId() == companyId;
+    }
+
+    function isCompanyAdmin(companyId) {
+      return belongsToCompany(companyId) && currentUserRole() == 'COMPANY_ADMIN';
+    }
+
+    function isManager(companyId) {
+      return belongsToCompany(companyId) && currentUserRole() == 'MANAGER';
+    }
+
+    function canManageCompanyData(companyId) {
+      return isSuperAdmin() || isCompanyAdmin(companyId);
+    }
+
+    function canManageOperations(companyId) {
+      return isSuperAdmin() || isCompanyAdmin(companyId) || isManager(companyId);
+    }
+
+    function canReadCompanyResource(companyId) {
+      return isSuperAdmin() || belongsToCompany(companyId);
+    }
+
+    function isValidCompanyId(companyId) {
+      return companyId is string && companyId.size() >= 2 && companyId.size() <= 128;
+    }
+
+    function assigneeMatchesCompany(assigneeUid, companyId) {
+      return assigneeUid is string
+        && exists(userDocPath(assigneeUid))
+        && get(userDocPath(assigneeUid)).data.companyId == companyId;
+    }
+
+    function projectMatchesCompanyIfPresent(data) {
+      return !('projectId' in data)
+        || data.projectId == null
+        || data.projectId == ''
+        || (exists(/databases/$(database)/documents/projects/$(data.projectId))
+            && get(/databases/$(database)/documents/projects/$(data.projectId)).data.companyId == data.companyId);
+    }
+
+    // =========================================================================
+    // 3. ADMINS (Server-managed UID verification map)
+    // =========================================================================
     match /admins/{adminId} {
-      allow read: if isSoleAdmin();
+      allow read: if isSuperAdmin();
       allow write: if false;
     }
 
-    // 3. Users / Employees
-    match /users/{userId} {
-      allow get: if isSignedIn();
-      allow list: if isSignedIn();
-      allow create: if isSignedIn() && isCurrentUser(userId)
-        && request.resource.data.uid == userId
-        && ((isSoleAdmin() && request.resource.data.role == 'ADMIN' && request.resource.data.status == 'active')
-          || (!isSoleAdmin() && request.resource.data.role == 'EMPLOYEE' && request.resource.data.status == 'pending'))
-        && request.resource.data.displayName is string
-        && request.resource.data.displayName.size() <= 128
-        && request.resource.data.email is string
-        && request.resource.data.email == request.auth.token.email
-        && request.resource.data.email.size() <= 256
-        && request.resource.data.phone is string
-        && request.resource.data.department is string
-        && request.resource.data.position is string;
+    // =========================================================================
+    // 4. COMPANIES (Parent LUMERE GROUP + Subsidiaries)
+    // =========================================================================
+    match /companies/{companyId} {
+      allow get: if isSuperAdmin() || belongsToCompany(companyId) || (isSignedIn() && resource.data.type == 'subsidiary' && resource.data.status == 'active');
+      allow list: if isSuperAdmin() || (isSignedIn() && resource.data.type == 'subsidiary' && resource.data.status == 'active');
 
-      allow update: if isSignedIn() && (
-        (isAdmin() && request.resource.data.role == 'EMPLOYEE' && userId != request.auth.uid) ||
-        (isCurrentUser(userId) && request.resource.data.role == resource.data.role &&
-          request.resource.data.status == resource.data.status &&
-          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'status', 'approvedBy', 'approvedAt', 'rejectionReason']))
+      allow create: if isSuperAdmin()
+        && request.resource.data.name is string
+        && request.resource.data.name.size() >= 2
+        && request.resource.data.name.size() <= 150
+        && request.resource.data.slug is string
+        && request.resource.data.type in ['parent', 'subsidiary']
+        && request.resource.data.status in ['active', 'inactive'];
+
+      allow update: if isSuperAdmin()
+        && request.resource.data.name is string
+        && request.resource.data.name.size() <= 150
+        && request.resource.data.status in ['active', 'inactive'];
+
+      allow delete: if false; // Archive/deactivate instead of destructive deletion
+    }
+
+    // =========================================================================
+    // 5. USERS / EMPLOYEES (Strict Multi-Company & Anti-Escalation Rules)
+    // =========================================================================
+    match /users/{userId} {
+      allow get: if isCurrentUser(userId)
+        || isSuperAdmin()
+        || belongsToCompany(resource.data.companyId);
+
+      allow list: if isSuperAdmin()
+        || belongsToCompany(resource.data.companyId);
+
+      // Self-registration locked strictly to EMPLOYEE + pending (except bootstrap SUPER_ADMIN)
+      allow create: if isSignedIn() && (
+        (
+          isCurrentUser(userId)
+          && request.resource.data.uid == userId
+          && request.resource.data.email == request.auth.token.email
+          && request.resource.data.displayName is string
+          && request.resource.data.displayName.size() <= 128
+          && isValidCompanyId(request.resource.data.companyId)
+          && (
+            (isBootstrapSuperAdmin() && request.resource.data.role in ['SUPER_ADMIN', 'ADMIN'] && request.resource.data.status == 'active')
+            || (!isBootstrapSuperAdmin()
+                && request.resource.data.role == 'EMPLOYEE'
+                && request.resource.data.status == 'pending'
+                && request.resource.data.companyId != 'lumere-group')
+          )
+        )
+        || (
+          isSuperAdmin()
+          && isValidCompanyId(request.resource.data.companyId)
+          && request.resource.data.role in ['SUPER_ADMIN', 'COMPANY_ADMIN', 'MANAGER', 'EMPLOYEE']
+        )
+        || (
+          isCompanyAdmin(request.resource.data.companyId)
+          && request.resource.data.companyId != 'lumere-group'
+          && request.resource.data.role in ['MANAGER', 'EMPLOYEE']
+        )
       );
 
-      allow delete: if isAdmin();
+      allow update: if isSignedIn() && (
+        // 1. SUPER_ADMIN can manage any user across any company
+        (
+          isSuperAdmin()
+          && isValidCompanyId(request.resource.data.companyId)
+          && request.resource.data.role in ['SUPER_ADMIN', 'COMPANY_ADMIN', 'MANAGER', 'EMPLOYEE', 'ADMIN']
+        )
+        // 2. COMPANY_ADMIN can manage ONLY users within their own company and assign MANAGER/EMPLOYEE only
+        || (
+          isCompanyAdmin(resource.data.companyId)
+          && request.resource.data.companyId == resource.data.companyId
+          && request.resource.data.role in ['MANAGER', 'EMPLOYEE']
+          && userId != request.auth.uid
+        )
+        // 3. Self profile update: cannot alter role, status, approval metadata, or jump companies once active
+        || (
+          isCurrentUser(userId)
+          && request.resource.data.role == resource.data.role
+          && request.resource.data.status == resource.data.status
+          && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'status', 'approvedBy', 'approvedAt', 'rejectionReason'])
+          && (
+            request.resource.data.companyId == resource.data.companyId
+            || (resource.data.status == 'pending' && isValidCompanyId(request.resource.data.companyId) && request.resource.data.companyId != 'lumere-group')
+          )
+        )
+      );
+
+      allow delete: if isSuperAdmin();
     }
 
-    // 4. Clients (Admin only for manage, all signed in can read)
+    // =========================================================================
+    // 6. DEPARTMENTS (Company-Scoped)
+    // =========================================================================
+    match /departments/{departmentId} {
+      // Pending users completing profile can read subsidiary departments to choose their department
+      allow read: if isSuperAdmin()
+        || belongsToCompany(resource.data.companyId)
+        || (isSignedIn() && hasUserDoc() && currentUserData().status == 'pending');
+
+      allow create: if canManageCompanyData(request.resource.data.companyId)
+        && isValidCompanyId(request.resource.data.companyId)
+        && request.resource.data.name is string
+        && request.resource.data.name.size() <= 120;
+
+      allow update: if canManageCompanyData(resource.data.companyId)
+        && request.resource.data.companyId == resource.data.companyId;
+
+      allow delete: if canManageCompanyData(resource.data.companyId);
+    }
+
+    // =========================================================================
+    // 7. CLIENTS (Company-Scoped)
+    // =========================================================================
     match /clients/{clientId} {
-      allow read: if isSignedIn();
-      allow create, update: if isSignedIn() && isAdmin()
+      allow read: if canReadCompanyResource(resource.data.companyId);
+
+      allow create: if canManageOperations(request.resource.data.companyId)
+        && isValidCompanyId(request.resource.data.companyId)
         && request.resource.data.name is string
         && request.resource.data.name.size() <= 200;
-      allow delete: if isSignedIn() && isAdmin();
+
+      allow update: if canManageOperations(resource.data.companyId)
+        && request.resource.data.companyId == resource.data.companyId
+        && request.resource.data.name is string
+        && request.resource.data.name.size() <= 200;
+
+      allow delete: if canManageCompanyData(resource.data.companyId);
     }
 
-    // 5. Projects (Admin only for manage, all signed in can read)
+    // =========================================================================
+    // 8. PROJECTS (Company-Scoped)
+    // =========================================================================
     match /projects/{projectId} {
-      allow read: if isSignedIn();
-      allow create, update: if isSignedIn() && isAdmin()
+      allow read: if canReadCompanyResource(resource.data.companyId);
+
+      allow create: if canManageOperations(request.resource.data.companyId)
+        && isValidCompanyId(request.resource.data.companyId)
         && request.resource.data.name is string
         && request.resource.data.name.size() <= 200
         && request.resource.data.clientId is string;
-      allow delete: if isSignedIn() && isAdmin();
+
+      allow update: if canManageOperations(resource.data.companyId)
+        && request.resource.data.companyId == resource.data.companyId
+        && request.resource.data.name is string
+        && request.resource.data.name.size() <= 200;
+
+      allow delete: if canManageCompanyData(resource.data.companyId);
     }
 
-    // 6. Tasks
+    // =========================================================================
+    // 9. TASKS & COMMENTS (Company-Scoped + Cross-Company Assignment Guard)
+    // =========================================================================
     match /tasks/{taskId} {
-      allow read: if isSignedIn();
+      allow read: if canReadCompanyResource(resource.data.companyId);
 
-      allow create: if isSignedIn() && isAdmin()
+      allow create: if canManageOperations(request.resource.data.companyId)
+        && isValidCompanyId(request.resource.data.companyId)
+        && request.resource.data.companyId != 'lumere-group'
         && request.resource.data.title is string
         && request.resource.data.title.size() <= 256
         && request.resource.data.description is string
         && request.resource.data.description.size() <= 5000
         && request.resource.data.department is string
         && request.resource.data.priority in ['Low', 'Medium', 'High', 'Urgent']
-        && request.resource.data.status in ['Pending', 'In Progress', 'Review', 'Completed', 'Rejected', 'Cancelled'];
+        && request.resource.data.status in ['Pending', 'In Progress', 'Review', 'Completed', 'Rejected', 'Cancelled']
+        && request.resource.data.completionPercentage is number
+        && request.resource.data.completionPercentage >= 0
+        && request.resource.data.completionPercentage <= 100
+        && assigneeMatchesCompany(request.resource.data.assignedTo, request.resource.data.companyId)
+        && projectMatchesCompanyIfPresent(request.resource.data);
 
-      allow update: if isSignedIn() && (
-        isAdmin() ||
-        // Employee assigned to task can update status to 'In Progress' or 'Review', progress percentage, and attachments
-        (
-          resource.data.assignedTo == request.auth.uid &&
-          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'completionPercentage', 'updatedAt', 'attachments', 'reviewStatus']) &&
-          // Employees cannot jump straight to Completed or approve their own work
-          request.resource.data.status in ['In Progress', 'Review']
-        )
-      );
+      allow update: if isSignedIn()
+        && request.resource.data.companyId == resource.data.companyId
+        && (
+          (
+            canManageOperations(resource.data.companyId)
+            && request.resource.data.completionPercentage >= 0
+            && request.resource.data.completionPercentage <= 100
+            && projectMatchesCompanyIfPresent(request.resource.data)
+          )
+          || (
+            belongsToCompany(resource.data.companyId)
+            && resource.data.assignedTo == request.auth.uid
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'completionPercentage', 'updatedAt', 'attachments', 'reviewStatus'])
+            && request.resource.data.status in ['In Progress', 'Review']
+            && request.resource.data.completionPercentage >= 0
+            && request.resource.data.completionPercentage <= 100
+          )
+        );
 
-      allow delete: if isAdmin();
+      allow delete: if canManageCompanyData(resource.data.companyId);
 
-      // Comments sub-collection
       match /comments/{commentId} {
-        allow read: if isSignedIn();
-        allow create: if isSignedIn()
+        allow read: if canReadCompanyResource(get(/databases/$(database)/documents/tasks/$(taskId)).data.companyId);
+        allow create: if isActiveUser()
+          && canReadCompanyResource(get(/databases/$(database)/documents/tasks/$(taskId)).data.companyId)
           && request.resource.data.userId == request.auth.uid
+          && request.resource.data.companyId == get(/databases/$(database)/documents/tasks/$(taskId)).data.companyId
           && request.resource.data.message is string
           && request.resource.data.message.size() <= 3000;
-        allow update: if isSignedIn() && resource.data.userId == request.auth.uid;
-        allow delete: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
+        allow update: if isActiveUser()
+          && resource.data.userId == request.auth.uid
+          && request.resource.data.companyId == resource.data.companyId;
+        allow delete: if canManageCompanyData(get(/databases/$(database)/documents/tasks/$(taskId)).data.companyId)
+          || (isActiveUser() && resource.data.userId == request.auth.uid);
       }
     }
 
-    // 7. Departments
-    match /departments/{departmentId} {
-      allow read: if isSignedIn();
-      allow create, update, delete: if isAdmin();
-    }
-
-    // 8. Notifications
+    // =========================================================================
+    // 10. NOTIFICATIONS (Company-Scoped & Recipient-Restricted)
+    // =========================================================================
     match /notifications/{notificationId} {
       allow read: if isSignedIn() && (
-        resource.data.userId == request.auth.uid || isAdmin()
+        resource.data.userId == request.auth.uid
+        || isSuperAdmin()
+        || isCompanyAdmin(resource.data.companyId)
       );
-      allow create: if isSignedIn();
+
+      allow create: if isActiveUser()
+        && isValidCompanyId(request.resource.data.companyId)
+        && canReadCompanyResource(request.resource.data.companyId)
+        && request.resource.data.userId is string
+        && request.resource.data.title is string
+        && request.resource.data.title.size() <= 200;
+
       allow update: if isSignedIn() && (
-        (resource.data.userId == request.auth.uid && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read'])) ||
-        isAdmin()
+        (
+          resource.data.userId == request.auth.uid
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read'])
+        )
+        || canManageCompanyData(resource.data.companyId)
       );
-      allow delete: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+
+      allow delete: if isSignedIn() && (
+        resource.data.userId == request.auth.uid
+        || canManageCompanyData(resource.data.companyId)
+      );
     }
 
-    // 9. Activity Logs (Immutable audit trail, readable by all signed in users)
+    // =========================================================================
+    // 11. ACTIVITY LOGS (Company-Scoped & Strictly Immutable)
+    // =========================================================================
     match /activity_logs/{logId} {
-      allow read: if isSignedIn();
-      allow create: if isSignedIn()
-        && request.resource.data.actorId is string
+      allow read: if isSuperAdmin()
+        || isCompanyAdmin(resource.data.companyId)
+        || isManager(resource.data.companyId);
+
+      allow create: if isActiveUser()
+        && isValidCompanyId(request.resource.data.companyId)
+        && canReadCompanyResource(request.resource.data.companyId)
+        && request.resource.data.actorId == request.auth.uid
         && request.resource.data.action is string;
-      allow update, delete: if false; // Immutable!
+
+      allow update, delete: if false; // Strictly Immutable Audit Trail
     }
 
-    // 10. Equipment
+    // =========================================================================
+    // 12. EQUIPMENT & EQUIPMENT HISTORY (Company-Scoped)
+    // =========================================================================
     match /equipment/{equipmentId} {
-      allow read: if isSignedIn() && (
-        isAdmin() ||
-        resource.data.assignedTo == request.auth.uid ||
-        resource.data.projectId != null
-      );
-      allow create, update: if isSignedIn() && isAdmin()
+      allow read: if canReadCompanyResource(resource.data.companyId);
+
+      allow create: if canManageOperations(request.resource.data.companyId)
+        && isValidCompanyId(request.resource.data.companyId)
         && request.resource.data.name is string
         && request.resource.data.name.size() <= 200
         && request.resource.data.serialNumber is string
         && request.resource.data.status in ['available', 'assigned', 'in_maintenance', 'damaged', 'lost', 'inactive'];
-      allow delete: if isSignedIn() && isAdmin();
+
+      allow update: if canManageOperations(resource.data.companyId)
+        && request.resource.data.companyId == resource.data.companyId;
+
+      allow delete: if canManageCompanyData(resource.data.companyId);
     }
 
-    // 11. Equipment History (Immutable assignment & lifecycle log)
     match /equipmentHistory/{historyId} {
-      allow read: if isSignedIn();
-      allow create: if isSignedIn()
+      allow read: if canReadCompanyResource(resource.data.companyId);
+
+      allow create: if isActiveUser()
+        && isValidCompanyId(request.resource.data.companyId)
+        && canReadCompanyResource(request.resource.data.companyId)
+        && request.resource.data.actorId == request.auth.uid
         && request.resource.data.equipmentId is string
         && request.resource.data.action is string;
-      allow update, delete: if false; // Immutable!
+
+      allow update, delete: if false; // Strictly Immutable
+    }
+
+    // =========================================================================
+    // 13. STORED REPORTS (Company-Scoped)
+    // =========================================================================
+    match /reports/{reportId} {
+      allow read: if isSuperAdmin()
+        || isCompanyAdmin(resource.data.companyId)
+        || isManager(resource.data.companyId);
+
+      allow create: if canManageOperations(request.resource.data.companyId)
+        && isValidCompanyId(request.resource.data.companyId)
+        && request.resource.data.generatedBy == request.auth.uid;
+
+      allow update, delete: if isSuperAdmin();
     }
   }
 }

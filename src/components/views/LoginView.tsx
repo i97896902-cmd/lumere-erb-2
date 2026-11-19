@@ -1,10 +1,17 @@
 import React, { useState } from 'react';
-import { Mail, Lock, Shield, AlertCircle, CheckCircle2, User, ChevronDown } from 'lucide-react';
+import { Mail, Lock, AlertCircle, CheckCircle2, ChevronDown, Building2 } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { Modal } from '../ui/Modal';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
+import {
+  CORE_COMPANIES,
+  DEFAULT_SUBSIDIARY_ID,
+  SUGGESTED_DEPARTMENTS_BY_COMPANY,
+} from '../../config/companies';
+
+const SUBSIDIARY_COMPANIES = CORE_COMPANIES.filter(c => c.type === 'subsidiary');
 
 interface LoginViewProps {
   onSuccess?: () => void;
@@ -24,10 +31,26 @@ export function LoginView({ onSuccess }: LoginViewProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
-  const [department, setDepartment] = useState('Design');
+  const [selectedCompanyId, setSelectedCompanyId] = useState<string>(DEFAULT_SUBSIDIARY_ID);
+  const [department, setDepartment] = useState(
+    SUGGESTED_DEPARTMENTS_BY_COMPANY[DEFAULT_SUBSIDIARY_ID]?.[0]?.name || 'التسويق'
+  );
   const [position, setPosition] = useState('أخصائي');
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  const companyDepartments =
+    SUGGESTED_DEPARTMENTS_BY_COMPANY[selectedCompanyId] ||
+    SUGGESTED_DEPARTMENTS_BY_COMPANY[DEFAULT_SUBSIDIARY_ID] ||
+    [];
+
+  const handleCompanyChange = (nextCompanyId: string) => {
+    setSelectedCompanyId(nextCompanyId);
+    const nextDepts = SUGGESTED_DEPARTMENTS_BY_COMPANY[nextCompanyId] || [];
+    if (nextDepts.length > 0) {
+      setDepartment(nextDepts[0].name);
+    }
+  };
 
   // Email form accordion toggle
   const [showEmailForm, setShowEmailForm] = useState(false);
@@ -53,9 +76,11 @@ export function LoginView({ onSuccess }: LoginViewProps) {
           displayName.trim(),
           'EMPLOYEE',
           department,
-          position
+          position,
+          undefined,
+          selectedCompanyId
         );
-        showToast('تم إنشاء الحساب وإرسال طلب الانضمام', 'success');
+        showToast('تم إنشاء الحساب وإرسال طلب الانضمام للشركة المختارة', 'success');
       }
       if (onSuccess) onSuccess();
     } catch (err: any) {
@@ -82,7 +107,6 @@ export function LoginView({ onSuccess }: LoginViewProps) {
       showToast('تم تسجيل الدخول بواسطة حساب Google بنجاح', 'success');
       if (onSuccess) onSuccess();
     } catch (err: any) {
-      console.error('Google Sign In Error:', err);
       setErrorMsg(err?.message || 'تم إلغاء أو تعذر استكمال تسجيل الدخول عبر Google.');
     } finally {
       setIsLoading(false);
@@ -108,11 +132,14 @@ export function LoginView({ onSuccess }: LoginViewProps) {
         {/* Brand Banner */}
         <div className="bg-gradient-to-r from-neutral-900 via-neutral-950 to-neutral-900 p-8 text-white text-center border-b border-neutral-800 relative">
           <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-600 to-teal-800 flex items-center justify-center mx-auto shadow-md text-white font-bold text-2xl tracking-wider border border-emerald-500/30 mb-3">
-            L
+            LG
           </div>
-          <h1 className="font-serif tracking-widest text-2xl font-bold">LUMÉRÉ</h1>
-          <p className="text-xs tracking-wider uppercase text-neutral-400 font-medium mt-1">
-            نظام إدارة المهام والمشاريع المؤسسي
+          <h1 className="font-serif tracking-widest text-2xl font-bold">LUMERE GROUP</h1>
+          <p className="text-xs tracking-wide text-neutral-400 font-medium mt-1">
+            منظومة إدارة موارد مجموعة الشركات المؤسسية
+          </p>
+          <p className="text-[11px] tracking-widest text-emerald-400/90 font-semibold mt-2.5">
+            LUMERE · NEX AURA · ORDARK
           </p>
         </div>
 
@@ -147,7 +174,7 @@ export function LoginView({ onSuccess }: LoginViewProps) {
               <span>{isLoading ? 'جارِ الاتصال بـ Google...' : 'تسجيل الدخول السريع بحساب Google'}</span>
             </button>
             <p className="text-[11px] text-neutral-400 text-center">
-              الدخول المعتمد لمنسوبي وموظفي شركة Luméré
+              الدخول المعتمد لمنسوبي وموظفي شركات مجموعة LUMERE GROUP
             </p>
           </div>
 
@@ -176,16 +203,54 @@ export function LoginView({ onSuccess }: LoginViewProps) {
                     onChange={e => setDisplayName(e.target.value)}
                     required
                   />
+                  <div>
+                    <label
+                      htmlFor="register-company"
+                      className="block text-xs font-semibold text-neutral-700 mb-1.5"
+                    >
+                      الشركة التابعة
+                    </label>
+                    <div className="relative">
+                      <Building2 className="w-4 h-4 text-neutral-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                      <select
+                        id="register-company"
+                        value={selectedCompanyId}
+                        onChange={e => handleCompanyChange(e.target.value)}
+                        className="w-full pr-9 pl-3 py-2 text-xs bg-white border border-neutral-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 text-neutral-900 font-medium"
+                      >
+                        {SUBSIDIARY_COMPANIES.map(company => (
+                          <option key={company.id} value={company.id}>
+                            {company.name} — {company.businessSector}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
                   <div className="grid grid-cols-2 gap-2.5">
-                    <Input
-                      label="القسم"
-                      placeholder="Design / Dev"
-                      value={department}
-                      onChange={e => setDepartment(e.target.value)}
-                    />
+                    <div>
+                      <label
+                        htmlFor="register-department"
+                        className="block text-xs font-semibold text-neutral-700 mb-1.5"
+                      >
+                        القسم
+                      </label>
+                      <select
+                        id="register-department"
+                        value={department}
+                        onChange={e => setDepartment(e.target.value)}
+                        className="w-full px-3 py-2 text-xs bg-white border border-neutral-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 text-neutral-900 font-medium"
+                      >
+                        {companyDepartments.map(dept => (
+                          <option key={dept.name} value={dept.name}>
+                            {dept.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
                     <Input
                       label="المسمى الوظيفي"
-                      placeholder="أخصائي تصميم"
+                      placeholder="أخصائي / مطور / مشرف"
                       value={position}
                       onChange={e => setPosition(e.target.value)}
                     />

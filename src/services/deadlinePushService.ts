@@ -1,5 +1,6 @@
-import { Task, User, Notification as AppNotification } from '../types';
+import { Task, User } from '../types';
 import { DataService } from './dataService';
+import { normalizeRole } from '../utils/rbac';
 
 export type DeadlineUrgency = 'overdue' | 'due_today' | 'due_tomorrow' | 'due_soon' | 'on_track';
 
@@ -260,6 +261,7 @@ class DeadlinePushServiceManager {
       if (this.settings.enableInAppNotifications && task.assignedTo) {
         try {
           await DataService.createNotification({
+            companyId: task.companyId,
             userId: task.assignedTo,
             title: notifTitle,
             message: notifBody,
@@ -278,6 +280,7 @@ class DeadlinePushServiceManager {
             task.createdBy !== task.assignedTo
           ) {
             await DataService.createNotification({
+              companyId: task.companyId,
               userId: task.createdBy,
               title: `[Manager Alert] ${notifTitle}`,
               message: `High-priority task assigned to ${task.assignedToName} is approaching deadline (${task.deadline}).`,
@@ -293,11 +296,11 @@ class DeadlinePushServiceManager {
       }
 
       // 2. Trigger Native Browser Web Push Notification
-      // Only pop browser notification if current user is the assignee, or an admin
+      // Only pop browser notification if current user is the assignee or a supervisory role
       const isRelevantUser =
         !currentUser ||
         currentUser.id === task.assignedTo ||
-        currentUser.role === 'ADMIN';
+        normalizeRole(currentUser.role, currentUser.email) !== 'EMPLOYEE';
 
       if (this.settings.enableBrowserPush && isRelevantUser) {
         this.sendNativeBrowserNotification(notifTitle, notifBody, task.id);

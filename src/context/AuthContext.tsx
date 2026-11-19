@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import {
   browserLocalPersistence,
+  getIdTokenResult,
   getRedirectResult,
   onAuthStateChanged,
   setPersistence,
@@ -14,12 +15,34 @@ import {
 } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { auth, db, googleProvider, testConnection } from '../lib/firebase';
-import { User, Role } from '../types';
+import { CanonicalRole, Role, User } from '../types';
+import { formatUnauthorizedDomainMessage } from '../utils/appGuards';
+import {
+  canSwitchCompanies as checkCanSwitchCompanies,
+  getUserCompanyId,
+  isActiveStatus,
+  isCompanyAdmin as checkIsCompanyAdmin,
+  isManager as checkIsManager,
+  isSuperAdmin as checkIsSuperAdmin,
+  normalizeRole,
+  PRIMARY_SUPER_ADMIN_EMAIL,
+} from '../utils/rbac';
+import { DEFAULT_SUBSIDIARY_ID, PARENT_COMPANY_ID } from '../config/companies';
+
+export interface AuthCustomClaims {
+  role?: CanonicalRole;
+  companyId?: string;
+}
 
 interface AuthContextType {
   currentUser: User | null;
   firebaseUser: FirebaseUser | null;
-  role: Role;
+  role: CanonicalRole;
+  claims: AuthCustomClaims;
+  isSuperAdmin: boolean;
+  isCompanyAdmin: boolean;
+  isManager: boolean;
+  canSwitchCompanies: boolean;
   loading: boolean;
   isProfileIncomplete: boolean;
   authError: string | null;
@@ -32,35 +55,90 @@ interface AuthContextType {
     role: Role,
     department: string,
     position: string,
-    phone?: string
+    phone?: string,
+    companyId?: string
   ) => Promise<void>;
   completeEmployeeProfile: (data: {
     displayName: string;
     phone: string;
     department: string;
     position: string;
+    companyId?: string;
   }) => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   logout: () => Promise<void>;
   refreshCurrentUser: () => Promise<void>;
 }
 
-const ADMIN_EMAIL = 'lumerecompany@gmail.com';
-
 function getGoogleAuthErrorMessage(error: unknown): string {
   const code = (error as { code?: string })?.code;
   switch (code) {
-    case 'auth/popup-blocked': return 'تم حظر نافذة Google. سيتم تحويلك إلى صفحة تسجيل الدخول الآمنة.';
+    case 'auth/popup-blocked':
+      return 'تم حظر نافذة Google. سيتم تحويلك إلى صفحة تسجيل الدخول الآمنة.';
     case 'auth/popup-closed-by-user':
     case 'auth/cancelled-popup-request':
-    case 'auth/popup-cancelled-by-user': return 'تم إلغاء تسجيل الدخول عبر Google.';
-    case 'auth/unauthorized-domain': return 'هذا النطاق غير مصرح به في Firebase. أضف نطاق Vercel إلى Authorized domains.';
-    case 'auth/operation-not-allowed': return 'تسجيل الدخول عبر Google غير مفعّل في Firebase Authentication.';
-    case 'auth/network-request-failed': return 'تعذر الاتصال بخدمة المصادقة. تحقق من اتصال الإنترنت.';
-    case 'auth/account-exists-with-different-credential': return 'يوجد حساب بهذا البريد باستخدام طريقة تسجيل دخول أخرى.';
-    case 'auth/invalid-api-key': return 'إعدادات Firebase غير صحيحة. راجع متغيرات Vercel.';
-    default: return 'تعذر تسجيل الدخول عبر Google. تحقق من إعدادات Firebase Authorized domains وحاول مرة أخرى.';
+    case 'auth/popup-cancelled-by-user':
+      return 'تم إلغاء تسجيل الدخول عبر Google.';
+    case 'auth/unauthorized-domain':
+      return formatUnauthorizedDomainMessage(
+        typeof window !== 'undefined' ? window.location.hostname : null
+      );
+    case 'auth/operation-not-allowed':
+      return 'تسجيل الدخول عبر Google غير مفعّل في Firebase Authentication.';
+    case 'auth/network-request-failed':
+      return 'تعذر الاتصال بخدمة المصادقة. تحقق من اتصال الإنترنت.';
+    case 'auth/account-exists-with-different-credential':
+      return 'يوجد حساب بهذا البريد باستخدام طريقة تسجيل دخول أخرى.';
+    case 'auth/invalid-api-key':
+      return 'إعدادات Firebase غير صحيحة. راجع إعدادات المشروع.';
+    default:
+      return 'تعذر تسجيل الدخول عبر Google. تحقق من إعدادات Firebase Authorized domains وحاول مرة أخرى.';
   }
+}
+
+async function readUserClaims(fUser: FirebaseUser): Promise<AuthCustomClaims> {
+  try {
+    const tokenResult = await getIdTokenResult(fUser);
+    const rawRole = tokenResult.claims.role;
+    const rawCompanyId = tokenResult.claims.companyId;
+    const parsedRole =
+      typeof rawRole === 'string' &&
+      ['SUPER_ADMIN', 'COMPANY_ADMIN', 'MANAGER', 'EMPLOYEE', 'ADMIN'].includes(rawRole)
+        ? normalizeRole(rawRole as Role, fUser.email)
+        : undefined;
+    return {
+      role: parsedRole,
+      companyId: typeof rawCompanyId === 'string' ? rawCompanyId : undefined,
+    };
+  } catch {
+    return {};
+  }
+}
+
+function resolveUserProfile(
+  snapId: string,
+  data: User,
+  fUser: FirebaseUser,
+  claims: AuthCustomClaims
+): User {
+  const isPrimarySuperAdmin = fUser.email?.toLowerCase() === PRIMARY_SUPER_ADMIN_EMAIL;
+  const resolvedRole: CanonicalRole = isPrimarySuperAdmin
+    ? 'SUPER_ADMIN'
+    : claims.role || normalizeRole(data.role, fUser.email);
+
+  const resolvedCompanyId =
+    data.companyId ||
+    claims.companyId ||
+    (resolvedRole === 'SUPER_ADMIN' ? PARENT_COMPANY_ID : DEFAULT_SUBSIDIARY_ID);
+
+  return {
+    ...data,
+    id: snapId,
+    uid: data.uid || fUser.uid,
+    role: resolvedRole,
+    companyId: resolvedCompanyId,
+    status: isPrimarySuperAdmin ? 'active' : data.status,
+  };
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -68,6 +146,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [claims, setClaims] = useState<AuthCustomClaims>({});
   const [loading, setLoading] = useState(true);
   const [isProfileIncomplete, setIsProfileIncomplete] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
@@ -79,7 +158,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
-  // Test connection on startup
   useEffect(() => {
     async function init() {
       await testConnection();
@@ -90,26 +168,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const refreshCurrentUser = async () => {
     if (!firebaseUser) return;
     try {
+      const tokenClaims = await readUserClaims(firebaseUser);
+      setClaims(tokenClaims);
       const userRef = doc(db, 'users', firebaseUser.uid);
       const snap = await getDoc(userRef);
       if (snap.exists()) {
         const data = snap.data() as User;
-        const isSoleAdmin = firebaseUser.email?.toLowerCase() === ADMIN_EMAIL;
-        const normalized: User = {
-          ...data,
-          id: snap.id,
-          role: isSoleAdmin ? 'ADMIN' : 'EMPLOYEE',
-          status: isSoleAdmin ? 'active' : data.status,
-        };
+        const normalized = resolveUserProfile(snap.id, data, firebaseUser, tokenClaims);
         setCurrentUser(normalized);
-        setIsProfileIncomplete(!isSoleAdmin && (!normalized.department || !normalized.position || !normalized.phone));
+        const isTopAdmin = normalized.role === 'SUPER_ADMIN';
+        setIsProfileIncomplete(
+          !isTopAdmin && (!normalized.department || !normalized.position || !normalized.phone)
+        );
       }
     } catch (err) {
       console.error('Error refreshing current user:', err);
     }
   };
 
-  // Listen to Auth changes and surface redirect OAuth errors.
   useEffect(() => {
     let active = true;
     getRedirectResult(auth).catch(error => {
@@ -121,55 +197,91 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setFirebaseUser(fUser);
       if (fUser) {
         try {
+          const tokenClaims = await readUserClaims(fUser);
+          if (active) setClaims(tokenClaims);
+
           const userRef = doc(db, 'users', fUser.uid);
           const snap = await getDoc(userRef);
-
-          const isSoleAdmin = fUser.email?.toLowerCase() === ADMIN_EMAIL;
+          const isPrimarySuperAdmin = fUser.email?.toLowerCase() === PRIMARY_SUPER_ADMIN_EMAIL;
 
           if (snap.exists()) {
             const data = snap.data() as User;
-            const normalized: User = { ...data, id: snap.id, role: isSoleAdmin ? 'ADMIN' : 'EMPLOYEE', status: isSoleAdmin ? 'active' : data.status };
-            if (isSoleAdmin && (data.role !== 'ADMIN' || data.status !== 'active')) {
-              await setDoc(userRef, { role: 'ADMIN', status: 'active' }, { merge: true });
+            const normalized = resolveUserProfile(snap.id, data, fUser, tokenClaims);
+
+            // Preserve backward compatibility for primary bootstrap SUPER_ADMIN without overwriting other users' roles
+            if (
+              isPrimarySuperAdmin &&
+              (data.role !== 'SUPER_ADMIN' ||
+                !isActiveStatus(data.status) ||
+                !data.companyId)
+            ) {
+              try {
+                await setDoc(
+                  userRef,
+                  {
+                    role: 'SUPER_ADMIN',
+                    status: 'active',
+                    companyId: data.companyId || PARENT_COMPANY_ID,
+                    companyName: data.companyName || 'LUMERE GROUP',
+                    updatedAt: new Date().toISOString(),
+                  },
+                  { merge: true }
+                );
+              } catch {
+                // Non-blocking if legacy Firestore rules only allow 'ADMIN' prior to rule deployment
+              }
             }
-            setCurrentUser(normalized);
-            setAuthError(null);
-            setIsProfileIncomplete(!isSoleAdmin && (!normalized.department || !normalized.position || !normalized.phone));
+
+            if (active) {
+              setCurrentUser(normalized);
+              setAuthError(null);
+              const isTopAdmin = normalized.role === 'SUPER_ADMIN';
+              setIsProfileIncomplete(
+                !isTopAdmin && (!normalized.department || !normalized.position || !normalized.phone)
+              );
+            }
           } else {
             const newUser: User = {
               id: fUser.uid,
               uid: fUser.uid,
+              companyId: isPrimarySuperAdmin ? PARENT_COMPANY_ID : DEFAULT_SUBSIDIARY_ID,
+              companyName: isPrimarySuperAdmin ? 'LUMERE GROUP' : 'LUMERE',
               email: fUser.email || '',
               displayName: fUser.displayName || fUser.email?.split('@')[0] || 'موظف جديد',
               fullName: fUser.displayName || fUser.email?.split('@')[0] || 'موظف جديد',
-              photoURL: fUser.photoURL || undefined,
-              role: isSoleAdmin ? 'ADMIN' : 'EMPLOYEE',
-              department: isSoleAdmin ? 'الإدارة العامة' : '',
-              position: isSoleAdmin ? 'مسؤول النظام' : '',
-              jobTitle: isSoleAdmin ? 'مسؤول النظام' : '',
+              ...(fUser.photoURL ? { photoURL: fUser.photoURL } : {}),
+              role: isPrimarySuperAdmin ? 'SUPER_ADMIN' : 'EMPLOYEE',
+              department: isPrimarySuperAdmin ? 'الإدارة المركزية' : '',
+              position: isPrimarySuperAdmin ? 'مدير المجموعة الأعلى' : '',
+              jobTitle: isPrimarySuperAdmin ? 'مدير المجموعة الأعلى' : '',
               phone: '',
-              status: isSoleAdmin ? 'active' : 'pending',
+              status: isPrimarySuperAdmin ? 'active' : 'pending',
               joinedDate: new Date().toISOString().split('T')[0],
               createdAt: new Date().toISOString(),
             };
             await setDoc(userRef, newUser);
-            setCurrentUser(newUser);
-            setAuthError(null);
-            setIsProfileIncomplete(!isSoleAdmin);
+            if (active) {
+              setCurrentUser(newUser);
+              setAuthError(null);
+              setIsProfileIncomplete(!isPrimarySuperAdmin);
+            }
           }
         } catch (err) {
           console.error('Failed to load user profile from Firestore:', err);
-          setAuthError('تم تسجيل الدخول إلى Google، لكن تعذر تحميل ملفك من Firestore. تحقق من نشر Firestore Rules وإعدادات Firebase.');
-          // Never invent an active profile when Firestore is unavailable.
-          setCurrentUser(null);
-          setIsProfileIncomplete(false);
+          if (active) {
+            setAuthError(
+              'تم تسجيل الدخول إلى Google، لكن تعذر تحميل ملفك من Firestore. تحقق من نشر Firestore Rules وإعدادات Firebase.'
+            );
+            setCurrentUser(null);
+            setIsProfileIncomplete(false);
+          }
         }
-      } else {
-        // When not logged in via Firebase Auth, set currentUser to null so LoginView is displayed
+      } else if (active) {
         setCurrentUser(null);
+        setClaims({});
         setIsProfileIncomplete(false);
       }
-      setLoading(false);
+      if (active) setLoading(false);
     });
 
     return () => {
@@ -186,17 +298,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await signInWithPopup(auth, googleProvider);
     } catch (error) {
       const code = (error as { code?: string })?.code;
-      console.error('Google sign-in error:', error);
-      // Popup is unreliable in embedded browsers and can be blocked by policy.
-      // Redirect uses Firebase's configured authDomain and works on Vercel HTTPS.
-      if (code === 'auth/popup-blocked' || code === 'auth/popup-cancelled-by-user' || code === 'auth/operation-not-supported-in-this-environment') {
+      if (
+        code === 'auth/popup-blocked' ||
+        code === 'auth/popup-cancelled-by-user' ||
+        code === 'auth/operation-not-supported-in-this-environment'
+      ) {
         try {
           await signInWithRedirect(auth, googleProvider);
           return;
         } catch (redirectError) {
           const message = getGoogleAuthErrorMessage(redirectError);
           setAuthError(message);
-          throw Object.assign(new Error(message), { code: (redirectError as { code?: string })?.code });
+          throw Object.assign(new Error(message), {
+            code: (redirectError as { code?: string })?.code,
+          });
         }
       }
       const message = getGoogleAuthErrorMessage(error);
@@ -223,17 +338,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     email: string,
     pass: string,
     displayName: string,
-    role: Role,
+    _requestedRole: Role,
     department: string,
     position: string,
-    phone?: string
+    phone?: string,
+    companyId = DEFAULT_SUBSIDIARY_ID
   ) => {
     setLoading(true);
     try {
       const res = await createUserWithEmailAndPassword(auth, email, pass);
+      // Security: Self-registration is always locked to EMPLOYEE + pending approval
+      const safeCompanyId =
+        companyId && companyId !== PARENT_COMPANY_ID ? companyId : DEFAULT_SUBSIDIARY_ID;
       const newUser: User = {
         id: res.user.uid,
         uid: res.user.uid,
+        companyId: safeCompanyId,
         email,
         displayName,
         fullName: displayName,
@@ -248,7 +368,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       };
       await setDoc(doc(db, 'users', res.user.uid), newUser);
       setCurrentUser(newUser);
-      setIsProfileIncomplete(true);
+      setIsProfileIncomplete(!department || !position || !phone);
     } catch (err) {
       console.error('Registration error:', err);
       throw err;
@@ -262,11 +382,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     phone: string;
     department: string;
     position: string;
+    companyId?: string;
   }) => {
     if (!currentUser) return;
     setLoading(true);
     try {
       const userRef = doc(db, 'users', currentUser.id);
+      const isTopAdmin = normalizeRole(currentUser.role, currentUser.email) === 'SUPER_ADMIN';
+      const targetCompanyId =
+        !isTopAdmin && data.companyId && data.companyId !== PARENT_COMPANY_ID
+          ? data.companyId
+          : getUserCompanyId(currentUser);
+
       const updated: Partial<User> = {
         displayName: data.displayName,
         fullName: data.displayName,
@@ -274,7 +401,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         department: data.department,
         position: data.position,
         jobTitle: data.position,
-        status: currentUser.role === 'ADMIN' ? 'active' : 'pending',
+        companyId: targetCompanyId,
         updatedAt: new Date().toISOString(),
       };
       await setDoc(userRef, updated, { merge: true });
@@ -302,13 +429,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await signOut(auth);
       setAuthError(null);
       setCurrentUser(null);
+      setClaims({});
       setIsProfileIncomplete(false);
     } catch (err) {
       console.error('Logout error:', err);
     }
   };
 
-  const role: Role = currentUser?.role || 'EMPLOYEE';
+  const role: CanonicalRole = currentUser
+    ? normalizeRole(currentUser.role, currentUser.email)
+    : 'EMPLOYEE';
 
   return (
     <AuthContext.Provider
@@ -316,6 +446,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         currentUser,
         firebaseUser,
         role,
+        claims,
+        isSuperAdmin: checkIsSuperAdmin(currentUser),
+        isCompanyAdmin: checkIsCompanyAdmin(currentUser),
+        isManager: checkIsManager(currentUser),
+        canSwitchCompanies: checkCanSwitchCompanies(currentUser),
         loading,
         isProfileIncomplete,
         authError,

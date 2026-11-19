@@ -1,4 +1,72 @@
-export type Role = 'ADMIN' | 'EMPLOYEE';
+export type CanonicalRole = 'SUPER_ADMIN' | 'COMPANY_ADMIN' | 'MANAGER' | 'EMPLOYEE';
+
+// Preserve legacy 'ADMIN' value in existing Firestore records; normalized via rbac.normalizeRole()
+export type Role = CanonicalRole | 'ADMIN';
+
+export type CompanyType = 'parent' | 'subsidiary';
+export type CompanyStatus = 'active' | 'inactive';
+
+export interface CompanyTheme {
+  primary: string;
+  accent: string;
+  surface: string;
+  badgeText: string;
+}
+
+export interface Company {
+  id: string;
+  name: string;
+  arabicName?: string;
+  slug: string;
+  type: CompanyType;
+  parentCompanyId: string | null;
+  logo: string;
+  description: string;
+  businessSector?: string;
+  status: CompanyStatus;
+  theme?: CompanyTheme;
+  adminIds?: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CompanyPerformanceMetrics {
+  companyId: string;
+  companyName: string;
+  companyArabicName: string;
+  slug: string;
+  type: CompanyType;
+  status: CompanyStatus;
+  businessSector: string;
+  employeesCount: number;
+  activeEmployeesCount: number;
+  pendingEmployeesCount: number;
+  departmentsCount: number;
+  clientsCount: number;
+  projectsCount: number;
+  activeProjectsCount: number;
+  completedProjectsCount: number;
+  totalTasksCount: number;
+  activeTasksCount: number;
+  completedTasksCount: number;
+  overdueTasksCount: number;
+  completionRate: number;
+}
+
+export interface GroupOverviewStats {
+  totalCompanies: number;
+  activeSubsidiariesCount: number;
+  totalEmployees: number;
+  activeEmployees: number;
+  totalProjects: number;
+  activeProjects: number;
+  totalTasks: number;
+  activeTasks: number;
+  completedTasks: number;
+  overdueTasks: number;
+  overallCompletionRate: number;
+  byCompany: CompanyPerformanceMetrics[];
+}
 
 export type UserStatus =
   | 'pending'
@@ -12,6 +80,8 @@ export type UserStatus =
 export interface User {
   id: string;
   uid?: string;
+  companyId?: string;
+  companyName?: string;
   email: string;
   displayName: string;
   fullName?: string;
@@ -20,6 +90,8 @@ export interface User {
   department: string;
   position: string;
   jobTitle?: string;
+  managerId?: string;
+  managerName?: string;
   phone?: string;
   status: UserStatus;
   joinedDate: string;
@@ -48,6 +120,7 @@ export type ClientStatus = 'active' | 'inactive';
 
 export interface Client {
   id: string;
+  companyId?: string;
   name: string; // اسم العميل
   phone: string; // رقم الهاتف
   email: string; // البريد الإلكتروني
@@ -79,6 +152,7 @@ export type ProjectStatus =
 
 export interface Project {
   id: string;
+  companyId?: string;
   name: string; // اسم المشروع
   clientId: string; // العميل (مطلوب)
   clientName: string; // اسم العميل
@@ -126,6 +200,7 @@ export type EquipmentStatus =
 
 export interface Equipment {
   id: string;
+  companyId?: string;
   name: string; // اسم المعدة
   type: EquipmentType | string; // النوع
   serialNumber: string; // الرقم التسلسلي
@@ -157,6 +232,7 @@ export type EquipmentHistoryAction =
 
 export interface EquipmentHistory {
   id: string;
+  companyId?: string;
   equipmentId: string;
   equipmentName: string;
   action: EquipmentHistoryAction;
@@ -194,6 +270,7 @@ export interface TaskAttachment {
 
 export interface Task {
   id: string;
+  companyId?: string;
   taskId: string;
   title: string;
   description: string;
@@ -224,6 +301,7 @@ export interface Task {
 
 export interface TaskComment {
   id: string;
+  companyId?: string;
   taskId: string;
   userId: string;
   userName: string;
@@ -237,6 +315,7 @@ export interface TaskComment {
 
 export interface Department {
   id: string;
+  companyId?: string;
   name: string;
   description: string;
   headName?: string;
@@ -263,10 +342,12 @@ export type NotificationType =
   | 'join_rejected'
   | 'client_created'
   | 'project_created'
+  | 'company_updated'
   | 'system';
 
 export interface Notification {
   id: string;
+  companyId?: string;
   userId: string;
   title: string;
   message: string;
@@ -279,6 +360,10 @@ export interface Notification {
 }
 
 export type ActivityAction =
+  | 'Company Created'
+  | 'Company Updated'
+  | 'Company Status Changed'
+  | 'Company Admin Assigned'
   | 'Task Created'
   | 'Task Updated'
   | 'Task Assigned'
@@ -304,6 +389,7 @@ export type ActivityAction =
 
 export interface ActivityLog {
   id: string;
+  companyId?: string;
   actorId: string;
   actorName: string;
   actorRole: Role;

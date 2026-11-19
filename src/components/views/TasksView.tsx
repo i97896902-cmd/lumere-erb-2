@@ -15,8 +15,10 @@ import {
 import { Card, EmptyState } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { StatusBadge, PriorityBadge } from '../ui/Badge';
-import { Task, User, Department, TaskPriority, TaskStatus } from '../../types';
+import { Task, User, Department, TaskPriority } from '../../types';
 import { useAuth } from '../../context/AuthContext';
+import { useCompany } from '../../context/CompanyContext';
+import { canCreateTask } from '../../utils/rbac';
 
 interface TasksViewProps {
   tasks: Task[];
@@ -36,6 +38,8 @@ export function TasksView({
   initialSearchQuery = '',
 }: TasksViewProps) {
   const { role, currentUser } = useAuth();
+  const { activeCompany, isGroupView, defaultWriteCompanyId, getCompanyById } = useCompany();
+  const allowCreateTask = canCreateTask(currentUser, defaultWriteCompanyId);
 
   const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
   const [search, setSearch] = useState(initialSearchQuery);
@@ -137,16 +141,16 @@ export function TasksView({
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-xl font-bold text-neutral-900">
-            {role === 'EMPLOYEE' ? 'مهامي المسندة' : 'دليل مهام Luméré المؤسسي'}
+            {role === 'EMPLOYEE' ? 'مهامي المسندة' : `دليل المهام — ${activeCompany.name}`}
           </h2>
           <p className="text-xs text-neutral-500">
             {role === 'EMPLOYEE'
               ? 'المهام والتكليفات المسندة إليك. حدّث نسب الإنجاز وارفع المخرجات للاعتماد.'
-              : 'نظرة شاملة ومفصلة على كافة المهام الميدانية والمكتبية عبر الأقسام والمشاريع.'}
+              : 'نظرة شاملة ومفصلة على كافة المهام التشغيلية عبر الأقسام والمشاريع.'}
           </p>
         </div>
 
-        {role === 'ADMIN' && (
+        {allowCreateTask && (
           <Button
             id="btn-tasksview-create"
             onClick={onOpenCreateTask}
@@ -286,7 +290,7 @@ export function TasksView({
           title="لا توجد مهام مطابقة للبحث"
           description="جرّب تغيير عبارة البحث أو اختيار حالة تصفية أخرى لإظهار المهام المطلوبة."
           action={
-            role === 'ADMIN' && (
+            allowCreateTask && (
               <Button size="sm" variant="primary" onClick={onOpenCreateTask}>
                 إنشاء مهمة جديدة
               </Button>
@@ -336,6 +340,11 @@ export function TasksView({
                       </td>
                       <td className="px-4 py-3.5 text-xs text-neutral-600 font-medium">
                         <div>{task.department}</div>
+                        {isGroupView && task.companyId && (
+                          <div className="text-[10px] font-bold text-neutral-500">
+                            {getCompanyById(task.companyId)?.name || task.companyId}
+                          </div>
+                        )}
                         {task.projectName && (
                           <div className="text-[11px] text-emerald-700 font-semibold">{task.projectName}</div>
                         )}

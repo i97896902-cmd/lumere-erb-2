@@ -91,15 +91,18 @@ export function StatusBadge({ status, isOverdue }: { status: TaskStatus; isOverd
 }
 
 export function RoleBadge({ role }: { role: string }) {
+  const normalized = role === 'ADMIN' ? 'SUPER_ADMIN' : role;
   const config =
-    role === 'ADMIN'
-      ? { label: 'Admin', cls: 'bg-emerald-100 text-emerald-900 border-emerald-300' }
-      : role === 'MANAGER'
-      ? { label: 'Manager', cls: 'bg-amber-100 text-amber-900 border-amber-300' }
-      : { label: 'Employee', cls: 'bg-neutral-100 text-neutral-800 border-neutral-300' };
+    normalized === 'SUPER_ADMIN'
+      ? { label: 'مدير المجموعة', cls: 'bg-emerald-100 text-emerald-900 border-emerald-300' }
+      : normalized === 'COMPANY_ADMIN'
+      ? { label: 'مدير شركة', cls: 'bg-blue-50 text-blue-900 border-blue-200' }
+      : normalized === 'MANAGER'
+      ? { label: 'مدير عمليات', cls: 'bg-amber-50 text-amber-900 border-amber-300' }
+      : { label: 'موظف', cls: 'bg-neutral-100 text-neutral-800 border-neutral-300' };
 
   return (
-    <span className={`inline-flex items-center px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wider rounded border ${config.cls}`}>
+    <span className={`inline-flex items-center px-2 py-0.5 text-[11px] font-semibold rounded border whitespace-nowrap shrink-0 ${config.cls}`}>
       {config.label}
     </span>
   );

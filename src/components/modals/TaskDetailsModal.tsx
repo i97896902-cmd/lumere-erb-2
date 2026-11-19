@@ -23,8 +23,11 @@ import { Button } from '../ui/Button';
 import { StatusBadge, PriorityBadge } from '../ui/Badge';
 import { Task, TaskComment, TaskAttachment, TaskStatus } from '../../types';
 import { useAuth } from '../../context/AuthContext';
+import { useCompany } from '../../context/CompanyContext';
 import { useToast } from '../../context/ToastContext';
 import { DataService } from '../../services/dataService';
+import { DEFAULT_SUBSIDIARY_ID } from '../../config/companies';
+import { canApproveTasks, canDeleteTask, getRoleArabicLabel } from '../../utils/rbac';
 
 interface TaskDetailsModalProps {
   task: Task | null;
@@ -41,7 +44,8 @@ export function TaskDetailsModal({
   onTaskUpdated,
   onTaskDeleted,
 }: TaskDetailsModalProps) {
-  const { currentUser, role } = useAuth();
+  const { currentUser } = useAuth();
+  const { getCompanyById } = useCompany();
   const { showToast } = useToast();
 
   const [comments, setComments] = useState<TaskComment[]>([]);
@@ -77,10 +81,13 @@ export function TaskDetailsModal({
   const isOverdue =
     task.deadline < nowStr && task.status !== 'Completed' && task.status !== 'Cancelled';
 
-  // Permission flags
+  // Permission flags (4-tier company-scoped RBAC)
+  const taskCompanyId = task.companyId || DEFAULT_SUBSIDIARY_ID;
+  const taskCompany = getCompanyById(taskCompanyId);
   const isAssignee = currentUser?.id === task.assignedTo;
-  const canApproveOrReject = role === 'ADMIN';
-  const canStartOrSubmit = isAssignee || role === 'ADMIN';
+  const canApproveOrReject = canApproveTasks(currentUser, taskCompanyId);
+  const canDelete = canDeleteTask(currentUser, taskCompanyId);
+  const canStartOrSubmit = isAssignee || canApproveOrReject;
 
   // Workflow Handlers
   const handleWorkflowTransition = async (
@@ -132,6 +139,7 @@ export function TaskDetailsModal({
       const commentObj = await DataService.addComment(
         task.id,
         {
+          companyId: taskCompanyId,
           taskId: task.id,
           userId: currentUser.id,
           userName: currentUser.displayName,
@@ -153,12 +161,12 @@ export function TaskDetailsModal({
   };
 
   const handleDelete = async () => {
-    if (!currentUser || role !== 'ADMIN') return;
+    if (!currentUser || !canDelete) return;
     if (!window.confirm(`هل أنت متأكد من حذف المهمة ${task.taskId} نهائياً؟`)) return;
 
     setIsActionLoading(true);
     try {
-      await DataService.deleteTask(task.id, task.title, currentUser);
+      await DataService.deleteTask(task.id, task.title, currentUser, taskCompanyId);
       showToast(`تم حذف المهمة ${task.taskId}`, 'info');
       if (onTaskDeleted) onTaskDeleted(task.id);
       onClose();
@@ -169,7 +177,7 @@ export function TaskDetailsModal({
     }
   };
 
-  // Upload file to task
+  // Upload file to task (Firebase Storage per company path with safe fallback)
   const handleAttachmentUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0 || !currentUser) return;
@@ -177,12 +185,18 @@ export function TaskDetailsModal({
     const newAttachments: TaskAttachment[] = [...(task.attachments || [])];
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
+      let fileUrl = URL.createObjectURL(file);
+      try {
+        fileUrl = await DataService.uploadTaskAttachment(taskCompanyId, task.id, file);
+      } catch {
+        // Fallback if Firebase Storage rules are not yet deployed
+      }
       newAttachments.push({
         id: Math.random().toString(36).substring(2, 9),
         name: file.name,
         size: file.size,
         type: file.type || 'application/octet-stream',
-        url: URL.createObjectURL(file),
+        url: fileUrl,
         uploaderName: currentUser.displayName,
         uploaderId: currentUser.id,
         uploadedAt: new Date().toISOString(),
@@ -203,7 +217,7 @@ export function TaskDetailsModal({
       isOpen={isOpen}
       onClose={onClose}
       title={`${task.taskId} — ${task.title}`}
-      subtitle={`قسم ${task.department} • تم الإنشاء بواسطة ${task.createdByName}`}
+      subtitle={`${taskCompany ? `${taskCompany.name} • ` : ''}قسم ${task.department} • تم الإنشاء بواسطة ${task.createdByName}`}
       maxWidth="3xl"
     >
       <div className="space-y-6" dir="rtl">
@@ -308,7 +322,7 @@ export function TaskDetailsModal({
             )}
 
             {/* Admin Delete */}
-            {role === 'ADMIN' && (
+            {canDelete && (
               <button
                 onClick={handleDelete}
                 className="p-2 rounded-lg text-neutral-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
@@ -475,8 +489,8 @@ export function TaskDetailsModal({
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <span className="font-bold text-neutral-900">{c.userName}</span>
-                      <span className="text-[10px] text-neutral-400 uppercase font-semibold">
-                        {c.userRole === 'ADMIN' ? 'مدير عام' : 'موظف'}
+                      <span className="text-[10px] text-neutral-400 font-semibold">
+                        {getRoleArabicLabel(c.userRole)}
                       </span>
                     </div>
                     <span className="text-[10px] text-neutral-400 font-mono">
