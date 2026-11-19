@@ -20,12 +20,13 @@
 import fs from 'node:fs';
 import { initializeApp, cert, applicationDefault } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
-import firebaseConfig from '../../firebase-applet-config.json';
 import {
   buildFullMigrationPlan,
   COMPANY_OWNED_COLLECTIONS,
   RawDocument,
 } from './lib/migrationLogic';
+
+const DEFAULT_PROJECT_ID = 'lumere-erb';
 
 function parseArgs() {
   const args = process.argv.slice(2);
@@ -43,10 +44,10 @@ function initAdminFirestore() {
 
   const app = initializeApp({
     credential,
-    projectId: process.env.FIREBASE_PROJECT_ID || firebaseConfig.projectId,
+    projectId: process.env.FIREBASE_PROJECT_ID || DEFAULT_PROJECT_ID,
   });
 
-  const databaseId = process.env.FIRESTORE_DATABASE_ID || firebaseConfig.firestoreDatabaseId;
+  const databaseId = process.env.FIRESTORE_DATABASE_ID?.trim() || '';
   return databaseId ? getFirestore(app, databaseId) : getFirestore(app);
 }
 

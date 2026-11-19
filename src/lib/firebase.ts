@@ -1,31 +1,46 @@
 import { initializeApp } from 'firebase/app';
+import { Analytics, getAnalytics, isSupported as isAnalyticsSupported } from 'firebase/analytics';
 import { getAuth, GoogleAuthProvider } from 'firebase/auth';
 import { getFirestore, doc, getDocFromServer } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 import { getFunctions } from 'firebase/functions';
-import firebaseDefaults from '../../firebase-applet-config.json';
 
-// Firebase Web configuration is public client configuration, not a server secret.
-// Vercel can override it with VITE_* variables while the checked-in defaults keep
-// local `npm run dev` working without a machine-specific .env file.
+// Firebase Web configuration for project "lumere-erb" (public client config).
+// Environment variables (VITE_FIREBASE_*) can override these values per deployment.
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || firebaseDefaults.apiKey,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || firebaseDefaults.authDomain,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || firebaseDefaults.projectId,
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || firebaseDefaults.storageBucket,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || firebaseDefaults.messagingSenderId,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID || firebaseDefaults.appId,
-  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || firebaseDefaults.measurementId,
-  firestoreDatabaseId: import.meta.env.VITE_FIRESTORE_DATABASE_ID || firebaseDefaults.firestoreDatabaseId,
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || 'AIzaSyCaNb3DUoVemzEd-7HecJheXkCUwe07hCU',
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || 'lumere-erb.firebaseapp.com',
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || 'lumere-erb',
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || 'lumere-erb.firebasestorage.app',
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || '1026686151578',
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || '1:1026686151578:web:86bbd9f72e58cff3492823',
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || 'G-7NYW806QC4',
 };
 
-const app = initializeApp(firebaseConfig);
+const firestoreDatabaseId = import.meta.env.VITE_FIRESTORE_DATABASE_ID?.trim() || '';
 
-// CRITICAL: The app will break without specifying firestoreDatabaseId
-export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+export const app = initializeApp(firebaseConfig);
+
+// Connect to the project's default Firestore database unless a named database ID is explicitly provided
+export const db = firestoreDatabaseId ? getFirestore(app, firestoreDatabaseId) : getFirestore(app);
 export const auth = getAuth(app);
 export const storage = getStorage(app);
 export const functions = getFunctions(app);
+
+// Safely initialize Firebase Analytics only in supported browser contexts
+export let analytics: Analytics | null = null;
+if (typeof window !== 'undefined') {
+  isAnalyticsSupported()
+    .then(supported => {
+      if (supported) {
+        analytics = getAnalytics(app);
+      }
+    })
+    .catch(() => {
+      analytics = null;
+    });
+}
+
 export const googleProvider = new GoogleAuthProvider();
 googleProvider.setCustomParameters({
   prompt: 'select_account',
@@ -57,7 +72,11 @@ export interface FirestoreErrorInfo {
   };
 }
 
-export function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null): never {
+export function handleFirestoreError(
+  error: unknown,
+  operationType: OperationType,
+  path: string | null
+): never {
   const errInfo: FirestoreErrorInfo = {
     error: error instanceof Error ? error.message : String(error),
     authInfo: {
@@ -66,10 +85,11 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
       emailVerified: auth.currentUser?.emailVerified,
       isAnonymous: auth.currentUser?.isAnonymous,
       tenantId: auth.currentUser?.tenantId,
-      providerInfo: auth.currentUser?.providerData?.map(provider => ({
-        providerId: provider.providerId,
-        email: provider.email,
-      })) || [],
+      providerInfo:
+        auth.currentUser?.providerData?.map(provider => ({
+          providerId: provider.providerId,
+          email: provider.email,
+        })) || [],
     },
     operationType,
     path,
@@ -78,7 +98,7 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
   throw new Error(JSON.stringify(errInfo));
 }
 
-// Test connection on boot per Firebase skill guidelines
+// Test connection on boot per Firebase guidelines
 export async function testConnection() {
   try {
     await getDocFromServer(doc(db, 'test', 'connection'));

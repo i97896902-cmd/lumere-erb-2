@@ -5,12 +5,11 @@ import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 
 const app = initializeApp();
 
-const DATABASE_ID =
-  process.env.FIRESTORE_DATABASE_ID || 'ai-studio-f456e639-5da6-4974-8a16-b2d2bbdd4686';
+const DATABASE_ID = process.env.FIRESTORE_DATABASE_ID?.trim() || '';
 const PRIMARY_SUPER_ADMIN_EMAIL = 'lumerecompany@gmail.com';
 const PARENT_COMPANY_ID = 'lumere-group';
 
-const db = getFirestore(app, DATABASE_ID);
+const db = DATABASE_ID ? getFirestore(app, DATABASE_ID) : getFirestore(app);
 const adminAuth = getAuth(app);
 
 type CanonicalRole = 'SUPER_ADMIN' | 'COMPANY_ADMIN' | 'MANAGER' | 'EMPLOYEE';

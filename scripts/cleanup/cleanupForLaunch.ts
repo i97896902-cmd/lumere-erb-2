@@ -27,7 +27,6 @@ import { initializeApp, cert, applicationDefault } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore } from 'firebase-admin/firestore';
 import { getStorage } from 'firebase-admin/storage';
-import firebaseConfig from '../../firebase-applet-config.json';
 import { RawDocument } from '../migration/lib/migrationLogic';
 import {
   ALLOWED_CLEANUP_COLLECTIONS,
@@ -36,6 +35,8 @@ import {
   verifyPostCleanupState,
 } from './lib/cleanupLogic';
 
+const DEFAULT_PROJECT_ID = 'lumere-erb';
+const DEFAULT_STORAGE_BUCKET = 'lumere-erb.firebasestorage.app';
 const APPROVAL_TOKEN = 'LAUNCH_CLEANUP_APPROVED';
 
 function initAdminServices() {
@@ -47,11 +48,11 @@ function initAdminServices() {
 
   const app = initializeApp({
     credential,
-    projectId: process.env.FIREBASE_PROJECT_ID || firebaseConfig.projectId,
-    storageBucket: process.env.FIREBASE_STORAGE_BUCKET || firebaseConfig.storageBucket,
+    projectId: process.env.FIREBASE_PROJECT_ID || DEFAULT_PROJECT_ID,
+    storageBucket: process.env.FIREBASE_STORAGE_BUCKET || DEFAULT_STORAGE_BUCKET,
   });
 
-  const databaseId = process.env.FIRESTORE_DATABASE_ID || firebaseConfig.firestoreDatabaseId;
+  const databaseId = process.env.FIRESTORE_DATABASE_ID?.trim() || '';
   const db = databaseId ? getFirestore(app, databaseId) : getFirestore(app);
   const auth = getAuth(app);
   const storage = getStorage(app);

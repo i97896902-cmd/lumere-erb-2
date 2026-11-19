@@ -14,9 +14,9 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { initializeApp, cert, applicationDefault } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
-import firebaseConfig from '../../firebase-applet-config.json';
 import { COMPANY_OWNED_COLLECTIONS } from './lib/migrationLogic';
 
+const DEFAULT_PROJECT_ID = 'lumere-erb';
 const ALL_COLLECTIONS = ['companies', 'admins', ...COMPANY_OWNED_COLLECTIONS, 'attendance'];
 
 function initAdminFirestore() {
@@ -27,10 +27,10 @@ function initAdminFirestore() {
 
   const app = initializeApp({
     credential,
-    projectId: process.env.FIREBASE_PROJECT_ID || firebaseConfig.projectId,
+    projectId: process.env.FIREBASE_PROJECT_ID || DEFAULT_PROJECT_ID,
   });
 
-  const databaseId = process.env.FIRESTORE_DATABASE_ID || firebaseConfig.firestoreDatabaseId;
+  const databaseId = process.env.FIRESTORE_DATABASE_ID?.trim() || '';
   return databaseId ? getFirestore(app, databaseId) : getFirestore(app);
 }
 
@@ -74,8 +74,8 @@ async function runBackup() {
 
   const manifest = {
     createdAt: new Date().toISOString(),
-    projectId: process.env.FIREBASE_PROJECT_ID || firebaseConfig.projectId,
-    databaseId: process.env.FIRESTORE_DATABASE_ID || firebaseConfig.firestoreDatabaseId,
+    projectId: process.env.FIREBASE_PROJECT_ID || DEFAULT_PROJECT_ID,
+    databaseId: process.env.FIRESTORE_DATABASE_ID?.trim() || '(default)',
     backupDir,
     counts,
     checksums,
