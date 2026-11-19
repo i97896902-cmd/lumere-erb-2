@@ -2,14 +2,9 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import {
   browserLocalPersistence,
   getIdTokenResult,
-  getRedirectResult,
   onAuthStateChanged,
   setPersistence,
   signInWithPopup,
-  signInWithRedirect,
-  signInWithEmailAndPassword,
-  createUserWithEmailAndPassword,
-  sendPasswordResetEmail,
   signOut,
   User as FirebaseUser,
 } from 'firebase/auth';
@@ -28,10 +23,9 @@ import {
   PRIMARY_SUPER_ADMIN_EMAIL,
 } from '../utils/rbac';
 import { DEFAULT_SUBSIDIARY_ID, PARENT_COMPANY_ID } from '../config/companies';
-import { DEFAULT_DIRECT_ACCESS_USER } from '../services/localDataService';
 
-// Direct access preview flag: set VITE_DISABLE_AUTH=false in production builds to enforce full Firebase Authentication
-export const AUTH_DISABLED = import.meta.env.VITE_DISABLE_AUTH !== 'false';
+// Authentication is strictly enabled (Google Sign-In only via Firebase Auth)
+export const AUTH_DISABLED = false;
 
 export interface AuthCustomClaims {
   role?: CanonicalRole;
@@ -51,17 +45,6 @@ interface AuthContextType {
   isProfileIncomplete: boolean;
   authError: string | null;
   signInWithGoogle: () => Promise<void>;
-  loginWithEmail: (email: string, pass: string) => Promise<void>;
-  registerWithEmail: (
-    email: string,
-    pass: string,
-    displayName: string,
-    role: Role,
-    department: string,
-    position: string,
-    phone?: string,
-    companyId?: string
-  ) => Promise<void>;
   completeEmployeeProfile: (data: {
     displayName: string;
     phone: string;
@@ -69,7 +52,6 @@ interface AuthContextType {
     position: string;
     companyId?: string;
   }) => Promise<void>;
-  resetPassword: (email: string) => Promise<void>;
   logout: () => Promise<void>;
   refreshCurrentUser: () => Promise<void>;
 }
@@ -78,7 +60,7 @@ function getGoogleAuthErrorMessage(error: unknown): string {
   const code = (error as { code?: string })?.code;
   switch (code) {
     case 'auth/popup-blocked':
-      return 'تم حظر نافذة Google. سيتم تحويلك إلى صفحة تسجيل الدخول الآمنة.';
+      return 'المتصفح حظر نافذة تسجيل الدخول من Google. يرجى السماح بالنوافذ المنبثقة لهذا الموقع ثم المحاولة مرة أخرى.';
     case 'auth/popup-closed-by-user':
     case 'auth/cancelled-popup-request':
     case 'auth/popup-cancelled-by-user':
@@ -88,15 +70,15 @@ function getGoogleAuthErrorMessage(error: unknown): string {
         typeof window !== 'undefined' ? window.location.hostname : null
       );
     case 'auth/operation-not-allowed':
-      return 'تسجيل الدخول عبر Google غير مفعّل في Firebase Authentication.';
+      return 'تسجيل الدخول عبر Google غير مفعّل في إعدادات Firebase Authentication.';
     case 'auth/network-request-failed':
-      return 'تعذر الاتصال بخدمة المصادقة. تحقق من اتصال الإنترنت.';
+      return 'تعذر الاتصال بخدمة المصادقة. تحقق من اتصال الإنترنت ثم أعد المحاولة.';
     case 'auth/account-exists-with-different-credential':
-      return 'يوجد حساب بهذا البريد باستخدام طريقة تسجيل دخول أخرى.';
+      return 'يوجد حساب مسجل بهذا البريد بطريقة مصادقة مختلفة.';
     case 'auth/invalid-api-key':
-      return 'إعدادات Firebase غير صحيحة. راجع إعدادات المشروع.';
+      return 'إعدادات Firebase غير صحيحة. يرجى مراجعة إعدادات المشروع.';
     default:
-      return 'تعذر تسجيل الدخول عبر Google. تحقق من إعدادات Firebase Authorized domains وحاول مرة أخرى.';
+      return 'تعذر إتمام تسجيل الدخول عبر Google. يرجى المحاولة مرة أخرى.';
   }
 }
 
@@ -149,13 +131,9 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
-  const [currentUser, setCurrentUser] = useState<User | null>(
-    AUTH_DISABLED ? DEFAULT_DIRECT_ACCESS_USER : null
-  );
-  const [claims, setClaims] = useState<AuthCustomClaims>(
-    AUTH_DISABLED ? { role: 'SUPER_ADMIN', companyId: PARENT_COMPANY_ID } : {}
-  );
-  const [loading, setLoading] = useState(!AUTH_DISABLED);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [claims, setClaims] = useState<AuthCustomClaims>({});
+  const [loading, setLoading] = useState(true);
   const [isProfileIncomplete, setIsProfileIncomplete] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
 
@@ -167,7 +145,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    if (AUTH_DISABLED) return;
     async function init() {
       await testConnection();
     }
@@ -196,20 +173,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   useEffect(() => {
-    if (AUTH_DISABLED) {
-      setCurrentUser(DEFAULT_DIRECT_ACCESS_USER);
-      setClaims({ role: 'SUPER_ADMIN', companyId: PARENT_COMPANY_ID });
-      setIsProfileIncomplete(false);
-      setAuthError(null);
-      setLoading(false);
-      return;
-    }
-
     let active = true;
-    getRedirectResult(auth).catch(error => {
-      if (active) setAuthError(getGoogleAuthErrorMessage(error));
-      console.error('Google redirect result error:', error);
-    });
 
     const unsubscribe = onAuthStateChanged(auth, async fUser => {
       setFirebaseUser(fUser);
@@ -226,7 +190,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             const data = snap.data() as User;
             const normalized = resolveUserProfile(snap.id, data, fUser, tokenClaims);
 
-            // Preserve backward compatibility for primary bootstrap SUPER_ADMIN without overwriting other users' roles
             if (
               isPrimarySuperAdmin &&
               (data.role !== 'SUPER_ADMIN' ||
@@ -316,80 +279,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await signInWithPopup(auth, googleProvider);
     } catch (error) {
       const code = (error as { code?: string })?.code;
-      if (
-        code === 'auth/popup-blocked' ||
-        code === 'auth/popup-cancelled-by-user' ||
-        code === 'auth/operation-not-supported-in-this-environment'
-      ) {
-        try {
-          await signInWithRedirect(auth, googleProvider);
-          return;
-        } catch (redirectError) {
-          const message = getGoogleAuthErrorMessage(redirectError);
-          setAuthError(message);
-          throw Object.assign(new Error(message), {
-            code: (redirectError as { code?: string })?.code,
-          });
-        }
-      }
       const message = getGoogleAuthErrorMessage(error);
       setAuthError(message);
       throw Object.assign(new Error(message), { code });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const loginWithEmail = async (email: string, pass: string) => {
-    setLoading(true);
-    try {
-      await signInWithEmailAndPassword(auth, email, pass);
-    } catch (err) {
-      console.error('Email sign-in error:', err);
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const registerWithEmail = async (
-    email: string,
-    pass: string,
-    displayName: string,
-    _requestedRole: Role,
-    department: string,
-    position: string,
-    phone?: string,
-    companyId = DEFAULT_SUBSIDIARY_ID
-  ) => {
-    setLoading(true);
-    try {
-      const res = await createUserWithEmailAndPassword(auth, email, pass);
-      // Security: Self-registration is always locked to EMPLOYEE + pending approval
-      const safeCompanyId =
-        companyId && companyId !== PARENT_COMPANY_ID ? companyId : DEFAULT_SUBSIDIARY_ID;
-      const newUser: User = {
-        id: res.user.uid,
-        uid: res.user.uid,
-        companyId: safeCompanyId,
-        email,
-        displayName,
-        fullName: displayName,
-        role: 'EMPLOYEE',
-        department,
-        position,
-        jobTitle: position,
-        phone: phone || '',
-        status: 'pending',
-        joinedDate: new Date().toISOString().split('T')[0],
-        createdAt: new Date().toISOString(),
-      };
-      await setDoc(doc(db, 'users', res.user.uid), newUser);
-      setCurrentUser(newUser);
-      setIsProfileIncomplete(!department || !position || !phone);
-    } catch (err) {
-      console.error('Registration error:', err);
-      throw err;
     } finally {
       setLoading(false);
     }
@@ -433,23 +325,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const resetPassword = async (email: string) => {
-    try {
-      await sendPasswordResetEmail(auth, email);
-    } catch (err) {
-      console.error('Password reset error:', err);
-      throw err;
-    }
-  };
-
   const logout = async () => {
     try {
       if (auth.currentUser) {
         await signOut(auth);
       }
       setAuthError(null);
-      setCurrentUser(AUTH_DISABLED ? DEFAULT_DIRECT_ACCESS_USER : null);
-      setClaims(AUTH_DISABLED ? { role: 'SUPER_ADMIN', companyId: PARENT_COMPANY_ID } : {});
+      setCurrentUser(null);
+      setClaims({});
       setIsProfileIncomplete(false);
     } catch (err) {
       console.error('Logout error:', err);
@@ -475,10 +358,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isProfileIncomplete,
         authError,
         signInWithGoogle,
-        loginWithEmail,
-        registerWithEmail,
         completeEmployeeProfile,
-        resetPassword,
         logout,
         refreshCurrentUser,
       }}

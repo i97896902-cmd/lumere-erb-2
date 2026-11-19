@@ -75,10 +75,11 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
     return PARENT_COMPANY_ID;
   });
 
-  // Subscribe to companies collection when active
+  // Subscribe to companies collection only for active authenticated users
   useEffect(() => {
-    if (loading || !currentUser) {
+    if (loading || !currentUser || !isActiveStatus(currentUser.status)) {
       setCompanies(CORE_COMPANIES);
+      setLoadingCompanies(false);
       return;
     }
 
