@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Save } from 'lucide-react';
 import { Card } from '../ui/Card';
 import { Button } from '../ui/Button';
@@ -11,13 +11,18 @@ import { DataService } from '../../services/dataService';
 import { getUserCompanyId } from '../../utils/rbac';
 
 export function ProfileView() {
-  const { currentUser, role } = useAuth();
+  const { currentUser, role, refreshCurrentUser } = useAuth();
   const { getCompanyById } = useCompany();
   const { showToast } = useToast();
 
   const [displayName, setDisplayName] = useState(currentUser?.displayName || '');
   const [position, setPosition] = useState(currentUser?.position || '');
   const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    setDisplayName(currentUser?.displayName || '');
+    setPosition(currentUser?.position || '');
+  }, [currentUser?.id, currentUser?.displayName, currentUser?.position]);
 
   if (!currentUser) return null;
 
@@ -27,6 +32,10 @@ export function ProfileView() {
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!displayName.trim()) {
+      showToast('يرجى إدخال الاسم الكامل', 'error');
+      return;
+    }
     setIsSaving(true);
     try {
       await DataService.updateUser(
@@ -37,6 +46,7 @@ export function ProfileView() {
         },
         currentUser
       );
+      await refreshCurrentUser();
       showToast('تم تحديث الملف الشخصي بنجاح', 'success');
     } catch {
       showToast('تعذر تحديث الملف الشخصي', 'error');

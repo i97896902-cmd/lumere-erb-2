@@ -92,7 +92,28 @@ export function ActivityLogView({ activityLogs }: ActivityLogViewProps) {
               </tr>
             </thead>
             <tbody className="divide-y divide-neutral-100 text-xs">
-              {filteredLogs.map(log => {
+              {filteredLogs.length === 0 ? (
+                <tr>
+                  <td colSpan={isGroupView ? 7 : 6} className="px-4 py-10 text-center text-neutral-400">
+                    <div className="space-y-2">
+                      <p>لا توجد سجلات نشاط مطابقة لمعايير البحث الحالية.</p>
+                      {(search.trim() || actionFilter !== 'All') && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSearch('');
+                            setActionFilter('All');
+                          }}
+                          className="text-emerald-700 hover:text-emerald-800 font-semibold underline cursor-pointer"
+                        >
+                          إعادة ضبط الفلاتر
+                        </button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ) : (
+                filteredLogs.map(log => {
                 const canonical = normalizeRole(log.actorRole);
                 const roleBadgeClass =
                   canonical === 'SUPER_ADMIN'
@@ -138,7 +159,8 @@ export function ActivityLogView({ activityLogs }: ActivityLogViewProps) {
                     </td>
                   </tr>
                 );
-              })}
+              })
+              )}
             </tbody>
           </table>
         </div>

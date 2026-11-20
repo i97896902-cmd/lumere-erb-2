@@ -132,7 +132,9 @@ export type ClientType =
   | 'store'
   | 'individual'
   | 'other'
-  | 'corporate';
+  | 'corporate'
+  | 'enterprise'
+  | 'government';
 
 export type ClientStatus = 'active' | 'inactive';
 

@@ -39,6 +39,7 @@ import {
   SUGGESTED_DEPARTMENTS_BY_COMPANY,
 } from '../config/companies';
 import { canAssignRole, getUserCompanyId, isPendingStatus, normalizeRole } from '../utils/rbac';
+import { stripUndefined } from '../utils/sanitize';
 import { LocalDataService } from './localDataService';
 
 const COMPANIES_COLLECTION = 'companies';
@@ -152,7 +153,7 @@ export const FirestoreDataService = {
     try {
       const now = new Date().toISOString();
       const companyId = companyData.slug.trim().toLowerCase();
-      const payload: Omit<Company, 'id'> = {
+      const payload = stripUndefined({
         ...companyData,
         slug: companyId,
         type: companyData.type || 'subsidiary',
@@ -161,7 +162,7 @@ export const FirestoreDataService = {
         adminIds: companyData.adminIds || [],
         createdAt: now,
         updatedAt: now,
-      };
+      }) as Omit<Company, 'id'>;
 
       await setDoc(doc(db, COMPANIES_COLLECTION, companyId), payload);
 
@@ -217,10 +218,10 @@ export const FirestoreDataService = {
       const now = new Date().toISOString();
       await setDoc(
         doc(db, COMPANIES_COLLECTION, companyId),
-        {
+        stripUndefined({
           ...partial,
           updatedAt: now,
-        },
+        }),
         { merge: true }
       );
 
@@ -368,13 +369,13 @@ export const FirestoreDataService = {
         ? requestedRole
         : 'EMPLOYEE';
 
-      const payload: Omit<User, 'id'> = {
+      const payload = stripUndefined({
         ...userData,
         companyId: targetCompanyId,
         role: safeRole,
         createdAt: now,
         updatedAt: now,
-      };
+      }) as Omit<User, 'id'>;
       const docRef = await addDoc(collection(db, USERS_COLLECTION), payload);
 
       await this.logActivity({
@@ -399,11 +400,11 @@ export const FirestoreDataService = {
     try {
       await setDoc(
         doc(db, USERS_COLLECTION, user.id),
-        {
+        stripUndefined({
           ...user,
           companyId: user.companyId || DEFAULT_SUBSIDIARY_ID,
           updatedAt: new Date().toISOString(),
-        },
+        }),
         { merge: true }
       );
     } catch (err) {
@@ -414,10 +415,13 @@ export const FirestoreDataService = {
   async updateUser(userId: string, partial: Partial<User>, actor?: User): Promise<void> {
     try {
       const now = new Date().toISOString();
-      await updateDoc(doc(db, USERS_COLLECTION, userId), {
-        ...partial,
-        updatedAt: now,
-      });
+      await updateDoc(
+        doc(db, USERS_COLLECTION, userId),
+        stripUndefined({
+          ...partial,
+          updatedAt: now,
+        })
+      );
 
       if (actor) {
         const companyId = resolveDocCompanyId(partial.companyId, actor);
@@ -492,14 +496,12 @@ export const FirestoreDataService = {
     try {
       const now = new Date().toISOString();
       const targetCompanyId = resolveDocCompanyId(taskData.companyId, actor);
-      const cleanPayload = Object.fromEntries(
-        Object.entries({
-          ...taskData,
-          companyId: targetCompanyId,
-          createdAt: now,
-          updatedAt: now,
-        }).filter(([, value]) => value !== undefined)
-      );
+      const cleanPayload = stripUndefined({
+        ...taskData,
+        companyId: targetCompanyId,
+        createdAt: now,
+        updatedAt: now,
+      });
 
       const docRef = await addDoc(collection(db, TASKS_COLLECTION), cleanPayload);
 
@@ -511,16 +513,20 @@ export const FirestoreDataService = {
         updatedAt: now,
       };
 
-      await this.createNotification({
-        companyId: targetCompanyId,
-        userId: taskData.assignedTo,
-        title: 'مهمة جديدة مسندة إليك',
-        message: `تم إسناد المهمة "${taskData.title}" في قسم ${taskData.department}.`,
-        type: 'task_assigned',
-        relatedTaskId: docRef.id,
-        read: false,
-        createdAt: now,
-      });
+      try {
+        await this.createNotification({
+          companyId: targetCompanyId,
+          userId: taskData.assignedTo,
+          title: 'مهمة جديدة مسندة إليك',
+          message: `تم إسناد المهمة "${taskData.title}" في قسم ${taskData.department}.`,
+          type: 'task_assigned',
+          relatedTaskId: docRef.id,
+          read: false,
+          createdAt: now,
+        });
+      } catch (notifErr) {
+        console.warn('Non-blocking task assignment notification warning:', notifErr);
+      }
 
       await this.logActivity({
         companyId: targetCompanyId,
@@ -543,10 +549,13 @@ export const FirestoreDataService = {
   async updateTask(taskId: string, partial: Partial<Task>, actor: User): Promise<void> {
     try {
       const now = new Date().toISOString();
-      await updateDoc(doc(db, TASKS_COLLECTION, taskId), {
-        ...partial,
-        updatedAt: now,
-      });
+      await updateDoc(
+        doc(db, TASKS_COLLECTION, taskId),
+        stripUndefined({
+          ...partial,
+          updatedAt: now,
+        })
+      );
 
       await this.logActivity({
         companyId: resolveDocCompanyId(partial.companyId, actor),
@@ -587,41 +596,45 @@ export const FirestoreDataService = {
         updates.completionPercentage = 100;
       }
 
-      await updateDoc(doc(db, TASKS_COLLECTION, task.id), updates);
+      await updateDoc(doc(db, TASKS_COLLECTION, task.id), stripUndefined(updates));
 
-      if (newStatus === 'Review') {
-        await this.createNotification({
-          companyId: targetCompanyId,
-          userId: task.createdBy,
-          title: 'مهمة جاهزة للمراجعة',
-          message: `قام ${actor.displayName} بتسليم "${task.title}" للمراجعة.`,
-          type: 'task_approved',
-          relatedTaskId: task.id,
-          read: false,
-          createdAt: now,
-        });
-      } else if (newStatus === 'Completed') {
-        await this.createNotification({
-          companyId: targetCompanyId,
-          userId: task.assignedTo,
-          title: 'تم اعتماد وإنجاز المهمة',
-          message: `تم اعتماد "${task.title}" كمهمة مكتملة.`,
-          type: 'task_approved',
-          relatedTaskId: task.id,
-          read: false,
-          createdAt: now,
-        });
-      } else if (newStatus === 'Rejected') {
-        await this.createNotification({
-          companyId: targetCompanyId,
-          userId: task.assignedTo,
-          title: 'المهمة تحتاج تعديل',
-          message: `تمت مراجعة "${task.title}" وتحتاج إلى تعديلات إضافية.`,
-          type: 'task_rejected',
-          relatedTaskId: task.id,
-          read: false,
-          createdAt: now,
-        });
+      try {
+        if (newStatus === 'Review' && task.createdBy) {
+          await this.createNotification({
+            companyId: targetCompanyId,
+            userId: task.createdBy,
+            title: 'مهمة جاهزة للمراجعة',
+            message: `قام ${actor.displayName} بتسليم "${task.title}" للمراجعة.`,
+            type: 'system',
+            relatedTaskId: task.id,
+            read: false,
+            createdAt: now,
+          });
+        } else if (newStatus === 'Completed' && task.assignedTo) {
+          await this.createNotification({
+            companyId: targetCompanyId,
+            userId: task.assignedTo,
+            title: 'تم اعتماد وإنجاز المهمة',
+            message: `تم اعتماد "${task.title}" كمهمة مكتملة.`,
+            type: 'task_approved',
+            relatedTaskId: task.id,
+            read: false,
+            createdAt: now,
+          });
+        } else if (newStatus === 'Rejected' && task.assignedTo) {
+          await this.createNotification({
+            companyId: targetCompanyId,
+            userId: task.assignedTo,
+            title: 'المهمة تحتاج تعديل',
+            message: `تمت مراجعة "${task.title}" وتحتاج إلى تعديلات إضافية.`,
+            type: 'task_rejected',
+            relatedTaskId: task.id,
+            read: false,
+            createdAt: now,
+          });
+        }
+      } catch (notifErr) {
+        console.warn('Non-blocking task status notification warning:', notifErr);
       }
 
       let action: 'Task Status Changed' | 'Task Completed' | 'Task Rejected' = 'Task Status Changed';
@@ -691,25 +704,29 @@ export const FirestoreDataService = {
     try {
       const now = new Date().toISOString();
       const targetCompanyId = task.companyId || commentData.companyId || DEFAULT_SUBSIDIARY_ID;
-      const payload = {
+      const payload = stripUndefined({
         ...commentData,
         companyId: targetCompanyId,
         createdAt: now,
-      };
+      });
       const docRef = await addDoc(collection(db, TASKS_COLLECTION, taskId, 'comments'), payload);
 
       const recipientId = commentData.userId === task.assignedTo ? task.createdBy : task.assignedTo;
       if (recipientId && recipientId !== commentData.userId) {
-        await this.createNotification({
-          companyId: targetCompanyId,
-          userId: recipientId,
-          title: `تعليق جديد على "${task.title.slice(0, 30)}"`,
-          message: `${commentData.userName}: ${commentData.message.slice(0, 60)}`,
-          type: 'comment_added',
-          relatedTaskId: taskId,
-          read: false,
-          createdAt: now,
-        });
+        try {
+          await this.createNotification({
+            companyId: targetCompanyId,
+            userId: recipientId,
+            title: `تعليق جديد على "${task.title.slice(0, 30)}"`,
+            message: `${commentData.userName}: ${commentData.message.slice(0, 60)}`,
+            type: 'comment_added',
+            relatedTaskId: taskId,
+            read: false,
+            createdAt: now,
+          });
+        } catch (notifErr) {
+          console.warn('Non-blocking comment notification warning:', notifErr);
+        }
       }
 
       await this.logActivity({
@@ -779,11 +796,11 @@ export const FirestoreDataService = {
     try {
       const now = new Date().toISOString();
       const targetCompanyId = resolveDocCompanyId(deptData.companyId, actor);
-      const payload = {
+      const payload = stripUndefined({
         ...deptData,
         companyId: targetCompanyId,
         createdAt: now,
-      };
+      });
       const docRef = await addDoc(collection(db, DEPARTMENTS_COLLECTION), payload);
 
       await this.logActivity({
@@ -805,7 +822,7 @@ export const FirestoreDataService = {
 
   async updateDepartment(deptId: string, partial: Partial<Department>, actor: User): Promise<void> {
     try {
-      await updateDoc(doc(db, DEPARTMENTS_COLLECTION, deptId), partial);
+      await updateDoc(doc(db, DEPARTMENTS_COLLECTION, deptId), stripUndefined(partial));
       await this.logActivity({
         companyId: resolveDocCompanyId(partial.companyId, actor),
         actorId: actor.id,
@@ -827,11 +844,11 @@ export const FirestoreDataService = {
       const targetCompanyId = resolveDocCompanyId(dept.companyId, actor);
       await setDoc(
         doc(db, DEPARTMENTS_COLLECTION, dept.id),
-        {
+        stripUndefined({
           ...dept,
           companyId: targetCompanyId,
           createdAt: dept.createdAt || now,
-        },
+        }),
         { merge: true }
       );
 
@@ -925,11 +942,14 @@ export const FirestoreDataService = {
     notif: Omit<Notification, 'id' | 'createdAt'> & { createdAt?: string }
   ): Promise<void> {
     try {
-      await addDoc(collection(db, NOTIFICATIONS_COLLECTION), {
-        ...notif,
-        companyId: notif.companyId || DEFAULT_SUBSIDIARY_ID,
-        createdAt: notif.createdAt || new Date().toISOString(),
-      });
+      await addDoc(
+        collection(db, NOTIFICATIONS_COLLECTION),
+        stripUndefined({
+          ...notif,
+          companyId: notif.companyId || DEFAULT_SUBSIDIARY_ID,
+          createdAt: notif.createdAt || new Date().toISOString(),
+        })
+      );
     } catch (err) {
       handleFirestoreError(err, OperationType.CREATE, NOTIFICATIONS_COLLECTION);
     }
@@ -946,13 +966,10 @@ export const FirestoreDataService = {
   async markAllNotificationsAsRead(userId: string): Promise<void> {
     try {
       const snap = await getDocs(
-        query(
-          collection(db, NOTIFICATIONS_COLLECTION),
-          where('userId', '==', userId),
-          where('read', '==', false)
-        )
+        query(collection(db, NOTIFICATIONS_COLLECTION), where('userId', '==', userId))
       );
-      for (const d of snap.docs) {
+      const unreadDocs = snap.docs.filter(d => d.data().read === false);
+      for (const d of unreadDocs) {
         await updateDoc(doc(db, NOTIFICATIONS_COLLECTION, d.id), { read: true });
       }
     } catch (err) {
@@ -999,10 +1016,13 @@ export const FirestoreDataService = {
 
   async logActivity(log: Omit<ActivityLog, 'id'>): Promise<void> {
     try {
-      await addDoc(collection(db, ACTIVITY_COLLECTION), {
-        ...log,
-        companyId: log.companyId || DEFAULT_SUBSIDIARY_ID,
-      });
+      await addDoc(
+        collection(db, ACTIVITY_COLLECTION),
+        stripUndefined({
+          ...log,
+          companyId: log.companyId || DEFAULT_SUBSIDIARY_ID,
+        })
+      );
     } catch (err) {
       console.warn('Non-blocking activity log write failed:', err);
     }
@@ -1062,13 +1082,13 @@ export const FirestoreDataService = {
     try {
       const now = new Date().toISOString();
       const targetCompanyId = resolveDocCompanyId(clientData.companyId, actor);
-      const payload = {
+      const payload = stripUndefined({
         ...clientData,
         companyId: targetCompanyId,
         status: clientData.status || 'active',
         createdAt: now,
         updatedAt: now,
-      };
+      });
       const docRef = await addDoc(collection(db, CLIENTS_COLLECTION), payload);
 
       await this.logActivity({
@@ -1092,10 +1112,13 @@ export const FirestoreDataService = {
   async updateClient(clientId: string, partial: Partial<Client>, actor?: User): Promise<void> {
     try {
       const now = new Date().toISOString();
-      await updateDoc(doc(db, CLIENTS_COLLECTION, clientId), {
-        ...partial,
-        updatedAt: now,
-      });
+      await updateDoc(
+        doc(db, CLIENTS_COLLECTION, clientId),
+        stripUndefined({
+          ...partial,
+          updatedAt: now,
+        })
+      );
 
       if (actor) {
         await this.logActivity({
@@ -1189,12 +1212,12 @@ export const FirestoreDataService = {
     try {
       const now = new Date().toISOString();
       const targetCompanyId = resolveDocCompanyId(projectData.companyId, actor);
-      const payload = {
+      const payload = stripUndefined({
         ...projectData,
         companyId: targetCompanyId,
         createdAt: now,
         updatedAt: now,
-      };
+      });
       const docRef = await addDoc(collection(db, PROJECTS_COLLECTION), payload);
 
       await this.logActivity({
@@ -1218,10 +1241,13 @@ export const FirestoreDataService = {
   async updateProject(projectId: string, partial: Partial<Project>, actor?: User): Promise<void> {
     try {
       const now = new Date().toISOString();
-      await updateDoc(doc(db, PROJECTS_COLLECTION, projectId), {
-        ...partial,
-        updatedAt: now,
-      });
+      await updateDoc(
+        doc(db, PROJECTS_COLLECTION, projectId),
+        stripUndefined({
+          ...partial,
+          updatedAt: now,
+        })
+      );
 
       if (actor) {
         await this.logActivity({
@@ -1301,25 +1327,32 @@ export const FirestoreDataService = {
     try {
       const now = new Date().toISOString();
       const targetCompanyId = resolveDocCompanyId(equipmentData.companyId, actor);
-      const payload = {
+      const payload = stripUndefined({
         ...equipmentData,
         companyId: targetCompanyId,
         createdAt: now,
         updatedAt: now,
-      };
+      });
       const docRef = await addDoc(collection(db, EQUIPMENT_COLLECTION), payload);
 
-      await addDoc(collection(db, EQUIPMENT_HISTORY_COLLECTION), {
-        companyId: targetCompanyId,
-        equipmentId: docRef.id,
-        equipmentName: equipmentData.name,
-        action: 'created',
-        newStatus: equipmentData.status,
-        actorId: actor.id,
-        actorName: actor.displayName,
-        actorRole: normalizeRole(actor.role, actor.email),
-        timestamp: now,
-      } satisfies Omit<EquipmentHistory, 'id'>);
+      try {
+        await addDoc(
+          collection(db, EQUIPMENT_HISTORY_COLLECTION),
+          stripUndefined({
+            companyId: targetCompanyId,
+            equipmentId: docRef.id,
+            equipmentName: equipmentData.name,
+            action: 'created',
+            newStatus: equipmentData.status,
+            actorId: actor.id,
+            actorName: actor.displayName,
+            actorRole: normalizeRole(actor.role, actor.email),
+            timestamp: now,
+          } satisfies Omit<EquipmentHistory, 'id'>)
+        );
+      } catch (historyErr) {
+        console.warn('Non-blocking equipment history write failed:', historyErr);
+      }
 
       return { id: docRef.id, ...payload };
     } catch (err) {
@@ -1337,11 +1370,11 @@ export const FirestoreDataService = {
     try {
       const now = new Date().toISOString();
       const targetCompanyId = resolveDocCompanyId(report.companyId, actor);
-      const payload = {
+      const payload = stripUndefined({
         ...report,
         companyId: targetCompanyId,
         createdAt: now,
-      };
+      });
       const docRef = await addDoc(collection(db, REPORTS_COLLECTION), payload);
       return { id: docRef.id, ...payload };
     } catch (err) {
@@ -1419,14 +1452,18 @@ export const FirestoreDataService = {
         updatedAt: now,
       });
 
-      await this.createNotification({
-        companyId: targetCompanyId,
-        userId,
-        title: 'تمت الموافقة على انضمامك إلى المنظومة',
-        message: `مرحباً بك في الفريق! تمت الموافقة على حسابك وتم تفعيل صلاحياتك.`,
-        type: 'join_approved',
-        read: false,
-      });
+      try {
+        await this.createNotification({
+          companyId: targetCompanyId,
+          userId,
+          title: 'تمت الموافقة على انضمامك إلى المنظومة',
+          message: `مرحباً بك في الفريق! تمت الموافقة على حسابك وتم تفعيل صلاحياتك.`,
+          type: 'join_approved',
+          read: false,
+        });
+      } catch (notifErr) {
+        console.warn('Non-blocking approval notification warning:', notifErr);
+      }
 
       await this.logActivity({
         companyId: targetCompanyId,

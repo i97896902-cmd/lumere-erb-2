@@ -303,7 +303,7 @@ service cloud.firestore {
         && isOptionalString(data, 'company', 200)
         && isOptionalString(data, 'companyName', 200)
         && (!('clientType' in data) || data.clientType == null
-            || data.clientType in ['company', 'restaurant', 'cafe', 'store', 'individual', 'other', 'corporate'])
+            || data.clientType in ['company', 'restaurant', 'cafe', 'store', 'individual', 'other', 'corporate', 'enterprise', 'government'])
         && isOptionalString(data, 'address', 500)
         && isOptionalString(data, 'notes', 3000)
         && isOptionalString(data, 'assignedEmployeeId', 128)

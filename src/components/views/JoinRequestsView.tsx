@@ -1,9 +1,10 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { User, CanonicalRole, Department } from '../../types';
 import { DataService } from '../../services/dataService';
 import { useAuth } from '../../context/AuthContext';
 import { useCompany } from '../../context/CompanyContext';
+import { useToast } from '../../context/ToastContext';
 import { getAssignableRoles, getRoleArabicLabel, getUserCompanyId } from '../../utils/rbac';
 import {
   UserCheck,
@@ -29,6 +30,7 @@ interface JoinRequestsViewProps {
 export const JoinRequestsView: React.FC<JoinRequestsViewProps> = ({ pendingUsers, onRefresh }) => {
   const { currentUser, isSuperAdmin } = useAuth();
   const { subsidiaries, defaultWriteCompanyId, activeCompany, getCompanyById } = useCompany();
+  const { showToast } = useToast();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedUserForApproval, setSelectedUserForApproval] = useState<User | null>(null);
   const [assignedRole, setAssignedRole] = useState<CanonicalRole>('EMPLOYEE');
@@ -37,6 +39,19 @@ export const JoinRequestsView: React.FC<JoinRequestsViewProps> = ({ pendingUsers
   const [rejectionReason, setRejectionReason] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !isProcessing) {
+        setSelectedUserForApproval(null);
+        setSelectedUserForRejection(null);
+      }
+    };
+    if (selectedUserForApproval || selectedUserForRejection) {
+      window.addEventListener('keydown', handleKeyDown);
+    }
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedUserForApproval, selectedUserForRejection, isProcessing]);
 
   const assignableRoles = useMemo(() => getAssignableRoles(currentUser), [currentUser]);
 
@@ -55,7 +70,9 @@ export const JoinRequestsView: React.FC<JoinRequestsViewProps> = ({ pendingUsers
     setIsProcessing(true);
     try {
       const resolvedCompanyId = isSuperAdmin
-        ? targetCompanyId
+        ? targetCompanyId && targetCompanyId !== 'lumere-group'
+          ? targetCompanyId
+          : defaultWriteCompanyId
         : getUserCompanyId(currentUser);
       await DataService.approveUser(
         selectedUserForApproval.id,
@@ -64,13 +81,15 @@ export const JoinRequestsView: React.FC<JoinRequestsViewProps> = ({ pendingUsers
         resolvedCompanyId
       );
       const companyLabel = getCompanyById(resolvedCompanyId)?.name || resolvedCompanyId;
-      setActionSuccess(
-        `تمت الموافقة على انضمام ${selectedUserForApproval.displayName} برتبة ${getRoleArabicLabel(assignedRole)} في شركة ${companyLabel}.`
-      );
+      const msg = `تمت الموافقة على انضمام ${selectedUserForApproval.displayName} برتبة ${getRoleArabicLabel(assignedRole)} في شركة ${companyLabel}.`;
+      setActionSuccess(msg);
+      showToast(msg, 'success');
       setSelectedUserForApproval(null);
       if (onRefresh) onRefresh();
     } catch (err: unknown) {
       console.error('Approve error:', err);
+      const errMsg = err instanceof Error ? err.message : 'تعذر اعتماد طلب الانضمام';
+      showToast(errMsg, 'error');
     } finally {
       setIsProcessing(false);
       setTimeout(() => setActionSuccess(null), 5000);
@@ -87,12 +106,16 @@ export const JoinRequestsView: React.FC<JoinRequestsViewProps> = ({ pendingUsers
         currentUser,
         selectedUserForRejection.companyId
       );
-      setActionSuccess(`تم رفض طلب انضمام ${selectedUserForRejection.displayName}.`);
+      const msg = `تم رفض طلب انضمام ${selectedUserForRejection.displayName}.`;
+      setActionSuccess(msg);
+      showToast(msg, 'info');
       setSelectedUserForRejection(null);
       setRejectionReason('');
       if (onRefresh) onRefresh();
     } catch (err: unknown) {
       console.error('Reject error:', err);
+      const errMsg = err instanceof Error ? err.message : 'تعذر رفض طلب الانضمام';
+      showToast(errMsg, 'error');
     } finally {
       setIsProcessing(false);
       setTimeout(() => setActionSuccess(null), 5000);
@@ -239,11 +262,16 @@ export const JoinRequestsView: React.FC<JoinRequestsViewProps> = ({ pendingUsers
               {/* Action Buttons */}
               <div className="flex items-center gap-2 pt-2 border-t border-neutral-100">
                 <button
+                  type="button"
                   id={`btn-approve-user-${user.id}`}
                   onClick={() => {
                     setSelectedUserForApproval(user);
                     setAssignedRole('EMPLOYEE');
-                    setTargetCompanyId(user.companyId || defaultWriteCompanyId);
+                    setTargetCompanyId(
+                      user.companyId && user.companyId !== 'lumere-group'
+                        ? user.companyId
+                        : defaultWriteCompanyId
+                    );
                   }}
                   className="flex-1 py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white text-xs font-semibold transition-colors flex items-center justify-center gap-1.5 shadow-2xs"
                 >
@@ -252,6 +280,7 @@ export const JoinRequestsView: React.FC<JoinRequestsViewProps> = ({ pendingUsers
                 </button>
 
                 <button
+                  type="button"
                   id={`btn-reject-user-${user.id}`}
                   onClick={() => setSelectedUserForRejection(user)}
                   className="py-2 px-3 rounded-xl border border-rose-200 text-rose-700 hover:bg-rose-50 text-xs font-medium transition-colors flex items-center justify-center gap-1.5"
@@ -268,11 +297,19 @@ export const JoinRequestsView: React.FC<JoinRequestsViewProps> = ({ pendingUsers
       {/* Approve Modal */}
       <AnimatePresence>
         {selectedUserForApproval && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-neutral-950/60 p-4" dir="rtl">
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-neutral-950/60 p-4"
+            dir="rtl"
+            onClick={() => !isProcessing && setSelectedUserForApproval(null)}
+          >
             <motion.div
+              role="dialog"
+              aria-modal="true"
+              aria-label="اعتماد طلب الانضمام"
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
+              onClick={e => e.stopPropagation()}
               className="bg-white rounded-2xl border border-neutral-200 shadow-xl max-w-md w-full p-6"
             >
               <div className="flex items-center justify-between pb-4 border-b border-neutral-100 mb-4">
@@ -281,6 +318,8 @@ export const JoinRequestsView: React.FC<JoinRequestsViewProps> = ({ pendingUsers
                   <h3 className="font-bold text-base text-neutral-900">اعتماد طلب الانضمام</h3>
                 </div>
                 <button
+                  type="button"
+                  aria-label="إغلاق"
                   onClick={() => setSelectedUserForApproval(null)}
                   className="text-neutral-400 hover:text-neutral-600 p-1"
                 >
@@ -340,6 +379,7 @@ export const JoinRequestsView: React.FC<JoinRequestsViewProps> = ({ pendingUsers
               {/* Action Buttons */}
               <div className="flex items-center gap-2">
                 <button
+                  type="button"
                   id="btn-confirm-approve"
                   onClick={handleApprove}
                   disabled={isProcessing}
@@ -348,6 +388,7 @@ export const JoinRequestsView: React.FC<JoinRequestsViewProps> = ({ pendingUsers
                   {isProcessing ? 'جارِ المعالجة...' : 'تأكيد الموافقة والتفعيل'}
                 </button>
                 <button
+                  type="button"
                   onClick={() => setSelectedUserForApproval(null)}
                   disabled={isProcessing}
                   className="py-2.5 px-4 rounded-xl border border-neutral-200 hover:bg-neutral-50 text-neutral-700 text-xs font-medium"
@@ -363,11 +404,19 @@ export const JoinRequestsView: React.FC<JoinRequestsViewProps> = ({ pendingUsers
       {/* Reject Modal */}
       <AnimatePresence>
         {selectedUserForRejection && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-neutral-950/60 p-4" dir="rtl">
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-neutral-950/60 p-4"
+            dir="rtl"
+            onClick={() => !isProcessing && setSelectedUserForRejection(null)}
+          >
             <motion.div
+              role="dialog"
+              aria-modal="true"
+              aria-label="رفض طلب الانضمام"
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
+              onClick={e => e.stopPropagation()}
               className="bg-white rounded-2xl border border-neutral-200 shadow-xl max-w-md w-full p-6"
             >
               <div className="flex items-center justify-between pb-4 border-b border-neutral-100 mb-4">
@@ -376,6 +425,8 @@ export const JoinRequestsView: React.FC<JoinRequestsViewProps> = ({ pendingUsers
                   <h3 className="font-bold text-base text-neutral-900">رفض طلب الانضمام</h3>
                 </div>
                 <button
+                  type="button"
+                  aria-label="إغلاق"
                   onClick={() => setSelectedUserForRejection(null)}
                   className="text-neutral-400 hover:text-neutral-600 p-1"
                 >
@@ -402,6 +453,7 @@ export const JoinRequestsView: React.FC<JoinRequestsViewProps> = ({ pendingUsers
 
               <div className="flex items-center gap-2">
                 <button
+                  type="button"
                   id="btn-confirm-reject"
                   onClick={handleReject}
                   disabled={isProcessing}
@@ -410,6 +462,7 @@ export const JoinRequestsView: React.FC<JoinRequestsViewProps> = ({ pendingUsers
                   {isProcessing ? 'جارِ المعالجة...' : 'تأكيد الرفض'}
                 </button>
                 <button
+                  type="button"
                   onClick={() => setSelectedUserForRejection(null)}
                   disabled={isProcessing}
                   className="py-2.5 px-4 rounded-xl border border-neutral-200 hover:bg-neutral-50 text-neutral-700 text-xs font-medium"

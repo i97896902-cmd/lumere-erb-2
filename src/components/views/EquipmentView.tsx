@@ -89,12 +89,20 @@ export function EquipmentView({ equipment, employees, projects, onRefresh }: Equ
           type,
           serialNumber: serialNumber.trim(),
           status: assignedEmp ? 'assigned' : status,
-          assignedTo: assignedEmp?.id,
-          assignedToName: assignedEmp?.displayName,
-          assignedToEmail: assignedEmp?.email,
-          projectId: linkedProj?.id,
-          projectName: linkedProj?.name,
-          notes: notes.trim() || undefined,
+          ...(assignedEmp
+            ? {
+                assignedTo: assignedEmp.id,
+                assignedToName: assignedEmp.displayName,
+                assignedToEmail: assignedEmp.email,
+              }
+            : {}),
+          ...(linkedProj
+            ? {
+                projectId: linkedProj.id,
+                projectName: linkedProj.name,
+              }
+            : {}),
+          ...(notes.trim() ? { notes: notes.trim() } : {}),
         },
         currentUser
       );
@@ -238,7 +246,11 @@ export function EquipmentView({ equipment, employees, projects, onRefresh }: Equ
             <Select
               label="الشركة المالكة للأصل *"
               value={targetCompanyId}
-              onChange={e => setTargetCompanyId(e.target.value)}
+              onChange={e => {
+                setTargetCompanyId(e.target.value);
+                setAssignedTo('');
+                setProjectId('');
+              }}
               options={subsidiaries.map(c => ({ value: c.id, label: c.name }))}
             />
           )}

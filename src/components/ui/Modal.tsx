@@ -56,6 +56,9 @@ export function Modal({
       {/* Dialog container - positioned with higher z-index above backdrop */}
       <div className="relative z-10 flex min-h-full items-center justify-center p-4 text-center sm:p-6 pointer-events-none">
         <div
+          role="dialog"
+          aria-modal="true"
+          aria-label={title}
           className={`w-full ${maxWidthClass} pointer-events-auto rounded-2xl bg-white text-right align-middle shadow-2xl border border-neutral-200 overflow-hidden`}
           onClick={e => e.stopPropagation()}
         >
@@ -66,6 +69,7 @@ export function Modal({
               {subtitle && <p className="mt-0.5 text-xs text-neutral-500">{subtitle}</p>}
             </div>
             <button
+              type="button"
               onClick={onClose}
               className="rounded-lg p-1.5 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700 transition-colors"
               aria-label="إغلاق النافذة"

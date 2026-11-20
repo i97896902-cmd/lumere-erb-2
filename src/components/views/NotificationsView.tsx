@@ -94,9 +94,13 @@ export function NotificationsView({
 
   // Manual test push for a specific approaching task
   const handleTriggerTaskPush = async (task: Task) => {
-    const calc = DeadlinePushService.calculateDeadlineInfo(task.deadline);
-    await DeadlinePushService.checkApproachingDeadlines([task], currentUser, true);
-    showToast(`تم إرسال إشعار فوري لمهمة "${task.title}" (${calc.humanReadableDiff})`, 'info');
+    try {
+      const calc = DeadlinePushService.calculateDeadlineInfo(task.deadline);
+      await DeadlinePushService.checkApproachingDeadlines([task], currentUser, true);
+      showToast(`تم إرسال إشعار فوري لمهمة "${task.title}" (${calc.humanReadableDiff})`, 'info');
+    } catch {
+      showToast('تعذر إرسال التنبيه الفوري للمهمة', 'error');
+    }
   };
 
   return (
@@ -186,8 +190,10 @@ export function NotificationsView({
             )}
 
             <button
+              type="button"
               onClick={() => DeadlinePushService.playGentleChime()}
               title="تجربة نغمة التنبيه الهادئة"
+              aria-label="تجربة نغمة التنبيه الهادئة"
               className="p-2 rounded-xl bg-white/10 hover:bg-white/15 text-neutral-300 hover:text-white transition-colors cursor-pointer"
             >
               <Volume2 className="w-4 h-4" />
@@ -231,6 +237,7 @@ export function NotificationsView({
       {/* Tabs */}
       <div className="flex items-center gap-2 border-b border-neutral-200">
         <button
+          type="button"
           onClick={() => setActiveTab('notifications')}
           className={`pb-3 px-3 text-xs font-bold transition-all relative cursor-pointer ${
             activeTab === 'notifications'
@@ -247,6 +254,7 @@ export function NotificationsView({
         </button>
 
         <button
+          type="button"
           onClick={() => setActiveTab('deadlines')}
           className={`pb-3 px-3 text-xs font-bold transition-all relative cursor-pointer ${
             activeTab === 'deadlines'
@@ -277,9 +285,18 @@ export function NotificationsView({
               {notifications.map(n => (
                 <div
                   key={n.id}
+                  role="button"
+                  tabIndex={0}
                   onClick={() => {
                     onMarkRead(n.id);
                     if (n.relatedTaskId) onSelectTask(n.relatedTaskId);
+                  }}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      onMarkRead(n.id);
+                      if (n.relatedTaskId) onSelectTask(n.relatedTaskId);
+                    }
                   }}
                   className={`p-4 flex items-start gap-3.5 hover:bg-neutral-50 transition-colors cursor-pointer ${
                     !n.read ? 'bg-emerald-50/20' : ''

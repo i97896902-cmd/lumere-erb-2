@@ -1,11 +1,13 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Project, Client, Task, User } from '../../types';
 import { DataService } from '../../services/dataService';
 import { useAuth } from '../../context/AuthContext';
 import { useCompany } from '../../context/CompanyContext';
+import { useToast } from '../../context/ToastContext';
 import { DEFAULT_SUBSIDIARY_ID } from '../../config/companies';
-import { canManageProjects as checkCanManageProjects } from '../../utils/rbac';
+import { canCreateTask, canManageProjects as checkCanManageProjects } from '../../utils/rbac';
+import { formatLocalDate } from '../../utils/sanitize';
 import {
   FolderKanban,
   Plus,
@@ -49,6 +51,7 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({
 }) => {
   const { currentUser } = useAuth();
   const { activeCompany, isGroupView, subsidiaries, defaultWriteCompanyId, getCompanyById } = useCompany();
+  const { showToast } = useToast();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | Project['status']>('all');
   const [clientFilter, setClientFilter] = useState<'all' | string>('all');
@@ -56,6 +59,18 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({
   const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [selectedProjectForDetails, setSelectedProjectForDetails] = useState<Project | null>(null);
   const [isDeletingId, setIsDeletingId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!isModalOpen && !selectedProjectForDetails) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (isModalOpen) setIsModalOpen(false);
+        else if (selectedProjectForDetails) setSelectedProjectForDetails(null);
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [isModalOpen, selectedProjectForDetails]);
 
   // Form State
   const [formCompanyId, setFormCompanyId] = useState(defaultWriteCompanyId);
@@ -112,14 +127,14 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({
     setFormCompanyId(initialCompany);
     setFormName('');
     setFormDescription('');
-    setFormClientId(companyClients[0]?.id || clients[0]?.id || '');
-    setFormDepartment(companyDepts[0]?.name || departments[0]?.name || 'عام');
+    setFormClientId(companyClients[0]?.id || '');
+    setFormDepartment(companyDepts[0]?.name || 'عام');
     setFormStatus('in_progress');
     setFormPriority('High');
-    setFormStartDate(new Date().toISOString().split('T')[0]);
+    setFormStartDate(formatLocalDate(new Date()));
     const d = new Date();
     d.setDate(d.getDate() + 30);
-    setFormDeadline(d.toISOString().split('T')[0]);
+    setFormDeadline(formatLocalDate(d));
     setFormBudget('');
     setFormManagerId(currentUser?.id || '');
     setIsModalOpen(true);
@@ -143,10 +158,15 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({
 
   const handleSaveProject = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formName.trim() || !formClientId || !currentUser) return;
+    if (!formName.trim() || !currentUser) return;
+    if (!formClientId) {
+      showToast('يرجى اختيار عميل تابع لنفس الشركة (أو إضافة عميل أولاً).', 'error');
+      return;
+    }
 
-    const selectedClient = clients.find(c => c.id === formClientId);
+    const selectedClient = scopedFormClients.find(c => c.id === formClientId) || clients.find(c => c.id === formClientId);
     const selectedManager = users.find(u => u.id === formManagerId);
+    const parsedBudget = formBudget.trim() !== '' && !Number.isNaN(Number(formBudget)) ? Number(formBudget) : undefined;
 
     setIsSaving(true);
     try {
@@ -154,6 +174,7 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({
         await DataService.updateProject(
           editingProject.id,
           {
+            companyId: editingProject.companyId,
             name: formName.trim(),
             description: formDescription.trim(),
             clientId: formClientId,
@@ -163,12 +184,13 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({
             priority: formPriority,
             startDate: formStartDate,
             deadline: formDeadline,
-            budget: formBudget ? Number(formBudget) : undefined,
-            managerId: formManagerId,
-            managerName: selectedManager?.displayName,
+            ...(parsedBudget !== undefined ? { budget: parsedBudget } : {}),
+            ...(formManagerId ? { managerId: formManagerId } : {}),
+            ...(selectedManager?.displayName ? { managerName: selectedManager.displayName } : {}),
           },
           currentUser
         );
+        showToast(`تم تحديث المشروع "${formName.trim()}" بنجاح`, 'success');
       } else {
         await DataService.createProject(
           {
@@ -177,13 +199,13 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({
             description: formDescription.trim(),
             clientId: formClientId,
             clientName: selectedClient?.name || 'عميل تجاري',
-            department: formDepartment,
+            department: formDepartment || 'عام',
             status: formStatus,
             priority: formPriority,
             startDate: formStartDate,
             deliveryDate: formDeadline,
             deadline: formDeadline,
-            budget: formBudget ? Number(formBudget) : undefined,
+            ...(parsedBudget !== undefined ? { budget: parsedBudget } : {}),
             progress: 0,
             tasksCount: 0,
             completedTasksCount: 0,
@@ -192,11 +214,13 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({
           },
           currentUser
         );
+        showToast(`تم إنشاء المشروع "${formName.trim()}" بنجاح`, 'success');
       }
       setIsModalOpen(false);
       if (onRefresh) onRefresh();
     } catch (err) {
       console.error('Error saving project:', err);
+      showToast('تعذر حفظ المشروع. تأكد من انتماء العميل لنفس الشركة وصلاحياتك.', 'error');
     } finally {
       setIsSaving(false);
     }
@@ -218,9 +242,11 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({
       if (selectedProjectForDetails?.id === project.id) {
         setSelectedProjectForDetails(null);
       }
+      showToast(`تم حذف المشروع "${project.name}"`, 'info');
       if (onRefresh) onRefresh();
     } catch (err) {
       console.error('Error deleting project:', err);
+      showToast('تعذر حذف المشروع. يتطلب الحذف صلاحية مدير شركة أو مدير مجموعة.', 'error');
     } finally {
       setIsDeletingId(null);
     }
@@ -454,8 +480,9 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({
                   </button>
 
                   <div className="flex items-center gap-1">
-                    {onOpenCreateTask && (
+                    {onOpenCreateTask && canCreateTask(currentUser, project.companyId || defaultWriteCompanyId) && (
                       <button
+                        type="button"
                         onClick={() => onOpenCreateTask(project.id, project.clientId)}
                         className="p-1.5 rounded-lg text-emerald-700 hover:bg-emerald-50 transition-colors"
                         title="إضافة مهمة لهذا المشروع"
@@ -512,11 +539,19 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({
       {/* Add / Edit Project Modal */}
       <AnimatePresence>
         {isModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-neutral-950/60 p-4" dir="rtl">
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-neutral-950/60 p-4"
+            dir="rtl"
+            role="dialog"
+            aria-modal="true"
+            aria-label={editingProject ? 'تعديل بيانات المشروع' : 'إنشاء مشروع جديد'}
+            onClick={() => setIsModalOpen(false)}
+          >
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
+              onClick={e => e.stopPropagation()}
               className="bg-white rounded-2xl border border-neutral-200 shadow-xl max-w-xl w-full p-6 max-h-[90vh] overflow-y-auto"
             >
               <div className="flex items-center justify-between pb-4 border-b border-neutral-100 mb-5">
@@ -527,7 +562,9 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({
                   </h3>
                 </div>
                 <button
+                  type="button"
                   onClick={() => setIsModalOpen(false)}
+                  aria-label="إغلاق"
                   className="text-neutral-400 hover:text-neutral-600 p-1"
                 >
                   <X className="w-4 h-4" />
@@ -542,7 +579,18 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({
                     </label>
                     <select
                       value={formCompanyId}
-                      onChange={e => setFormCompanyId(e.target.value)}
+                      onChange={e => {
+                        const nextCompanyId = e.target.value;
+                        setFormCompanyId(nextCompanyId);
+                        const nextClients = clients.filter(
+                          c => (c.companyId || DEFAULT_SUBSIDIARY_ID) === nextCompanyId
+                        );
+                        const nextDepts = departments.filter(
+                          d => ((d as { companyId?: string }).companyId || DEFAULT_SUBSIDIARY_ID) === nextCompanyId
+                        );
+                        setFormClientId(nextClients[0]?.id || '');
+                        setFormDepartment(nextDepts[0]?.name || 'عام');
+                      }}
                       className="w-full px-3.5 py-2.5 rounded-xl border border-neutral-300 text-neutral-900 bg-white focus:outline-none focus:border-emerald-500"
                     >
                       {subsidiaries.map(c => (
@@ -590,11 +638,15 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({
                       onChange={e => setFormClientId(e.target.value)}
                       className="w-full px-3.5 py-2.5 rounded-xl border border-neutral-300 text-neutral-900 bg-white focus:outline-none focus:border-emerald-500"
                     >
-                      {(scopedFormClients.length > 0 ? scopedFormClients : clients).map(c => (
-                        <option key={c.id} value={c.id}>
-                          {c.name} {c.company ? `(${c.company})` : ''}
-                        </option>
-                      ))}
+                      {scopedFormClients.length === 0 ? (
+                        <option value="">-- لا يوجد عملاء في هذه الشركة (أضف عميلاً أولاً) --</option>
+                      ) : (
+                        scopedFormClients.map(c => (
+                          <option key={c.id} value={c.id}>
+                            {c.name} {c.company ? `(${c.company})` : ''}
+                          </option>
+                        ))
+                      )}
                     </select>
                   </div>
 
@@ -605,11 +657,15 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({
                       onChange={e => setFormDepartment(e.target.value)}
                       className="w-full px-3.5 py-2.5 rounded-xl border border-neutral-300 text-neutral-900 bg-white focus:outline-none focus:border-emerald-500"
                     >
-                      {(scopedFormDepartments.length > 0 ? scopedFormDepartments : departments).map(d => (
-                        <option key={d.id} value={d.name}>
-                          {d.name}
-                        </option>
-                      ))}
+                      {scopedFormDepartments.length > 0 ? (
+                        scopedFormDepartments.map(d => (
+                          <option key={d.id} value={d.name}>
+                            {d.name}
+                          </option>
+                        ))
+                      ) : (
+                        <option value="عام">عام</option>
+                      )}
                     </select>
                   </div>
                 </div>
@@ -704,11 +760,19 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({
       {/* Project Details Modal (Shows linked tasks) */}
       <AnimatePresence>
         {selectedProjectForDetails && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-neutral-950/60 p-4" dir="rtl">
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-neutral-950/60 p-4"
+            dir="rtl"
+            role="dialog"
+            aria-modal="true"
+            aria-label={`تفاصيل المشروع ${selectedProjectForDetails.name}`}
+            onClick={() => setSelectedProjectForDetails(null)}
+          >
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
+              onClick={e => e.stopPropagation()}
               className="bg-white rounded-2xl border border-neutral-200 shadow-xl max-w-2xl w-full p-6 max-h-[85vh] overflow-y-auto"
             >
               <div className="flex items-start justify-between pb-4 border-b border-neutral-100 mb-4">
@@ -720,7 +784,9 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({
                   <p className="text-xs text-neutral-500">العميل: {selectedProjectForDetails.clientName}</p>
                 </div>
                 <button
+                  type="button"
                   onClick={() => setSelectedProjectForDetails(null)}
+                  aria-label="إغلاق"
                   className="text-neutral-400 hover:text-neutral-600 p-1"
                 >
                   <X className="w-4 h-4" />
@@ -744,8 +810,13 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({
                     </span>
                   </h4>
 
-                  {onOpenCreateTask && (
+                  {onOpenCreateTask &&
+                    canCreateTask(
+                      currentUser,
+                      selectedProjectForDetails.companyId || defaultWriteCompanyId
+                    ) && (
                     <button
+                      type="button"
                       onClick={() => {
                         const projId = selectedProjectForDetails.id;
                         const clId = selectedProjectForDetails.clientId;
@@ -765,8 +836,13 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({
                     <div className="p-6 text-center bg-neutral-50 rounded-xl border border-dashed border-neutral-200">
                       <ListTodo className="w-8 h-8 text-neutral-300 mx-auto mb-2" />
                       <p className="text-xs text-neutral-500">لا توجد مهام منشأة لهذا المشروع حتى الآن.</p>
-                      {onOpenCreateTask && (
+                      {onOpenCreateTask &&
+                        canCreateTask(
+                          currentUser,
+                          selectedProjectForDetails.companyId || defaultWriteCompanyId
+                        ) && (
                         <button
+                          type="button"
                           onClick={() => {
                             const projId = selectedProjectForDetails.id;
                             const clId = selectedProjectForDetails.clientId;

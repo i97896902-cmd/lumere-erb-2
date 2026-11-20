@@ -10,6 +10,7 @@ import { Card } from '../ui/Card';
 import { StatusBadge, PriorityBadge } from '../ui/Badge';
 import { Task } from '../../types';
 import { useAuth } from '../../context/AuthContext';
+import { formatLocalDate, formatLocalYMD } from '../../utils/sanitize';
 
 interface CalendarViewProps {
   tasks: Task[];
@@ -19,9 +20,7 @@ interface CalendarViewProps {
 export function CalendarView({ tasks, onSelectTask }: CalendarViewProps) {
   const { role, currentUser } = useAuth();
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [selectedDateStr, setSelectedDateStr] = useState<string>(
-    new Date().toISOString().split('T')[0]
-  );
+  const [selectedDateStr, setSelectedDateStr] = useState<string>(formatLocalDate(new Date()));
 
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
@@ -55,7 +54,7 @@ export function CalendarView({ tasks, onSelectTask }: CalendarViewProps) {
   const goToToday = () => {
     const today = new Date();
     setCurrentDate(today);
-    setSelectedDateStr(today.toISOString().split('T')[0]);
+    setSelectedDateStr(formatLocalDate(today));
   };
 
   // Calendar matrix calculation
@@ -70,7 +69,7 @@ export function CalendarView({ tasks, onSelectTask }: CalendarViewProps) {
     daysArray.push({
       day: daysInPrevMonth - i,
       monthOffset: -1,
-      dateStr: new Date(year, month - 1, daysInPrevMonth - i).toISOString().split('T')[0],
+      dateStr: formatLocalYMD(year, month - 1, daysInPrevMonth - i),
     });
   }
 
@@ -79,17 +78,17 @@ export function CalendarView({ tasks, onSelectTask }: CalendarViewProps) {
     daysArray.push({
       day: d,
       monthOffset: 0,
-      dateStr: `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`,
+      dateStr: formatLocalYMD(year, month, d),
     });
   }
 
-  // Next month padding to fill 35 or 42 grid slots
+  // Next month padding to fill 42 grid slots
   const remaining = 42 - daysArray.length;
   for (let n = 1; n <= remaining; n++) {
     daysArray.push({
       day: n,
       monthOffset: 1,
-      dateStr: new Date(year, month + 1, n).toISOString().split('T')[0],
+      dateStr: formatLocalYMD(year, month + 1, n),
     });
   }
 
@@ -154,7 +153,7 @@ export function CalendarView({ tasks, onSelectTask }: CalendarViewProps) {
             {daysArray.map((cell, idx) => {
               const dayTasks = relevantTasks.filter(t => t.deadline === cell.dateStr);
               const isSelected = selectedDateStr === cell.dateStr;
-              const isToday = cell.dateStr === new Date().toISOString().split('T')[0];
+              const isToday = cell.dateStr === formatLocalDate(new Date());
 
               return (
                 <div

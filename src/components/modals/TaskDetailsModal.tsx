@@ -28,6 +28,7 @@ import { useToast } from '../../context/ToastContext';
 import { DataService } from '../../services/dataService';
 import { DEFAULT_SUBSIDIARY_ID } from '../../config/companies';
 import { canApproveTasks, canDeleteTask, getRoleArabicLabel } from '../../utils/rbac';
+import { formatLocalDate } from '../../utils/sanitize';
 
 interface TaskDetailsModalProps {
   task: Task | null;
@@ -79,7 +80,7 @@ export function TaskDetailsModal({
 
   if (!task) return null;
 
-  const nowStr = new Date().toISOString().split('T')[0];
+  const nowStr = formatLocalDate();
   const isOverdue =
     task.deadline < nowStr && task.status !== 'Completed' && task.status !== 'Cancelled';
 
@@ -90,6 +91,8 @@ export function TaskDetailsModal({
   const canApproveOrReject = canApproveTasks(currentUser, taskCompanyId);
   const canDelete = canDeleteTask(currentUser, taskCompanyId);
   const canStartOrSubmit = isAssignee || canApproveOrReject;
+  const isTerminalStatus = task.status === 'Completed' || task.status === 'Cancelled';
+  const canModifyProgressOrAttachments = canStartOrSubmit && !isTerminalStatus;
 
   // Workflow Handlers
   const handleWorkflowTransition = async (
@@ -119,7 +122,8 @@ export function TaskDetailsModal({
   };
 
   const handleProgressSave = async () => {
-    if (!currentUser) return;
+    if (!currentUser || !canModifyProgressOrAttachments) return;
+    if (progressVal === (task.completionPercentage || 0)) return;
     setIsActionLoading(true);
     try {
       await DataService.updateTask(
@@ -190,30 +194,45 @@ export function TaskDetailsModal({
   // Upload file to task (Firebase Storage per company path with safe fallback)
   const handleAttachmentUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
-    if (!files || files.length === 0 || !currentUser) return;
+    if (!files || files.length === 0 || !currentUser || !canModifyProgressOrAttachments) return;
 
-    const newAttachments: TaskAttachment[] = [...(task.attachments || [])];
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
-      let fileUrl = URL.createObjectURL(file);
-      try {
-        fileUrl = await DataService.uploadTaskAttachment(taskCompanyId, task.id, file);
-      } catch {
-        // Fallback if Firebase Storage rules are not yet deployed
-      }
-      newAttachments.push({
-        id: Math.random().toString(36).substring(2, 9),
-        name: file.name,
-        size: file.size,
-        type: file.type || 'application/octet-stream',
-        url: fileUrl,
-        uploaderName: currentUser.displayName,
-        uploaderId: currentUser.id,
-        uploadedAt: new Date().toISOString(),
-      });
-    }
+    const blockedExts = new Set(['exe', 'bat', 'sh', 'cmd', 'vbs', 'scr', 'js', 'msi']);
+    const addedAttachments: TaskAttachment[] = [];
 
     try {
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        if (file.size > 15 * 1024 * 1024) {
+          showToast(`حجم الملف ${file.name} يتجاوز الحد المسموح (15 ميجابايت).`, 'error');
+          continue;
+        }
+        const ext = file.name.split('.').pop()?.toLowerCase() || '';
+        if (blockedExts.has(ext)) {
+          showToast(`نوع الملف .${ext} محظور لدواعي أمان النظام.`, 'error');
+          continue;
+        }
+
+        let fileUrl = '';
+        try {
+          fileUrl = await DataService.uploadTaskAttachment(taskCompanyId, task.id, file);
+        } catch {
+          fileUrl = URL.createObjectURL(file);
+        }
+        addedAttachments.push({
+          id: Math.random().toString(36).substring(2, 9),
+          name: file.name,
+          size: file.size,
+          type: file.type || 'application/octet-stream',
+          url: fileUrl,
+          uploaderName: currentUser.displayName,
+          uploaderId: currentUser.id,
+          uploadedAt: new Date().toISOString(),
+        });
+      }
+
+      if (addedAttachments.length === 0) return;
+
+      const newAttachments: TaskAttachment[] = [...(task.attachments || []), ...addedAttachments];
       await DataService.updateTask(
         task.id,
         { companyId: taskCompanyId, attachments: newAttachments },
@@ -223,6 +242,8 @@ export function TaskDetailsModal({
       showToast('تم رفع المرفق بنجاح', 'success');
     } catch {
       showToast('تعذر رفع الملف', 'error');
+    } finally {
+      e.target.value = '';
     }
   };
 
@@ -357,6 +378,7 @@ export function TaskDetailsModal({
                 </div>
               ) : (
                 <button
+                  type="button"
                   onClick={handleDelete}
                   className="p-2 rounded-lg text-neutral-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
                   title="حذف المهمة"
@@ -428,12 +450,13 @@ export function TaskDetailsModal({
               min={0}
               max={100}
               step={5}
-              disabled={task.status === 'Completed'}
+              disabled={!canModifyProgressOrAttachments}
               value={progressVal}
               onChange={e => setProgressVal(Number(e.target.value))}
               onMouseUp={handleProgressSave}
               onTouchEnd={handleProgressSave}
-              className="w-full accent-emerald-600 cursor-pointer disabled:cursor-not-allowed"
+              onKeyUp={handleProgressSave}
+              className="w-full accent-emerald-600 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
             />
             <div className="flex justify-between text-[10px] text-neutral-400 mt-1">
               <span>0%</span>
@@ -460,11 +483,13 @@ export function TaskDetailsModal({
               <Paperclip className="w-3.5 h-3.5 text-neutral-400" />
               المرفقات والملفات ({task.attachments?.length || 0})
             </h4>
-            <label className="text-xs font-semibold text-emerald-700 hover:text-emerald-800 cursor-pointer flex items-center gap-1">
-              <Upload className="w-3.5 h-3.5" />
-              رفع ملف أو مخرج
-              <input type="file" multiple onChange={handleAttachmentUpload} className="hidden" />
-            </label>
+            {canModifyProgressOrAttachments && (
+              <label className="text-xs font-semibold text-emerald-700 hover:text-emerald-800 cursor-pointer flex items-center gap-1">
+                <Upload className="w-3.5 h-3.5" />
+                رفع ملف أو مخرج
+                <input type="file" multiple onChange={handleAttachmentUpload} className="hidden" />
+              </label>
+            )}
           </div>
 
           {task.attachments && task.attachments.length > 0 ? (

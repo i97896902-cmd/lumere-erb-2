@@ -10,6 +10,7 @@ import { useToast } from '../../context/ToastContext';
 import { DataService } from '../../services/dataService';
 import { DEFAULT_SUBSIDIARY_ID } from '../../config/companies';
 import { getUserCompanyId, isActiveStatus, validateTaskAssignment } from '../../utils/rbac';
+import { formatLocalDate } from '../../utils/sanitize';
 
 interface CreateTaskModalProps {
   isOpen: boolean;
@@ -46,9 +47,9 @@ export function CreateTaskModal({
   const [projectId, setProjectId] = useState(defaultProjectId);
   const [clientId, setClientId] = useState(defaultClientId);
   const [priority, setPriority] = useState<TaskPriority>('Medium');
-  const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
-  const [deadline, setDeadline] = useState(
-    new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0]
+  const [startDate, setStartDate] = useState(() => formatLocalDate());
+  const [deadline, setDeadline] = useState(() =>
+    formatLocalDate(new Date(Date.now() + 7 * 86400000))
   );
   const [attachments, setAttachments] = useState<TaskAttachment[]>([]);
   const [pendingFiles, setPendingFiles] = useState<Array<{ id: string; file: File }>>([]);
@@ -171,10 +172,17 @@ export function CreateTaskModal({
 
     setPendingFiles(prev => [...prev, ...newPending]);
     setAttachments(prev => [...prev, ...newAttachments]);
+    e.target.value = '';
   };
 
   const removeAttachment = (id: string) => {
-    setAttachments(prev => prev.filter(a => a.id !== id));
+    setAttachments(prev => {
+      const target = prev.find(a => a.id === id);
+      if (target?.url.startsWith('blob:')) {
+        URL.revokeObjectURL(target.url);
+      }
+      return prev.filter(a => a.id !== id);
+    });
     setPendingFiles(prev => prev.filter(f => f.id !== id));
   };
 
@@ -237,6 +245,9 @@ export function CreateTaskModal({
               taskIdCode,
               pending.file
             );
+            if (att.url.startsWith('blob:')) {
+              URL.revokeObjectURL(att.url);
+            }
             finalAttachments.push({ ...att, url: storageUrl });
           } catch {
             finalAttachments.push(att);

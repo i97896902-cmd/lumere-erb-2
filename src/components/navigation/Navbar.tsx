@@ -63,8 +63,19 @@ export function Navbar({
         setShowSearchResults(false);
       }
     };
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setShowNotifMenu(false);
+        setShowUserMenu(false);
+        setShowSearchResults(false);
+      }
+    };
     document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
   }, []);
 
   const unreadCount = notifications.filter(n => !n.read).length;
@@ -89,6 +100,7 @@ export function Navbar({
       {/* Right (Start in RTL): Mobile Hamburger, Active Context & Search */}
       <div className="flex items-center gap-3 flex-1 max-w-xl min-w-0">
         <button
+          type="button"
           onClick={onOpenMobileSidebar}
           className="lg:hidden p-2 rounded-xl text-neutral-600 hover:bg-neutral-100 transition-colors shrink-0"
           aria-label="فتح القائمة الجانبية"
@@ -130,6 +142,7 @@ export function Navbar({
                 <div className="py-1 max-h-64 overflow-y-auto">
                   {filteredTasks.map(task => (
                     <button
+                      type="button"
                       key={task.id}
                       onClick={() => {
                         onSelectTask(task.id);
@@ -185,10 +198,12 @@ export function Navbar({
         {/* Notifications Popover */}
         <div ref={notifMenuRef} className="relative">
           <button
+            type="button"
             id="btn-notifications-bell"
             onClick={() => setShowNotifMenu(!showNotifMenu)}
             className="relative p-2 rounded-xl text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900 transition-colors cursor-pointer"
             aria-label="عرض التنبيهات"
+            aria-expanded={showNotifMenu}
           >
             <Bell className="w-5 h-5" />
             {unreadCount > 0 && (
@@ -211,6 +226,7 @@ export function Navbar({
                 </div>
                 {unreadCount > 0 && (
                   <button
+                    type="button"
                     onClick={onMarkAllNotificationsRead}
                     className="text-xs text-emerald-700 hover:text-emerald-800 font-semibold cursor-pointer"
                   >
@@ -222,9 +238,10 @@ export function Navbar({
               <div className="max-h-80 overflow-y-auto divide-y divide-neutral-100">
                 {notifications.length > 0 ? (
                   notifications.map(n => (
-                    <div
+                    <button
+                      type="button"
                       key={n.id}
-                      className={`p-3.5 hover:bg-neutral-50 transition-colors cursor-pointer flex gap-3 ${
+                      className={`w-full text-right p-3.5 hover:bg-neutral-50 transition-colors cursor-pointer flex gap-3 ${
                         !n.read ? 'bg-emerald-50/30' : ''
                       }`}
                       onClick={() => {
@@ -267,7 +284,7 @@ export function Navbar({
                           })}
                         </p>
                       </div>
-                    </div>
+                    </button>
                   ))
                 ) : (
                   <div className="p-6 text-center text-xs text-neutral-400">
@@ -278,6 +295,7 @@ export function Navbar({
 
               <div className="p-2.5 border-t border-neutral-100 text-center bg-neutral-50/50">
                 <button
+                  type="button"
                   onClick={() => {
                     onOpenNotificationsTab();
                     setShowNotifMenu(false);
@@ -294,6 +312,8 @@ export function Navbar({
         {/* User Profile Menu */}
         <div ref={userMenuRef} className="relative">
           <button
+            type="button"
+            aria-expanded={showUserMenu}
             onClick={() => setShowUserMenu(!showUserMenu)}
             className="flex items-center gap-2.5 p-1 sm:px-2 sm:py-1 rounded-xl hover:bg-neutral-100 transition-colors cursor-pointer"
           >
@@ -332,6 +352,7 @@ export function Navbar({
                 </div>
               </div>
               <button
+                type="button"
                 onClick={() => {
                   logout();
                   setShowUserMenu(false);

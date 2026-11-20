@@ -13,6 +13,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useCompany } from '../../context/CompanyContext';
 import { useToast } from '../../context/ToastContext';
 import { DataService } from '../../services/dataService';
+import { escapeCsvCell, formatLocalDate } from '../../utils/sanitize';
 
 interface ReportsViewProps {
   tasks: Task[];
@@ -27,7 +28,7 @@ export function ReportsView({ tasks, employees, departments }: ReportsViewProps)
   const [timeframe, setTimeframe] = useState<'all' | 'month' | 'quarter'>('all');
   const [isSavingReport, setIsSavingReport] = useState(false);
 
-  const nowStr = new Date().toISOString().split('T')[0];
+  const nowStr = formatLocalDate();
 
   // Filter tasks by timeframe if selected
   const filteredTasks = tasks.filter(t => {
@@ -92,21 +93,31 @@ export function ReportsView({ tasks, employees, departments }: ReportsViewProps)
     };
   });
 
-  // Export CSV functionality
+  // Export CSV functionality (RFC 4180 + formula-injection hardened)
   const exportToCSV = () => {
-    const headers = ['رمز المهمة', 'عنوان المهمة', 'القسم', 'المسؤول', 'الأولوية', 'الحالة', 'تاريخ التسليم', 'نسبة الإنجاز'];
+    const headers = [
+      'رمز المهمة',
+      'عنوان المهمة',
+      'القسم',
+      'المسؤول',
+      'الأولوية',
+      'الحالة',
+      'تاريخ التسليم',
+      'نسبة الإنجاز',
+    ];
     const rows = filteredTasks.map(t => [
-      t.taskId,
-      `"${t.title.replace(/"/g, '""')}"`,
-      t.department,
-      `"${t.assignedToName}"`,
-      t.priority,
-      t.status,
-      t.deadline,
-      `${t.completionPercentage}%`,
+      escapeCsvCell(t.taskId),
+      escapeCsvCell(t.title),
+      escapeCsvCell(t.department),
+      escapeCsvCell(t.assignedToName),
+      escapeCsvCell(t.priority),
+      escapeCsvCell(t.status),
+      escapeCsvCell(t.deadline),
+      escapeCsvCell(`${t.completionPercentage}%`),
     ]);
 
-    const csvContent = '\uFEFF' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
+    const csvContent =
+      '\uFEFF' + [headers.map(escapeCsvCell).join(','), ...rows.map(e => e.join(','))].join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -115,6 +126,8 @@ export function ReportsView({ tasks, employees, departments }: ReportsViewProps)
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    showToast('تم تصدير تقرير CSV بنجاح', 'success');
   };
 
   const handleSaveSnapshotReport = async () => {
@@ -268,52 +281,58 @@ export function ReportsView({ tasks, employees, departments }: ReportsViewProps)
           </div>
 
           <div className="space-y-3">
-            {employeeRankings.slice(0, 6).map((emp, index) => (
-              <div
-                key={emp.id}
-                className="flex items-center justify-between p-3 rounded-xl bg-neutral-50/70 border border-neutral-100 text-xs"
-              >
-                <div className="flex items-center gap-3">
-                  <span
-                    className={`w-6 h-6 rounded-full flex items-center justify-center font-bold font-mono text-xs ${
-                      index === 0
-                        ? 'bg-amber-100 text-amber-800'
-                        : index === 1
-                        ? 'bg-neutral-200 text-neutral-800'
-                        : index === 2
-                        ? 'bg-amber-50 text-amber-700'
-                        : 'bg-neutral-100 text-neutral-500'
-                    }`}
-                  >
-                    {index + 1}
-                  </span>
-                  {emp.photoURL ? (
-                    <img
-                      src={emp.photoURL}
-                      alt={emp.displayName}
-                      className="w-8 h-8 rounded-full object-cover border"
-                    />
-                  ) : (
-                    <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-800 text-[10px] flex items-center justify-center font-bold border border-emerald-200">
-                      {emp.displayName.slice(0, 2).toUpperCase()}
+            {employeeRankings.length === 0 ? (
+              <div className="py-8 text-center text-xs text-neutral-400">
+                لا توجد بيانات موظفين لعرض الترتيب في النطاق المحدد.
+              </div>
+            ) : (
+              employeeRankings.slice(0, 6).map((emp, index) => (
+                <div
+                  key={emp.id}
+                  className="flex items-center justify-between p-3 rounded-xl bg-neutral-50/70 border border-neutral-100 text-xs"
+                >
+                  <div className="flex items-center gap-3">
+                    <span
+                      className={`w-6 h-6 rounded-full flex items-center justify-center font-bold font-mono text-xs ${
+                        index === 0
+                          ? 'bg-amber-100 text-amber-800'
+                          : index === 1
+                          ? 'bg-neutral-200 text-neutral-800'
+                          : index === 2
+                          ? 'bg-amber-50 text-amber-700'
+                          : 'bg-neutral-100 text-neutral-500'
+                      }`}
+                    >
+                      {index + 1}
+                    </span>
+                    {emp.photoURL ? (
+                      <img
+                        src={emp.photoURL}
+                        alt={emp.displayName}
+                        className="w-8 h-8 rounded-full object-cover border"
+                      />
+                    ) : (
+                      <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-800 text-[10px] flex items-center justify-center font-bold border border-emerald-200">
+                        {emp.displayName.slice(0, 2).toUpperCase()}
+                      </div>
+                    )}
+                    <div>
+                      <p className="font-bold text-neutral-900">{emp.displayName}</p>
+                      <p className="text-[11px] text-neutral-500">{emp.department}</p>
                     </div>
-                  )}
-                  <div>
-                    <p className="font-bold text-neutral-900">{emp.displayName}</p>
-                    <p className="text-[11px] text-neutral-500">{emp.department}</p>
+                  </div>
+
+                  <div className="text-left">
+                    <p className="font-bold text-neutral-900 font-mono">
+                      {emp.completedCount} <span className="font-normal text-neutral-500 text-xs">منجزة</span>
+                    </p>
+                    <p className="text-[10px] text-emerald-700 font-semibold font-mono">
+                      {emp.rate}% نسبة النجاح
+                    </p>
                   </div>
                 </div>
-
-                <div className="text-left">
-                  <p className="font-bold text-neutral-900 font-mono">
-                    {emp.completedCount} <span className="font-normal text-neutral-500 text-xs">منجزة</span>
-                  </p>
-                  <p className="text-[10px] text-emerald-700 font-semibold font-mono">
-                    {emp.rate}% نسبة النجاح
-                  </p>
-                </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </Card>
 
@@ -330,28 +349,34 @@ export function ReportsView({ tasks, employees, departments }: ReportsViewProps)
           </div>
 
           <div className="space-y-3.5">
-            {departmentBreakdown.map(dept => (
-              <div key={dept.id} className="space-y-1.5 text-xs">
-                <div className="flex justify-between font-semibold">
-                  <div className="flex items-center gap-2">
-                    <span
-                      className="w-2.5 h-2.5 rounded-full"
-                      style={{ backgroundColor: dept.color || '#059669' }}
-                    />
-                    <span className="text-neutral-800">{dept.name}</span>
-                  </div>
-                  <span className="font-mono text-neutral-600">
-                    {dept.completed}/{dept.total} مكتملة ({dept.rate}%)
-                  </span>
-                </div>
-                <div className="h-2 w-full bg-neutral-100 rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-emerald-600 rounded-full transition-all duration-500"
-                    style={{ width: `${dept.rate}%` }}
-                  />
-                </div>
+            {departmentBreakdown.length === 0 ? (
+              <div className="py-8 text-center text-xs text-neutral-400">
+                لا توجد أقسام مسجلة في النطاق المحدد بعد.
               </div>
-            ))}
+            ) : (
+              departmentBreakdown.map(dept => (
+                <div key={dept.id} className="space-y-1.5 text-xs">
+                  <div className="flex justify-between font-semibold">
+                    <div className="flex items-center gap-2">
+                      <span
+                        className="w-2.5 h-2.5 rounded-full"
+                        style={{ backgroundColor: dept.color || '#059669' }}
+                      />
+                      <span className="text-neutral-800">{dept.name}</span>
+                    </div>
+                    <span className="font-mono text-neutral-600">
+                      {dept.completed}/{dept.total} مكتملة ({dept.rate}%)
+                    </span>
+                  </div>
+                  <div className="h-2 w-full bg-neutral-100 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-emerald-600 rounded-full transition-all duration-500"
+                      style={{ width: `${dept.rate}%` }}
+                    />
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </Card>
       </div>

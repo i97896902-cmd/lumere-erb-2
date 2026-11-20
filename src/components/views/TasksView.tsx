@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   Search,
   Filter,
@@ -19,6 +19,7 @@ import { Task, User, Department, TaskPriority } from '../../types';
 import { useAuth } from '../../context/AuthContext';
 import { useCompany } from '../../context/CompanyContext';
 import { canCreateTask, scopeTasksForUser } from '../../utils/rbac';
+import { formatLocalDate } from '../../utils/sanitize';
 
 interface TasksViewProps {
   tasks: Task[];
@@ -49,7 +50,11 @@ export function TasksView({
   const [assigneeFilter, setAssigneeFilter] = useState<string>('All');
   const [sortBy, setSortBy] = useState<'deadline' | 'createdAt' | 'priority' | 'title'>('deadline');
 
-  const nowStr = new Date().toISOString().split('T')[0];
+  useEffect(() => {
+    setSearch(initialSearchQuery);
+  }, [initialSearchQuery]);
+
+  const nowStr = formatLocalDate(new Date());
 
   // Restrict tasks strictly by canonical role (Employee: own tasks, Manager: department/team tasks)
   const baseTasks = useMemo(
@@ -205,7 +210,7 @@ export function TasksView({
 
       {/* Filter Controls Bar */}
       <Card className="p-3.5 space-y-3">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2.5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-2.5">
           {/* Search */}
           <div className="relative lg:col-span-2">
             <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
@@ -234,6 +239,22 @@ export function TasksView({
             </select>
           )}
 
+          {/* Assignee Filter (Supervisors only) */}
+          {role !== 'EMPLOYEE' && (
+            <select
+              value={assigneeFilter}
+              onChange={e => setAssigneeFilter(e.target.value)}
+              className="px-3 py-1.5 text-xs bg-neutral-50 rounded-xl border border-neutral-200 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+            >
+              <option value="All">كافة المكلفين</option>
+              {employees.map(emp => (
+                <option key={emp.id} value={emp.id}>
+                  {emp.displayName}
+                </option>
+              ))}
+            </select>
+          )}
+
           {/* Priority Filter */}
           <select
             value={priorityFilter}
@@ -250,7 +271,7 @@ export function TasksView({
           {/* Sort By */}
           <select
             value={sortBy}
-            onChange={e => setSortBy(e.target.value as any)}
+            onChange={e => setSortBy(e.target.value as 'deadline' | 'createdAt' | 'priority' | 'title')}
             className="px-3 py-1.5 text-xs bg-neutral-50 rounded-xl border border-neutral-200 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
           >
             <option value="deadline">الترتيب: الموعد النهائي</option>
@@ -296,11 +317,32 @@ export function TasksView({
           title="لا توجد مهام مطابقة للبحث"
           description="جرّب تغيير عبارة البحث أو اختيار حالة تصفية أخرى لإظهار المهام المطلوبة."
           action={
-            allowCreateTask && (
-              <Button size="sm" variant="primary" onClick={onOpenCreateTask}>
-                إنشاء مهمة جديدة
-              </Button>
-            )
+            <div className="flex items-center justify-center gap-2">
+              {(search ||
+                statusFilter !== 'All' ||
+                priorityFilter !== 'All' ||
+                departmentFilter !== 'All' ||
+                assigneeFilter !== 'All') && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    setSearch('');
+                    setStatusFilter('All');
+                    setPriorityFilter('All');
+                    setDepartmentFilter('All');
+                    setAssigneeFilter('All');
+                  }}
+                >
+                  إعادة ضبط الفلاتر
+                </Button>
+              )}
+              {allowCreateTask && (
+                <Button size="sm" variant="primary" onClick={onOpenCreateTask}>
+                  إنشاء مهمة جديدة
+                </Button>
+              )}
+            </div>
           }
         />
       ) : viewMode === 'table' ? (

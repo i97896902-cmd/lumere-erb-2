@@ -22,10 +22,12 @@ import { DataService } from '../../services/dataService';
 import {
   canCreateTask,
   canManageDepartments as checkCanManageDepartments,
+  getUserCompanyId,
   scopeDepartmentsForUser,
   scopeEmployeesForUser,
   scopeTasksForUser,
 } from '../../utils/rbac';
+import { formatLocalDate } from '../../utils/sanitize';
 
 interface DepartmentsViewProps {
   departments: Department[];
@@ -68,12 +70,15 @@ export function DepartmentsView({
   const [color, setColor] = useState('#059669');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const scopedModalEmployees = employees.filter(emp => getUserCompanyId(emp) === companyId);
+
   const openAddModal = () => {
     setEditingDept(null);
     setCompanyId(defaultWriteCompanyId);
     setName('');
     setDescription('');
-    setHeadName(employees[0]?.displayName || currentUser?.displayName || '');
+    const initialScoped = employees.filter(emp => getUserCompanyId(emp) === defaultWriteCompanyId);
+    setHeadName(initialScoped[0]?.displayName || '');
     setColor('#059669');
     setIsModalOpen(true);
   };
@@ -129,7 +134,7 @@ export function DepartmentsView({
     }
   };
 
-  const nowStr = new Date().toISOString().split('T')[0];
+  const nowStr = formatLocalDate();
 
   return (
     <div className="space-y-5" dir="rtl">
@@ -210,6 +215,7 @@ export function DepartmentsView({
 
                   {canManageDepts && (
                     <button
+                      type="button"
                       onClick={() => openEditModal(dept)}
                       className="p-1 text-neutral-400 hover:text-neutral-700 rounded-lg hover:bg-neutral-100 transition-colors cursor-pointer"
                       title="تعديل بيانات القسم"
@@ -361,6 +367,7 @@ export function DepartmentsView({
               </div>
               {onNavigateToTab && (
                 <button
+                  type="button"
                   onClick={() => onNavigateToTab('employees')}
                   className="text-xs font-semibold text-emerald-700 hover:text-emerald-800 cursor-pointer"
                 >
@@ -427,7 +434,12 @@ export function DepartmentsView({
             <Select
               label="الشركة التابعة *"
               value={companyId}
-              onChange={e => setCompanyId(e.target.value)}
+              onChange={e => {
+                const nextCompany = e.target.value;
+                setCompanyId(nextCompany);
+                const nextEmps = employees.filter(emp => getUserCompanyId(emp) === nextCompany);
+                setHeadName(nextEmps[0]?.displayName || '');
+              }}
               options={subsidiaries.map(c => ({ label: c.name, value: c.id }))}
             />
           )}
@@ -452,10 +464,16 @@ export function DepartmentsView({
             label="رئيس / قائد القسم"
             value={headName}
             onChange={e => setHeadName(e.target.value)}
-            options={employees.map(emp => ({
-              label: `${emp.displayName} (${emp.position || emp.role})`,
-              value: emp.displayName,
-            }))}
+            options={[
+              { label: '-- بدون تحديد --', value: '' },
+              ...(headName && !scopedModalEmployees.some(emp => emp.displayName === headName)
+                ? [{ label: headName, value: headName }]
+                : []),
+              ...scopedModalEmployees.map(emp => ({
+                label: `${emp.displayName} (${emp.position || emp.role})`,
+                value: emp.displayName,
+              })),
+            ]}
           />
 
           <div className="space-y-1.5">

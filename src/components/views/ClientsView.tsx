@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Client, Project, Task } from '../../types';
 import { DataService } from '../../services/dataService';
 import { useAuth } from '../../context/AuthContext';
 import { useCompany } from '../../context/CompanyContext';
+import { useToast } from '../../context/ToastContext';
 import { canManageClients as checkCanManageClients } from '../../utils/rbac';
 import {
   Building,
@@ -42,6 +43,7 @@ export const ClientsView: React.FC<ClientsViewProps> = ({
 }) => {
   const { currentUser } = useAuth();
   const { activeCompany, isGroupView, subsidiaries, defaultWriteCompanyId, getCompanyById } = useCompany();
+  const { showToast } = useToast();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
   const [typeFilter, setTypeFilter] = useState<'all' | string>('all');
@@ -49,6 +51,18 @@ export const ClientsView: React.FC<ClientsViewProps> = ({
   const [editingClient, setEditingClient] = useState<Client | null>(null);
   const [selectedClientForDetails, setSelectedClientForDetails] = useState<Client | null>(null);
   const [isDeletingId, setIsDeletingId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!isModalOpen && !selectedClientForDetails) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (isModalOpen) setIsModalOpen(false);
+        else if (selectedClientForDetails) setSelectedClientForDetails(null);
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [isModalOpen, selectedClientForDetails]);
 
   // Form State
   const [formCompanyId, setFormCompanyId] = useState(defaultWriteCompanyId);
@@ -116,6 +130,7 @@ export const ClientsView: React.FC<ClientsViewProps> = ({
         await DataService.updateClient(
           editingClient.id,
           {
+            companyId: editingClient.companyId,
             name: formName.trim(),
             email: formEmail.trim(),
             phone: formPhone.trim(),
@@ -127,6 +142,7 @@ export const ClientsView: React.FC<ClientsViewProps> = ({
           },
           currentUser
         );
+        showToast(`تم تحديث بيانات العميل "${formName.trim()}" بنجاح`, 'success');
       } else {
         await DataService.createClient(
           {
@@ -144,11 +160,13 @@ export const ClientsView: React.FC<ClientsViewProps> = ({
           },
           currentUser
         );
+        showToast(`تمت إضافة العميل "${formName.trim()}" بنجاح`, 'success');
       }
       setIsModalOpen(false);
       if (onRefresh) onRefresh();
     } catch (err) {
       console.error('Error saving client:', err);
+      showToast('تعذر حفظ بيانات العميل. يرجى التحقق من الصلاحيات والمحاولة مجدداً.', 'error');
     } finally {
       setIsSaving(false);
     }
@@ -170,9 +188,11 @@ export const ClientsView: React.FC<ClientsViewProps> = ({
       if (selectedClientForDetails?.id === client.id) {
         setSelectedClientForDetails(null);
       }
+      showToast(`تم حذف العميل "${client.name}"`, 'info');
       if (onRefresh) onRefresh();
     } catch (err) {
       console.error('Error deleting client:', err);
+      showToast('تعذر حذف العميل. يتطلب الحذف صلاحية مدير شركة أو مدير مجموعة.', 'error');
     } finally {
       setIsDeletingId(null);
     }
@@ -442,11 +462,19 @@ export const ClientsView: React.FC<ClientsViewProps> = ({
       {/* Add/Edit Modal */}
       <AnimatePresence>
         {isModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-neutral-950/60 p-4" dir="rtl">
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-neutral-950/60 p-4"
+            dir="rtl"
+            role="dialog"
+            aria-modal="true"
+            aria-label={editingClient ? 'تعديل بيانات العميل' : 'إضافة عميل جديد'}
+            onClick={() => setIsModalOpen(false)}
+          >
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
+              onClick={e => e.stopPropagation()}
               className="bg-white rounded-2xl border border-neutral-200 shadow-xl max-w-lg w-full p-6 max-h-[90vh] overflow-y-auto"
             >
               <div className="flex items-center justify-between pb-4 border-b border-neutral-100 mb-5">
@@ -457,7 +485,9 @@ export const ClientsView: React.FC<ClientsViewProps> = ({
                   </h3>
                 </div>
                 <button
+                  type="button"
                   onClick={() => setIsModalOpen(false)}
+                  aria-label="إغلاق"
                   className="text-neutral-400 hover:text-neutral-600 p-1"
                 >
                   <X className="w-4 h-4" />
@@ -611,11 +641,19 @@ export const ClientsView: React.FC<ClientsViewProps> = ({
       {/* Client Details Slideover / Modal */}
       <AnimatePresence>
         {selectedClientForDetails && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-neutral-950/60 p-4" dir="rtl">
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-neutral-950/60 p-4"
+            dir="rtl"
+            role="dialog"
+            aria-modal="true"
+            aria-label={`ملف العميل ${selectedClientForDetails.name}`}
+            onClick={() => setSelectedClientForDetails(null)}
+          >
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
+              onClick={e => e.stopPropagation()}
               className="bg-white rounded-2xl border border-neutral-200 shadow-xl max-w-xl w-full p-6 max-h-[85vh] overflow-y-auto"
             >
               <div className="flex items-start justify-between pb-4 border-b border-neutral-100 mb-4">
@@ -629,7 +667,9 @@ export const ClientsView: React.FC<ClientsViewProps> = ({
                   )}
                 </div>
                 <button
+                  type="button"
                   onClick={() => setSelectedClientForDetails(null)}
+                  aria-label="إغلاق"
                   className="text-neutral-400 hover:text-neutral-600 p-1"
                 >
                   <X className="w-4 h-4" />

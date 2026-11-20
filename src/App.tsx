@@ -310,13 +310,23 @@ function LumereAppContent() {
   };
 
   const handleMarkNotificationRead = async (id: string) => {
-    await DataService.markNotificationAsRead(id);
+    try {
+      await DataService.markNotificationAsRead(id);
+    } catch (err) {
+      console.error('Failed to mark notification read:', err);
+      showToast('تعذر تحديث حالة التنبيه', 'error');
+    }
   };
 
   const handleMarkAllNotificationsRead = async () => {
     if (!currentUser) return;
-    await DataService.markAllNotificationsAsRead(currentUser.id);
-    showToast('تم تحديد جميع التنبيهات كمقروءة', 'info');
+    try {
+      await DataService.markAllNotificationsAsRead(currentUser.id);
+      showToast('تم تحديد جميع التنبيهات كمقروءة', 'info');
+    } catch (err) {
+      console.error('Failed to mark all notifications read:', err);
+      showToast('تعذر تحديث حالة التنبيهات', 'error');
+    }
   };
 
   const handleOpenCreateTaskWithContext = (defaultProjId?: string, defaultCliId?: string) => {
@@ -616,11 +626,7 @@ function LumereAppContent() {
           )}
 
           {currentTab === 'settings' && canAccessTab(currentUser, 'settings') && (
-            <SettingsView
-              onRefreshAllData={() => {
-                handleRefreshAllCollections();
-              }}
-            />
+            <SettingsView onRefreshAllData={handleRefreshAllCollections} />
           )}
 
           {currentTab === 'profile' && canAccessTab(currentUser, 'profile') && <ProfileView />}

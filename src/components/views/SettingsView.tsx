@@ -29,7 +29,7 @@ import {
 const PREFS_STORAGE_KEY = 'lumere_erp_company_prefs_v1';
 
 interface SettingsViewProps {
-  onRefreshAllData: () => void;
+  onRefreshAllData: () => Promise<void> | void;
 }
 
 export function SettingsView({ onRefreshAllData }: SettingsViewProps) {
@@ -37,6 +37,7 @@ export function SettingsView({ onRefreshAllData }: SettingsViewProps) {
   const { activeCompany, refreshCompanies } = useCompany();
   const { showToast } = useToast();
 
+  const canRenameCompany = isSuperAdmin && activeCompany.id !== 'lumere-group';
   const [companyName, setCompanyName] = useState(activeCompany.name);
   const [defaultDeadlineDays, setDefaultDeadlineDays] = useState('7');
   const [requireReview, setRequireReview] = useState(true);
@@ -89,7 +90,7 @@ export function SettingsView({ onRefreshAllData }: SettingsViewProps) {
           requireReview,
         })
       );
-      if (isSuperAdmin && currentUser && companyName.trim() && companyName.trim() !== activeCompany.name) {
+      if (canRenameCompany && currentUser && companyName.trim() && companyName.trim() !== activeCompany.name) {
         await DataService.updateCompany(activeCompany.id, { name: companyName.trim() }, currentUser);
         await refreshCompanies();
       }
@@ -137,7 +138,7 @@ export function SettingsView({ onRefreshAllData }: SettingsViewProps) {
   const handleRefreshDatabase = async () => {
     setIsResetting(true);
     try {
-      onRefreshAllData();
+      await onRefreshAllData();
       showToast('تمت مزامنة وتحديث كافة البيانات بنجاح من Firestore!', 'success');
     } catch {
       showToast('فشل تحديث البيانات', 'error');
@@ -187,11 +188,20 @@ export function SettingsView({ onRefreshAllData }: SettingsViewProps) {
               label="اسم المنشأة"
               value={companyName}
               onChange={e => setCompanyName(e.target.value)}
+              disabled={!canRenameCompany}
+              helperText={
+                !isSuperAdmin
+                  ? 'تعديل اسم المنشأة متاح للمدير العام فقط'
+                  : activeCompany.id === 'lumere-group'
+                  ? 'اختر شركة تابعة محددة لتعديل اسمها'
+                  : undefined
+              }
             />
 
             <Input
               label="المهلة الافتراضية للمهمة (بالأيام)"
               type="number"
+              min={1}
               value={defaultDeadlineDays}
               onChange={e => setDefaultDeadlineDays(e.target.value)}
             />
