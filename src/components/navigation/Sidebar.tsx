@@ -24,6 +24,7 @@ import { useCompany } from '../../context/CompanyContext';
 import { CompanySwitcher } from './CompanySwitcher';
 import { getCompanyInitials, PARENT_COMPANY_ID } from '../../config/companies';
 import { getRoleArabicLabel } from '../../utils/rbac';
+import { buildRouteUrl, isModifiedClick } from '../../utils/navigation';
 import type { TabType } from '../../types';
 
 export type { TabType };
@@ -39,6 +40,7 @@ interface NavItem {
 interface SidebarProps {
   currentTab: TabType;
   onSelectTab: (tab: TabType) => void;
+  onCompanySwitched?: (companyId: string) => void;
   isOpenMobile: boolean;
   onCloseMobile: () => void;
   unreadNotificationsCount: number;
@@ -48,13 +50,14 @@ interface SidebarProps {
 export function Sidebar({
   currentTab,
   onSelectTab,
+  onCompanySwitched,
   isOpenMobile,
   onCloseMobile,
   unreadNotificationsCount,
   pendingRequestsCount = 0,
 }: SidebarProps) {
   const { role, currentUser, isSuperAdmin, isCompanyAdmin, isManager } = useAuth();
-  const { activeCompany, isGroupView } = useCompany();
+  const { activeCompany, activeCompanyId, isGroupView } = useCompany();
 
   const groupNavItems: NavItem[] = isSuperAdmin
     ? [
@@ -136,10 +139,21 @@ export function Sidebar({
 
   const navItems = getWorkspaceNavItems();
 
-  const handleNavClick = (tab: TabType) => {
+  const handleNavClick = (e: React.MouseEvent<HTMLAnchorElement>, tab: TabType) => {
+    if (isModifiedClick(e)) {
+      return;
+    }
+    e.preventDefault();
     onSelectTab(tab);
     onCloseMobile();
   };
+
+  const getItemHref = (tab: TabType) =>
+    buildRouteUrl({
+      tab,
+      companyId: activeCompanyId,
+      includeCompanyParam: isSuperAdmin,
+    });
 
   const brandColor = activeCompany?.theme?.primary || '#059669';
 
@@ -202,7 +216,9 @@ export function Sidebar({
         <div className="px-3 py-2.5 border-b border-neutral-100 bg-neutral-50/50">
           <CompanySwitcher
             onCompanyChanged={cid => {
-              if (cid === PARENT_COMPANY_ID) {
+              if (onCompanySwitched) {
+                onCompanySwitched(cid);
+              } else if (cid === PARENT_COMPANY_ID) {
                 onSelectTab('group_dashboard');
               } else if (currentTab === 'group_dashboard' || currentTab === 'companies') {
                 onSelectTab('dashboard');
@@ -238,10 +254,12 @@ export function Sidebar({
                 const Icon = item.icon;
                 const isActive = currentTab === item.id;
                 return (
-                  <button
+                  <a
                     key={item.id}
                     id={`nav-${item.id}`}
-                    onClick={() => handleNavClick(item.id)}
+                    href={getItemHref(item.id)}
+                    aria-current={isActive ? 'page' : undefined}
+                    onClick={e => handleNavClick(e, item.id)}
                     className={`w-full flex items-center justify-between px-3.5 py-2 rounded-xl text-xs font-medium transition-all duration-150 cursor-pointer ${
                       isActive
                         ? 'bg-emerald-50 text-emerald-950 font-bold'
@@ -256,7 +274,7 @@ export function Sidebar({
                       />
                       <span className="truncate">{item.label}</span>
                     </div>
-                  </button>
+                  </a>
                 );
               })}
             </div>
@@ -272,10 +290,12 @@ export function Sidebar({
               const Icon = item.icon;
               const isActive = currentTab === item.id;
               return (
-                <button
+                <a
                   key={item.id}
                   id={`nav-${item.id}`}
-                  onClick={() => handleNavClick(item.id)}
+                  href={getItemHref(item.id)}
+                  aria-current={isActive ? 'page' : undefined}
+                  onClick={e => handleNavClick(e, item.id)}
                   className={`w-full flex items-center justify-between px-3.5 py-2 rounded-xl text-xs font-medium transition-all duration-150 cursor-pointer ${
                     isActive
                       ? 'bg-emerald-50 text-emerald-950 font-bold'
@@ -299,7 +319,7 @@ export function Sidebar({
                       {item.badge}
                     </span>
                   )}
-                </button>
+                </a>
               );
             })}
           </div>

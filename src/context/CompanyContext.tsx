@@ -67,6 +67,13 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
 
   const [selectedCompanyId, setSelectedCompanyId] = useState<string>(() => {
     try {
+      if (typeof window !== 'undefined') {
+        const urlCompany = new URLSearchParams(window.location.search).get('company')?.trim();
+        if (urlCompany) {
+          sessionStorage.setItem(STORAGE_ACTIVE_COMPANY_KEY, urlCompany);
+          return urlCompany;
+        }
+      }
       const saved = sessionStorage.getItem(STORAGE_ACTIVE_COMPANY_KEY);
       if (saved) return saved;
     } catch {

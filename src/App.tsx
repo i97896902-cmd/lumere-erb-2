@@ -43,6 +43,7 @@ import {
   canAccessTab,
   canManageCompanies,
   canManageCompanyUsers,
+  canSwitchCompanies,
   canViewActivityLogs,
   canViewReports,
   getDefaultTabForRole,
@@ -53,6 +54,14 @@ import {
   scopeEmployeesForUser,
   scopeTasksForUser,
 } from './utils/rbac';
+import { PARENT_COMPANY_ID } from './config/companies';
+import {
+  buildRouteUrl,
+  getDocumentTitleForTab,
+  parseRouteFromUrl,
+  resolveInitialTab,
+  syncBrowserHistory,
+} from './utils/navigation';
 import { AlertCircle } from 'lucide-react';
 
 type BeforeInstallPromptEvent = Event & {
@@ -73,34 +82,202 @@ function LumereAppContent() {
   } = useCompany();
   const { showToast } = useToast();
 
-  const [currentTab, setCurrentTab] = useState<TabType>('dashboard');
+  const [currentTab, setCurrentTab] = useState<TabType>(() => {
+    if (typeof window === 'undefined') return 'dashboard';
+    return parseRouteFromUrl(window.location.pathname, window.location.search).tab || 'dashboard';
+  });
   const initializedRoleKeyRef = useRef<string | null>(null);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [globalSearchQuery, setGlobalSearchQuery] = useState('');
   const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [isInstalled, setIsInstalled] = useState(false);
 
-  // Land each role on its exact hierarchy hub on login / role resolution:
-  // SUPER_ADMIN -> Group Dashboard | COMPANY_ADMIN -> Company Dashboard | MANAGER -> Department Management | EMPLOYEE -> Employee Dashboard
+  const userCanSwitchCompanies = canSwitchCompanies(currentUser);
+
+  // Modals (defined early so history/popstate handlers can sync ?task= cleanly)
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [createTaskDefaultProjectId, setCreateTaskDefaultProjectId] = useState<string | undefined>();
+  const [createTaskDefaultClientId, setCreateTaskDefaultClientId] = useState<string | undefined>();
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(() => {
+    if (typeof window === 'undefined') return null;
+    return parseRouteFromUrl(window.location.pathname, window.location.search).taskId;
+  });
+  const pushedTaskHistoryRef = useRef<string | null>(null);
+
+  // Centralized navigation helper that updates React state and Browser History atomically
+  const navigateToRoute = (
+    targetTab: TabType,
+    options?: {
+      mode?: 'push' | 'replace';
+      companyId?: string;
+      taskId?: string | null;
+      clearSearch?: boolean;
+    }
+  ) => {
+    const mode = options?.mode ?? 'push';
+    const nextCompanyId = options?.companyId ?? activeCompanyId;
+    const nextIsGroupView = userCanSwitchCompanies && nextCompanyId === PARENT_COMPANY_ID;
+    const allowedTab =
+      currentUser && !canAccessTab(currentUser, targetTab)
+        ? getDefaultTabForRole(role, nextIsGroupView)
+        : targetTab;
+    const effectiveMode = allowedTab !== targetTab ? 'replace' : mode;
+    const nextTaskId = options?.taskId !== undefined ? options.taskId : null;
+
+    setCurrentTab(allowedTab);
+    setSelectedTaskId(nextTaskId);
+    if (options?.clearSearch) {
+      setGlobalSearchQuery('');
+    }
+
+    const targetUrl = buildRouteUrl({
+      tab: allowedTab,
+      companyId: nextCompanyId,
+      taskId: nextTaskId,
+      includeCompanyParam: userCanSwitchCompanies,
+    });
+
+    syncBrowserHistory(targetUrl, effectiveMode, {
+      lumereNav: true,
+      tab: allowedTab,
+      companyId: nextCompanyId,
+      taskId: nextTaskId,
+    });
+  };
+
+  // Resolve initial route on login / page refresh while preserving valid deep links
+  // Uses replaceState (never pushState) so pressing Back from the entry page returns cleanly to Google Search
   useEffect(() => {
     if (!currentUser) {
       initializedRoleKeyRef.current = null;
-      setCurrentTab('dashboard');
       return;
     }
     const roleKey = `${currentUser.id}:${role}`;
     if (initializedRoleKeyRef.current !== roleKey) {
       initializedRoleKeyRef.current = roleKey;
-      setCurrentTab(getDefaultTabForRole(role, isGroupView));
-    }
-  }, [currentUser, role, isGroupView]);
+      const parsed = parseRouteFromUrl(window.location.pathname, window.location.search);
 
-  // Enforce strict route-level RBAC for every role
+      let effectiveCompanyId = activeCompanyId;
+      if (userCanSwitchCompanies && parsed.companyId) {
+        const matched = companies.some(c => c.id === parsed.companyId);
+        if (matched && parsed.companyId !== activeCompanyId) {
+          switchCompany(parsed.companyId);
+          effectiveCompanyId = parsed.companyId;
+        }
+      }
+
+      const effectiveIsGroupView =
+        userCanSwitchCompanies && effectiveCompanyId === PARENT_COMPANY_ID;
+      const defaultTab = getDefaultTabForRole(role, effectiveIsGroupView);
+      const { tab: initialTab } = resolveInitialTab({
+        parsedRoute: parsed,
+        defaultTab,
+        canAccess: tab => canAccessTab(currentUser, tab),
+      });
+
+      setCurrentTab(initialTab);
+      setSelectedTaskId(parsed.taskId);
+
+      const canonicalUrl = buildRouteUrl({
+        tab: initialTab,
+        companyId: effectiveCompanyId,
+        taskId: parsed.taskId,
+        includeCompanyParam: userCanSwitchCompanies,
+      });
+
+      syncBrowserHistory(canonicalUrl, 'replace', {
+        lumereNav: true,
+        tab: initialTab,
+        companyId: effectiveCompanyId,
+        taskId: parsed.taskId,
+      });
+    }
+  }, [currentUser, role, activeCompanyId, userCanSwitchCompanies, companies, switchCompany]);
+
+  // Enforce strict route-level RBAC for every role without trapping Back navigation
   useEffect(() => {
     if (currentUser && !canAccessTab(currentUser, currentTab)) {
-      setCurrentTab(getDefaultTabForRole(role, isGroupView));
+      const fallbackTab = getDefaultTabForRole(role, isGroupView);
+      setCurrentTab(fallbackTab);
+      const fallbackUrl = buildRouteUrl({
+        tab: fallbackTab,
+        companyId: activeCompanyId,
+        includeCompanyParam: userCanSwitchCompanies,
+      });
+      syncBrowserHistory(fallbackUrl, 'replace', {
+        lumereNav: true,
+        tab: fallbackTab,
+        companyId: activeCompanyId,
+        taskId: null,
+      });
     }
-  }, [currentUser, currentTab, role, isGroupView]);
+  }, [currentUser, currentTab, role, isGroupView, activeCompanyId, userCanSwitchCompanies]);
+
+  // Listen to native Browser Back & Forward (popstate) events
+  useEffect(() => {
+    const handlePopState = () => {
+      setIsMobileSidebarOpen(false);
+      pushedTaskHistoryRef.current = null;
+      const parsed = parseRouteFromUrl(window.location.pathname, window.location.search);
+
+      if (!currentUser) {
+        if (parsed.tab) setCurrentTab(parsed.tab);
+        setSelectedTaskId(parsed.taskId);
+        return;
+      }
+
+      let effectiveCompanyId = activeCompanyId;
+      if (userCanSwitchCompanies) {
+        const targetCompany =
+          parsed.companyId && companies.some(c => c.id === parsed.companyId)
+            ? parsed.companyId
+            : PARENT_COMPANY_ID;
+        if (targetCompany !== activeCompanyId) {
+          switchCompany(targetCompany);
+        }
+        effectiveCompanyId = targetCompany;
+      }
+
+      const effectiveIsGroupView =
+        userCanSwitchCompanies && effectiveCompanyId === PARENT_COMPANY_ID;
+      const defaultTab = getDefaultTabForRole(role, effectiveIsGroupView);
+      const { tab: resolvedTab, shouldReplaceUrl } = resolveInitialTab({
+        parsedRoute: parsed,
+        defaultTab,
+        canAccess: tab => canAccessTab(currentUser, tab),
+      });
+
+      setCurrentTab(resolvedTab);
+      setSelectedTaskId(parsed.taskId);
+
+      if (shouldReplaceUrl) {
+        const canonicalUrl = buildRouteUrl({
+          tab: resolvedTab,
+          companyId: effectiveCompanyId,
+          taskId: parsed.taskId,
+          includeCompanyParam: userCanSwitchCompanies,
+        });
+        syncBrowserHistory(canonicalUrl, 'replace', {
+          lumereNav: true,
+          tab: resolvedTab,
+          companyId: effectiveCompanyId,
+          taskId: parsed.taskId,
+        });
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [currentUser, role, activeCompanyId, userCanSwitchCompanies, companies, switchCompany]);
+
+  // Keep document.title synchronized so Chrome Back/Forward history dropdown shows exact page names
+  useEffect(() => {
+    if (!currentUser) {
+      document.title = 'Luméré — نظام إدارة الشركة';
+      return;
+    }
+    document.title = getDocumentTitleForTab(currentTab, activeCompany.name);
+  }, [currentUser, currentTab, activeCompany.name]);
 
   useEffect(() => {
     const standalone =
@@ -148,12 +325,6 @@ function LumereAppContent() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
 
-  // Modals
-  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const [createTaskDefaultProjectId, setCreateTaskDefaultProjectId] = useState<string | undefined>();
-  const [createTaskDefaultClientId, setCreateTaskDefaultClientId] = useState<string | undefined>();
-  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
-
   const subscriptionScope = getFirestoreSubscriptionScope({
     loading,
     isAuthenticated: AUTH_DISABLED ? Boolean(currentUser) : Boolean(firebaseUser && currentUser),
@@ -162,8 +333,12 @@ function LumereAppContent() {
   });
 
   // Real-time subscriptions gated on auth + active company scope (resets state on company switch)
+  const prevQueryCompanyRef = useRef<string | null | undefined>(undefined);
   useEffect(() => {
-    setSelectedTaskId(null);
+    if (prevQueryCompanyRef.current !== undefined && prevQueryCompanyRef.current !== queryCompanyId) {
+      setSelectedTaskId(null);
+    }
+    prevQueryCompanyRef.current = queryCompanyId;
 
     if (subscriptionScope === 'none') {
       setEmployees([]);
@@ -268,9 +443,55 @@ function LumereAppContent() {
     return () => unsubNotifs();
   }, [subscriptionScope, currentUser, queryCompanyId]);
 
-  // Handler to open task modal
+  // Handler to open task modal (pushes ?task= so browser Back closes the modal naturally)
   const handleSelectTask = (taskId: string) => {
     setSelectedTaskId(taskId);
+    const taskUrl = buildRouteUrl({
+      tab: currentTab,
+      companyId: activeCompanyId,
+      taskId,
+      includeCompanyParam: userCanSwitchCompanies,
+    });
+    const pushed = syncBrowserHistory(taskUrl, 'push', {
+      lumereNav: true,
+      tab: currentTab,
+      companyId: activeCompanyId,
+      taskId,
+    });
+    if (pushed) {
+      pushedTaskHistoryRef.current = taskId;
+    }
+  };
+
+  const handleCloseTaskModal = () => {
+    const closingId = selectedTaskId;
+    setSelectedTaskId(null);
+
+    if (
+      closingId &&
+      pushedTaskHistoryRef.current === closingId &&
+      typeof window !== 'undefined' &&
+      window.history.state?.lumereNav &&
+      window.history.state?.taskId === closingId
+    ) {
+      pushedTaskHistoryRef.current = null;
+      window.history.back();
+      return;
+    }
+
+    pushedTaskHistoryRef.current = null;
+    const cleanUrl = buildRouteUrl({
+      tab: currentTab,
+      companyId: activeCompanyId,
+      taskId: null,
+      includeCompanyParam: userCanSwitchCompanies,
+    });
+    syncBrowserHistory(cleanUrl, 'replace', {
+      lumereNav: true,
+      tab: currentTab,
+      companyId: activeCompanyId,
+      taskId: null,
+    });
   };
 
   // Start automated background deadline push notification service
@@ -292,8 +513,19 @@ function LumereAppContent() {
 
   const handleEnterCompanyWorkspace = (companyId: string) => {
     switchCompany(companyId);
-    setCurrentTab('dashboard');
-    setGlobalSearchQuery('');
+    const nextTab: TabType =
+      companyId === PARENT_COMPANY_ID ? 'group_dashboard' : 'dashboard';
+    navigateToRoute(nextTab, { mode: 'push', companyId, taskId: null, clearSearch: true });
+  };
+
+  const handleCompanySwitchedFromSidebar = (companyId: string) => {
+    const nextTab: TabType =
+      companyId === PARENT_COMPANY_ID
+        ? 'group_dashboard'
+        : currentTab === 'group_dashboard' || currentTab === 'companies'
+        ? 'dashboard'
+        : currentTab;
+    navigateToRoute(nextTab, { mode: 'push', companyId, taskId: null, clearSearch: true });
   };
 
   const handleTaskUpdated = (updatedTask: Task) => {
@@ -302,7 +534,7 @@ function LumereAppContent() {
 
   const handleTaskDeleted = (taskId: string) => {
     setTasks(prev => prev.filter(t => t.id !== taskId));
-    setSelectedTaskId(null);
+    handleCloseTaskModal();
   };
 
   const handleTaskCreated = (newTask: Task) => {
@@ -374,12 +606,7 @@ function LumereAppContent() {
   );
 
   const handleSelectTabSafe = (tab: TabType) => {
-    if (currentUser && !canAccessTab(currentUser, tab)) {
-      setCurrentTab(getDefaultTabForRole(role, isGroupView));
-      return;
-    }
-    setCurrentTab(tab);
-    setGlobalSearchQuery('');
+    navigateToRoute(tab, { mode: 'push', taskId: null, clearSearch: true });
   };
 
   const selectedTask = scopedTasks.find(t => t.id === selectedTaskId) || null;
@@ -468,6 +695,7 @@ function LumereAppContent() {
       <Sidebar
         currentTab={currentTab}
         onSelectTab={handleSelectTabSafe}
+        onCompanySwitched={handleCompanySwitchedFromSidebar}
         isOpenMobile={isMobileSidebarOpen}
         onCloseMobile={() => setIsMobileSidebarOpen(false)}
         unreadNotificationsCount={notifications.filter(n => !n.read).length}
@@ -550,7 +778,7 @@ function LumereAppContent() {
               departments={departments}
               onRefresh={handleRefreshAllCollections}
               onOpenCreateTask={(projId, cliId) => handleOpenCreateTaskWithContext(projId, cliId)}
-              onSelectTask={task => setSelectedTaskId(task.id)}
+              onSelectTask={task => handleSelectTask(task.id)}
             />
           )}
 
@@ -654,7 +882,7 @@ function LumereAppContent() {
       <TaskDetailsModal
         isOpen={!!selectedTaskId}
         task={selectedTask}
-        onClose={() => setSelectedTaskId(null)}
+        onClose={handleCloseTaskModal}
         onTaskUpdated={handleTaskUpdated}
         onTaskDeleted={handleTaskDeleted}
       />
