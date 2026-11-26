@@ -1,0 +1,517 @@
+{
+  "name": "Luméré — إشعارات المهام الفورية (Gmail + Telegram + Google Sheets)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "lumere-tasks",
+        "options": {}
+      },
+      "id": "f1063448-29da-49bd-9e60-6ed74ebbfb84",
+      "name": "Luméré Task Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        304
+      ],
+      "webhookId": "lumere-tasks-webhook"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body ?? $input.first().json;\nconst task = body.task || {};\nconst employee = body.employee || {};\nconst rawTab = (employee.sheetTabName || employee.name || 'Employee_Tasks').toString();\nconst safeTab = rawTab.replace(/[:\\\\/?*[\\]]/g, ' ').replace(/\\s+/g, ' ').trim().slice(0, 80) || 'Employee_Tasks';\n\nreturn [{\n  json: {\n    event: body.event || 'task.created',\n    timestamp: body.timestamp || new Date().toISOString(),\n    appUrl: body.appUrl || '',\n    spreadsheetId: body.googleSpreadsheetId || 'YOUR_GOOGLE_SPREADSHEET_ID',\n    mappingSheetName: body.mappingSheetName || 'Employees_Telegram_Map',\n    taskCode: task.taskCode || task.id || 'LMR-000',\n    title: task.title || 'مهمة جديدة',\n    description: task.description || '',\n    department: task.department || '',\n    projectName: task.projectName || 'عام',\n    priority: task.priority || 'Medium',\n    priorityAr: task.priorityAr || task.priority || 'متوسطة',\n    status: task.status || 'Pending',\n    statusAr: task.statusAr || task.status || 'قيد الانتظار',\n    completionPercentage: Number(task.completionPercentage ?? 0),\n    startDate: task.startDate || '',\n    deadline: task.deadline || '',\n    createdDate: task.createdDate || (body.timestamp || '').slice(0, 10),\n    employeeName: employee.name || '',\n    employeeEmail: (employee.email || '').toLowerCase().trim(),\n    fallbackSheetTab: safeTab\n  }\n}];"
+      },
+      "id": "abcadaaf-f9cc-4ce2-b2d9-d8887e482b13",
+      "name": "تجهيز بيانات المهمة",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1Ry4Bsmo7gWZuCxZhQ-YOZN2_vt1-fKFmEg9NMIbWYCM",
+          "mode": "list",
+          "cachedResultName": "Lumere Tasks",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1Ry4Bsmo7gWZuCxZhQ-YOZN2_vt1-fKFmEg9NMIbWYCM/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Employees_Telegram_Map",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1Ry4Bsmo7gWZuCxZhQ-YOZN2_vt1-fKFmEg9NMIbWYCM/edit#gid=0"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "=employee_email",
+              "lookupValue": "={{ $json.employeeEmail }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "5fa763e6-66bb-4bf9-8eba-5af80ad63444",
+      "name": "قراءة جدول ربط Telegram",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        480,
+        304
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "dKMfGpJKBZ7Emv4p",
+          "name": "lumere"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const taskData = $('تجهيز بيانات المهمة').first().json;\nconst mapRow = $input.first()?.json || {};\nconst mappedTab = (mapRow.sheet_tab_name || '').toString().trim();\nconst targetSheetTab = (mappedTab || taskData.fallbackSheetTab || 'Employee_Tasks')\n  .replace(/[:\\\\/?*[\\]]/g, ' ')\n  .replace(/\\s+/g, ' ')\n  .trim()\n  .slice(0, 80);\n\nconst telegramChatId = (mapRow.telegram_chat_id || '').toString().trim();\n\nconst telegramMessage = [\n  '📌 *مهمة جديدة من نظام Luméré*',\n  '',\n  '*الكود:* ' + taskData.taskCode,\n  '*العنوان:* ' + taskData.title,\n  '*المشروع:* ' + taskData.projectName,\n  '*القسم:* ' + taskData.department,\n  '*الأولوية:* ' + taskData.priorityAr,\n  '*تاريخ البداية:* ' + taskData.startDate,\n  '*تاريخ الديدلاين:* ' + taskData.deadline,\n  taskData.description ? ('\\n*التفاصيل:*\\n' + taskData.description) : ''\n].filter(Boolean).join('\\n');\n\nconst gmailHtml = `\n<div dir=\"rtl\" style=\"font-family:Tahoma,Arial,sans-serif;background:#f8fafc;padding:24px;color:#0f172a;\">\n  <div style=\"max-width:600px;margin:0 auto;background:#ffffff;border:1px solid #e2e8f0;border-radius:12px;padding:24px;\">\n    <p style=\"font-size:12px;color:#059669;font-weight:bold;margin:0 0 8px;\">LUMÉRÉ — نظام إدارة المهام</p>\n    <h2 style=\"margin:0 0 16px;font-size:20px;\">مهمة جديدة: ${taskData.title}</h2>\n    <p style=\"margin:0 0 16px;color:#334155;\">مرحبًا <strong>${taskData.employeeName}</strong>، تم إسناد مهمة جديدة إليك بالتفاصيل التالية:</p>\n    <table style=\"width:100%;border-collapse:collapse;font-size:14px;margin-bottom:16px;\">\n      <tr><td style=\"padding:8px;border-bottom:1px solid #e2e8f0;color:#64748b;\">كود المهمة</td><td style=\"padding:8px;border-bottom:1px solid #e2e8f0;font-weight:bold;\">${taskData.taskCode}</td></tr>\n      <tr><td style=\"padding:8px;border-bottom:1px solid #e2e8f0;color:#64748b;\">القسم / المشروع</td><td style=\"padding:8px;border-bottom:1px solid #e2e8f0;\">${taskData.department} · ${taskData.projectName}</td></tr>\n      <tr><td style=\"padding:8px;border-bottom:1px solid #e2e8f0;color:#64748b;\">الأولوية</td><td style=\"padding:8px;border-bottom:1px solid #e2e8f0;font-weight:bold;\">${taskData.priorityAr}</td></tr>\n      <tr><td style=\"padding:8px;border-bottom:1px solid #e2e8f0;color:#64748b;\">تاريخ البداية</td><td style=\"padding:8px;border-bottom:1px solid #e2e8f0;\">${taskData.startDate}</td></tr>\n      <tr><td style=\"padding:8px;border-bottom:1px solid #e2e8f0;color:#64748b;\">تاريخ الديدلاين</td><td style=\"padding:8px;border-bottom:1px solid #e2e8f0;color:#dc2626;font-weight:bold;\">${taskData.deadline}</td></tr>\n    </table>\n    ${taskData.description ? `<div style=\"background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px;font-size:14px;line-height:1.7;\">${taskData.description}</div>` : ''}\n  </div>\n</div>`;\n\nreturn [{\n  json: {\n    ...taskData,\n    targetSheetTab,\n    telegramChatId,\n    telegramMessage,\n    gmailHtml\n  }\n}];"
+      },
+      "id": "f20c63cc-dff1-4d4f-b7b9-dbcdc7fbbf5d",
+      "name": "دمج البيانات وتنسيق الرسائل",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        720,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "documentId": {
+          "__rl": true,
+          "value": "1Ry4Bsmo7gWZuCxZhQ-YOZN2_vt1-fKFmEg9NMIbWYCM",
+          "mode": "list",
+          "cachedResultName": "Lumere Tasks",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1Ry4Bsmo7gWZuCxZhQ-YOZN2_vt1-fKFmEg9NMIbWYCM/edit?usp=drivesdk"
+        },
+        "title": "={{ $json.targetSheetTab }}",
+        "options": {}
+      },
+      "id": "11b8fdad-bd16-4881-b6ca-f7897f258951",
+      "name": "إنشاء Tab الموظف تلقائيا إن لم يوجد",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        976,
+        96
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "dKMfGpJKBZ7Emv4p",
+          "name": "lumere"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "cond-new-tab",
+              "leftValue": "={{ $json.error ? \"exists\" : \"created\" }}",
+              "rightValue": "created",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "42686a3f-868b-4074-b74c-39d147c756b6",
+      "name": "هل تم إنشاء Tab جديد الآن؟",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1216,
+        96
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1Ry4Bsmo7gWZuCxZhQ-YOZN2_vt1-fKFmEg9NMIbWYCM",
+          "mode": "list",
+          "cachedResultName": "Lumere Tasks",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1Ry4Bsmo7gWZuCxZhQ-YOZN2_vt1-fKFmEg9NMIbWYCM/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "={{ $('دمج البيانات وتنسيق الرسائل').first().json.targetSheetTab }}",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "c96450c8-c2da-46a4-8ea5-38f6142b3a18",
+      "name": "إضافة أول مهمة والعناوين في التاب الجديد",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1648,
+        0
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "dKMfGpJKBZ7Emv4p",
+          "name": "lumere"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "value": "1Ry4Bsmo7gWZuCxZhQ-YOZN2_vt1-fKFmEg9NMIbWYCM",
+          "mode": "list",
+          "cachedResultName": "Lumere Tasks",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1Ry4Bsmo7gWZuCxZhQ-YOZN2_vt1-fKFmEg9NMIbWYCM/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "={{ $('دمج البيانات وتنسيق الرسائل').first().json.targetSheetTab }}",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [
+            "task_code"
+          ],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "ec2fc780-11ac-4e1e-8ffa-be5830792782",
+      "name": "تسجيل / تحديث المهمة في Tab الموظف",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1664,
+        208
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "dKMfGpJKBZ7Emv4p",
+          "name": "lumere"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "cond-created",
+              "leftValue": "={{ $json.event }}",
+              "rightValue": "task.status_updated",
+              "operator": {
+                "type": "string",
+                "operation": "notEquals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "b922a118-c3a2-453b-98f8-8ca8f00c426f",
+      "name": "هل الحدث مهمة جديدة؟",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        976,
+        448
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.employeeEmail }}",
+        "subject": "={{ \"مهمة جديدة: \" + $json.title + \" [\" + $json.taskCode + \"]\" }}",
+        "message": "={{ $json.gmailHtml }}",
+        "options": {}
+      },
+      "id": "058b9744-e887-4c02-bd89-b950df886d08",
+      "name": "إرسال تذكير فوري عبر Gmail",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        1248,
+        368
+      ],
+      "webhookId": "59e99750-fa1e-4190-b484-79c0933703a5",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "NriGewLCjDLemA40",
+          "name": "lumere1"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "cond-has-chat-id",
+              "leftValue": "={{ $json.telegramChatId }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "88116df9-463f-4716-87eb-b838654f774b",
+      "name": "هل يوجد Telegram Chat ID؟",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1248,
+        560
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.telegramChatId }}",
+        "text": "={{ $json.telegramMessage }}",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
+      },
+      "id": "3b407046-7c3a-4da7-8c41-d1414c018e39",
+      "name": "إرسال تنبيه فوري عبر Telegram",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1504,
+        560
+      ],
+      "webhookId": "b83337af-afbc-4ca9-9e6c-0b6da9fa47d1",
+      "credentials": {
+        "telegramApi": {
+          "id": "ZvC6QLj5Y8F7UZ7r",
+          "name": "lumere"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const d = $('دمج البيانات وتنسيق الرسائل').first().json;\nreturn [{\n  json: {\n    task_code: d.taskCode,\n    title: d.title,\n    department: d.department,\n    project: d.projectName,\n    priority: d.priorityAr,\n    status: d.statusAr,\n    progress_pct: d.completionPercentage,\n    created_date: d.createdDate,\n    start_date: d.startDate,\n    deadline: d.deadline,\n    employee_email: d.employeeEmail,\n    updated_at: d.timestamp\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1392,
+        16
+      ],
+      "id": "f41ab582-d00e-41b8-9cc8-87699c2fe70f",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "jsCode": "const d = $('دمج البيانات وتنسيق الرسائل').first().json;\nreturn [{\n  json: {\n    task_code: d.taskCode,\n    title: d.title,\n    department: d.department,\n    project: d.projectName,\n    priority: d.priorityAr,\n    status: d.statusAr,\n    progress_pct: d.completionPercentage,\n    created_date: d.createdDate,\n    start_date: d.startDate,\n    deadline: d.deadline,\n    employee_email: d.employeeEmail,\n    updated_at: d.timestamp\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1392,
+        192
+      ],
+      "id": "681e114a-e91e-42f0-bc27-6151bdd48346",
+      "name": "Code in JavaScript1"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Luméré Task Webhook": {
+      "main": [
+        [
+          {
+            "node": "تجهيز بيانات المهمة",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "تجهيز بيانات المهمة": {
+      "main": [
+        [
+          {
+            "node": "قراءة جدول ربط Telegram",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "قراءة جدول ربط Telegram": {
+      "main": [
+        [
+          {
+            "node": "دمج البيانات وتنسيق الرسائل",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "دمج البيانات وتنسيق الرسائل": {
+      "main": [
+        [
+          {
+            "node": "إنشاء Tab الموظف تلقائيا إن لم يوجد",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "هل الحدث مهمة جديدة؟",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "إنشاء Tab الموظف تلقائيا إن لم يوجد": {
+      "main": [
+        [
+          {
+            "node": "هل تم إنشاء Tab جديد الآن؟",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "هل تم إنشاء Tab جديد الآن؟": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Code in JavaScript1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "هل الحدث مهمة جديدة؟": {
+      "main": [
+        [
+          {
+            "node": "إرسال تذكير فوري عبر Gmail",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "هل يوجد Telegram Chat ID؟",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "هل يوجد Telegram Chat ID؟": {
+      "main": [
+        [
+          {
+            "node": "إرسال تنبيه فوري عبر Telegram",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "إضافة أول مهمة والعناوين في التاب الجديد",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript1": {
+      "main": [
+        [
+          {
+            "node": "تسجيل / تحديث المهمة في Tab الموظف",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "6c22e3a3-f05b-4c5e-83c1-757778ba6444",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "e55db34dc7a9f6413e5f11fb076b27aa8c592477c7939f6c49a4b99f1d1306bc"
+  },
+  "nodeGroups": [],
+  "id": "uEOrlvfCRF0VFGY5",
+  "tags": []
+}

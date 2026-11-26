@@ -41,6 +41,7 @@ import {
 import { canAssignRole, getUserCompanyId, isPendingStatus, normalizeRole } from '../utils/rbac';
 import { stripUndefined } from '../utils/sanitize';
 import { LocalDataService } from './localDataService';
+import { N8nService } from './n8nService';
 
 const COMPANIES_COLLECTION = 'companies';
 const USERS_COLLECTION = 'users';
@@ -540,6 +541,8 @@ export const FirestoreDataService = {
         metadata: `مسندة إلى ${taskData.assignedToName} (${taskData.priority})`,
       });
 
+      void N8nService.notifyTaskCreated(newTask);
+
       return newTask;
     } catch (err) {
       handleFirestoreError(err, OperationType.CREATE, TASKS_COLLECTION);
@@ -568,6 +571,17 @@ export const FirestoreDataService = {
         timestamp: now,
         metadata: partial.status ? `تحديث الحالة إلى ${partial.status}` : 'تم تحديث تفاصيل المهمة',
       });
+
+      if (partial.status !== undefined || partial.completionPercentage !== undefined) {
+        void this.getTaskById(taskId)
+          .then(latestTask => {
+            if (latestTask) {
+              return N8nService.notifyTaskStatusUpdated(latestTask);
+            }
+            return undefined;
+          })
+          .catch(err => console.warn('Non-blocking n8n updateTask sync warning:', err));
+      }
     } catch (err) {
       handleFirestoreError(err, OperationType.UPDATE, `${TASKS_COLLECTION}/${taskId}`);
     }
@@ -652,6 +666,9 @@ export const FirestoreDataService = {
         timestamp: now,
         metadata: `تغيير الحالة من ${task.status} إلى ${newStatus}`,
       });
+
+      const updatedTask: Task = { ...task, ...updates };
+      void N8nService.notifyTaskStatusUpdated(updatedTask);
     } catch (err) {
       handleFirestoreError(err, OperationType.UPDATE, `${TASKS_COLLECTION}/${task.id}`);
     }

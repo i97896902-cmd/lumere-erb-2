@@ -24,6 +24,7 @@ import {
 } from '../config/companies';
 import { canAssignRole, getUserCompanyId, isPendingStatus, normalizeRole } from '../utils/rbac';
 import type { StoredReport } from './dataService';
+import { N8nService } from './n8nService';
 
 const STORAGE_KEY = 'lumere_group_erp_local_store_v1';
 
@@ -550,15 +551,20 @@ export const LocalDataService = {
       metadata: `مسندة إلى ${taskData.assignedToName} (${taskData.priority})`,
     });
 
+    void N8nService.notifyTaskCreated(created);
+
     return created;
   },
 
   async updateTask(taskId: string, partial: Partial<Task>, actor: User): Promise<void> {
     const state = readState();
     const now = new Date().toISOString();
-    state.tasks = state.tasks.map(t =>
-      t.id === taskId ? { ...t, ...partial, updatedAt: now } : t
-    );
+    let updatedTask: Task | undefined;
+    state.tasks = state.tasks.map(t => {
+      if (t.id !== taskId) return t;
+      updatedTask = { ...t, ...partial, updatedAt: now };
+      return updatedTask;
+    });
     persistState(['tasks']);
 
     await this.logActivity({
@@ -572,6 +578,13 @@ export const LocalDataService = {
       timestamp: now,
       metadata: partial.status ? `تحديث الحالة إلى ${partial.status}` : 'تم تحديث تفاصيل المهمة',
     });
+
+    if (
+      updatedTask &&
+      (partial.status !== undefined || partial.completionPercentage !== undefined)
+    ) {
+      void N8nService.notifyTaskStatusUpdated(updatedTask);
+    }
   },
 
   async updateTaskStatus(
@@ -643,6 +656,8 @@ export const LocalDataService = {
       timestamp: now,
       metadata: `تغيير الحالة من ${task.status} إلى ${newStatus}`,
     });
+
+    void N8nService.notifyTaskStatusUpdated({ ...task, ...updates });
   },
 
   async deleteTask(
