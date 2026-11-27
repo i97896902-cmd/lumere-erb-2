@@ -155,65 +155,151 @@ export function Sidebar({
       includeCompanyParam: isSuperAdmin,
     });
 
-  const brandColor = activeCompany?.theme?.primary || '#059669';
+  const getIconBgClass = (id: TabType) => {
+    switch (id) {
+      case 'group_dashboard':
+        return 'bg-[#18181B]';
+      case 'companies':
+        return 'bg-indigo-600';
+      case 'dashboard':
+        return 'bg-[#22C55E]';
+      case 'tasks':
+        return 'bg-amber-500';
+      case 'projects':
+        return 'bg-purple-500';
+      case 'calendar':
+        return 'bg-rose-500';
+      case 'employees':
+        return 'bg-blue-500';
+      case 'clients':
+        return 'bg-pink-600';
+      case 'departments':
+        return 'bg-sky-500';
+      case 'equipment':
+        return 'bg-slate-500';
+      case 'reports':
+        return 'bg-teal-500';
+      case 'join_requests':
+        return 'bg-amber-500';
+      case 'notifications':
+        return 'bg-[#EF4444]';
+      case 'activity':
+        return 'bg-zinc-800';
+      case 'settings':
+        return 'bg-emerald-600';
+      case 'profile':
+      default:
+        return 'bg-slate-600';
+    }
+  };
+
+  const coreIds = new Set<TabType>(['dashboard', 'tasks', 'projects', 'calendar']);
+  const mgmtIds = new Set<TabType>(['employees', 'clients', 'departments', 'equipment', 'reports']);
+  const otherIds = new Set<TabType>(['join_requests', 'notifications', 'activity', 'settings', 'profile']);
+
+  const coreNavItems = navItems.filter(item => coreIds.has(item.id));
+  const mgmtNavItems = navItems.filter(item => mgmtIds.has(item.id));
+  const otherNavItems = navItems.filter(item => otherIds.has(item.id));
+  const fallbackNavItems = navItems.filter(
+    item => !coreIds.has(item.id) && !mgmtIds.has(item.id) && !otherIds.has(item.id)
+  );
+
+  const renderNavLink = (item: NavItem) => {
+    const Icon = item.icon;
+    const isActive = currentTab === item.id;
+    return (
+      <a
+        key={item.id}
+        id={`nav-${item.id}`}
+        href={getItemHref(item.id)}
+        aria-current={isActive ? 'page' : undefined}
+        onClick={e => handleNavClick(e, item.id)}
+        className={`w-full flex items-center justify-between px-2.5 py-2 rounded-xl text-xs transition-colors duration-150 cursor-pointer ${
+          isActive
+            ? 'bg-[#DCFCE7] text-[#14532D] font-bold'
+            : 'text-slate-700 font-medium hover:text-slate-900 hover:bg-slate-50'
+        }`}
+      >
+        <div className="flex items-center gap-2.5 min-w-0">
+          <span
+            className={`w-7 h-7 rounded-lg flex items-center justify-center text-white shrink-0 shadow-[0_1px_2px_rgba(15,23,42,0.08)] ${getIconBgClass(
+              item.id
+            )}`}
+          >
+            <Icon className="w-3.5 h-3.5" />
+          </span>
+          <span className="truncate">{item.label}</span>
+        </div>
+        {item.badge !== undefined && (
+          <span
+            className="inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 text-[10px] font-bold leading-none text-white bg-[#EF4444] rounded-full tabular-nums shrink-0"
+          >
+            {item.badge}
+          </span>
+        )}
+      </a>
+    );
+  };
 
   return (
     <>
       {/* Mobile Backdrop */}
       {isOpenMobile && (
         <div
-          className="fixed inset-0 z-40 bg-neutral-900/50 lg:hidden"
+          className="fixed inset-0 z-40 bg-slate-900/35 backdrop-blur-[2px] lg:hidden"
           onClick={onCloseMobile}
         />
       )}
 
       {/* Sidebar Container (RTL Right-Aligned) */}
       <aside
-        className={`fixed top-0 bottom-0 right-0 z-40 w-64 bg-white border-l border-neutral-200/80 flex flex-col transition-transform duration-300 ease-in-out lg:translate-x-0 ${
+        className={`fixed top-0 bottom-0 right-0 z-40 w-64 bg-[#F5F6F8] border-l border-slate-200/80 flex flex-col transition-transform duration-300 ease-in-out lg:translate-x-0 ${
           isOpenMobile ? 'translate-x-0' : 'translate-x-full'
         }`}
         dir="rtl"
       >
         {/* Dynamic Active Company Brand Header */}
-        <div className="h-18 px-4 flex items-center justify-between border-b border-neutral-100">
-          <div className="flex items-center gap-3 min-w-0">
-            {activeCompany.logo ? (
+        <div className="h-16 px-4 flex items-center justify-between bg-[#F5F6F8]">
+          <div className="flex items-center gap-2.5 min-w-0">
+            {activeCompany.logo && (
               <img
                 src={activeCompany.logo}
                 alt={activeCompany.name}
                 referrerPolicy="no-referrer"
-                className="w-9 h-9 rounded-xl object-cover border border-neutral-200 shrink-0"
+                className="w-8 h-8 rounded-xl object-cover border border-slate-200 shrink-0"
               />
-            ) : (
-              <div
-                className="w-9 h-9 rounded-xl flex items-center justify-center text-white font-bold text-sm tracking-wider shrink-0"
-                style={{ backgroundColor: brandColor }}
-              >
-                {getCompanyInitials(activeCompany.name)}
-              </div>
             )}
             <div className="min-w-0">
-              <span className="font-serif tracking-wider text-base font-bold text-neutral-900 block truncate">
+              <span className="tracking-tight text-sm font-extrabold text-slate-900 block truncate">
                 {activeCompany.name}
               </span>
-              <p className="text-[10px] text-neutral-500 font-medium truncate">
+              <p className="text-[11px] text-slate-400 font-medium truncate">
                 {activeCompany.id === PARENT_COMPANY_ID
                   ? 'منظومة إدارة مجموعة الشركات'
                   : activeCompany.arabicName || activeCompany.businessSector || 'شركة تابعة'}
               </p>
             </div>
           </div>
-          <button
-            onClick={onCloseMobile}
-            className="lg:hidden p-1 text-neutral-400 hover:text-neutral-700"
-            aria-label="إغلاق القائمة"
-          >
-            <X className="w-5 h-5" />
-          </button>
+
+          <div className="flex items-center gap-1.5 shrink-0">
+            <img
+              src="/assets/aistudio/image_4888628b.png"
+              alt="Luméré"
+              className="h-10 w-auto shrink-0 object-contain hidden lg:block select-none"
+            />
+            <button
+              type="button"
+              onClick={onCloseMobile}
+              className="lg:hidden p-1.5 rounded-full text-slate-400 hover:text-slate-700 hover:bg-white/80 transition-colors"
+              aria-label="إغلاق القائمة"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
         </div>
 
         {/* Company Switcher / Active Company Context */}
-        <div className="px-3 py-2.5 border-b border-neutral-100 bg-neutral-50/50">
+        <div className="px-3 pb-2.5">
           <CompanySwitcher
             onCompanyChanged={cid => {
               if (onCompanySwitched) {
@@ -228,126 +314,85 @@ export function Sidebar({
           />
         </div>
 
-        {/* Current Role Summary */}
-        <div className="px-4 py-2.5 bg-neutral-50/40 border-b border-neutral-100 flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2 min-w-0">
-            {isSuperAdmin || isCompanyAdmin ? (
-              <Shield className="w-4 h-4 text-emerald-600 shrink-0" />
-            ) : (
-              <UserIcon className="w-4 h-4 text-neutral-500 shrink-0" />
-            )}
-            <div className="min-w-0">
-              <p className="text-[10px] font-medium text-neutral-400">الصلاحية الحالية</p>
-              <p className="text-xs font-bold text-neutral-800 truncate">
-                {getRoleArabicLabel(role, currentUser?.email)}
-              </p>
-            </div>
-          </div>
-        </div>
-
         {/* Navigation List */}
-        <nav className="flex-1 px-3 py-3 space-y-4 overflow-y-auto">
+        <nav className="flex-1 px-3 py-1 space-y-3 overflow-y-auto">
           {groupNavItems.length > 0 && (
-            <div className="space-y-1">
-              <p className="px-3 text-[10px] font-bold text-neutral-400">إدارة المجموعة</p>
-              {groupNavItems.map(item => {
-                const Icon = item.icon;
-                const isActive = currentTab === item.id;
-                return (
-                  <a
-                    key={item.id}
-                    id={`nav-${item.id}`}
-                    href={getItemHref(item.id)}
-                    aria-current={isActive ? 'page' : undefined}
-                    onClick={e => handleNavClick(e, item.id)}
-                    className={`w-full flex items-center justify-between px-3.5 py-2 rounded-xl text-xs font-medium transition-all duration-150 cursor-pointer ${
-                      isActive
-                        ? 'bg-emerald-50 text-emerald-950 font-bold'
-                        : 'text-neutral-600 hover:text-neutral-900 hover:bg-neutral-50'
-                    }`}
-                  >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <Icon
-                        className={`w-4 h-4 shrink-0 transition-colors ${
-                          isActive ? 'text-emerald-700' : 'text-neutral-400'
-                        }`}
-                      />
-                      <span className="truncate">{item.label}</span>
-                    </div>
-                  </a>
-                );
-              })}
+            <div className="space-y-1.5">
+              <p className="px-2 text-[11px] font-semibold text-slate-400">إدارة المجموعة</p>
+              <div className="bg-white rounded-2xl border border-slate-200/75 p-1.5 space-y-0.5 shadow-[0_1px_2px_rgba(15,23,42,0.02)]">
+                {groupNavItems.map(renderNavLink)}
+              </div>
             </div>
           )}
 
-          <div className="space-y-1">
-            {groupNavItems.length > 0 && (
-              <p className="px-3 text-[10px] font-bold text-neutral-400">
-                {isGroupView ? 'عمليات المجموعة' : `مساحة عمل ${activeCompany.name}`}
-              </p>
-            )}
-            {navItems.map(item => {
-              const Icon = item.icon;
-              const isActive = currentTab === item.id;
-              return (
-                <a
-                  key={item.id}
-                  id={`nav-${item.id}`}
-                  href={getItemHref(item.id)}
-                  aria-current={isActive ? 'page' : undefined}
-                  onClick={e => handleNavClick(e, item.id)}
-                  className={`w-full flex items-center justify-between px-3.5 py-2 rounded-xl text-xs font-medium transition-all duration-150 cursor-pointer ${
-                    isActive
-                      ? 'bg-emerald-50 text-emerald-950 font-bold'
-                      : 'text-neutral-600 hover:text-neutral-900 hover:bg-neutral-50'
-                  }`}
-                >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <Icon
-                      className={`w-4 h-4 shrink-0 transition-colors ${
-                        isActive ? 'text-emerald-700' : 'text-neutral-400'
-                      }`}
-                    />
-                    <span className="truncate">{item.label}</span>
-                  </div>
-                  {item.badge !== undefined && (
-                    <span
-                      className={`inline-flex items-center justify-center px-2 py-0.5 text-[10px] font-bold leading-none text-white rounded-full tabular-nums ${
-                        item.badgeColor || 'bg-emerald-600'
-                      }`}
-                    >
-                      {item.badge}
-                    </span>
-                  )}
-                </a>
-              );
-            })}
-          </div>
+          {coreNavItems.length > 0 && (
+            <div className="space-y-1.5">
+              {groupNavItems.length > 0 && !isGroupView && (
+                <p className="px-2 text-[11px] font-semibold text-slate-400">
+                  {`مساحة عمل ${activeCompany.name}`}
+                </p>
+              )}
+              <div className="bg-white rounded-2xl border border-slate-200/75 p-1.5 space-y-0.5 shadow-[0_1px_2px_rgba(15,23,42,0.02)]">
+                {coreNavItems.map(renderNavLink)}
+              </div>
+            </div>
+          )}
+
+          {mgmtNavItems.length > 0 && (
+            <div className="space-y-1.5">
+              <p className="px-2 text-[11px] font-semibold text-slate-400">الإدارة</p>
+              <div className="bg-white rounded-2xl border border-slate-200/75 p-1.5 space-y-0.5 shadow-[0_1px_2px_rgba(15,23,42,0.02)]">
+                {mgmtNavItems.map(renderNavLink)}
+              </div>
+            </div>
+          )}
+
+          {otherNavItems.length > 0 && (
+            <div className="space-y-1.5">
+              <p className="px-2 text-[11px] font-semibold text-slate-400">أخرى</p>
+              <div className="bg-white rounded-2xl border border-slate-200/75 p-1.5 space-y-0.5 shadow-[0_1px_2px_rgba(15,23,42,0.02)]">
+                {otherNavItems.map(renderNavLink)}
+              </div>
+            </div>
+          )}
+
+          {fallbackNavItems.length > 0 && (
+            <div className="bg-white rounded-2xl border border-slate-200/75 p-1.5 space-y-0.5 shadow-[0_1px_2px_rgba(15,23,42,0.02)]">
+              {fallbackNavItems.map(renderNavLink)}
+            </div>
+          )}
         </nav>
 
         {/* User Card Footer */}
-        <div className="p-3 border-t border-neutral-100 bg-neutral-50/50">
-          <div className="flex items-center gap-3 p-2 rounded-xl">
-            {currentUser?.photoURL ? (
-              <img
-                src={currentUser.photoURL}
-                alt={currentUser.displayName}
-                referrerPolicy="no-referrer"
-                className="w-8 h-8 rounded-full object-cover border border-neutral-200 shrink-0"
-              />
-            ) : (
-              <div className="w-8 h-8 rounded-full bg-emerald-800 text-white flex items-center justify-center text-xs font-bold shrink-0">
-                {currentUser?.displayName?.slice(0, 2).toUpperCase() || 'LU'}
+        <div className="p-3 bg-[#F5F6F8]">
+          <div className="flex items-center justify-between gap-2.5 p-2.5 rounded-2xl bg-white border border-slate-200/75 shadow-[0_1px_2px_rgba(15,23,42,0.02)]">
+            <div className="flex items-center gap-2.5 min-w-0">
+              {currentUser?.photoURL ? (
+                <img
+                  src={currentUser.photoURL}
+                  alt={currentUser.displayName}
+                  referrerPolicy="no-referrer"
+                  className="w-9 h-9 rounded-full object-cover border border-slate-200 shrink-0"
+                />
+              ) : (
+                <div className="w-9 h-9 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center text-xs font-bold shrink-0">
+                  {currentUser?.displayName?.slice(0, 2).toUpperCase() || 'LU'}
+                </div>
+              )}
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-bold text-slate-900 truncate">
+                  {currentUser?.displayName || 'مستخدم'}
+                </p>
+                <p className="text-[11px] text-slate-500 truncate">
+                  {getRoleArabicLabel(role, currentUser?.email)}
+                </p>
               </div>
-            )}
-            <div className="flex-1 min-w-0">
-              <p className="text-xs font-bold text-neutral-900 truncate">
-                {currentUser?.displayName || 'مستخدم'}
-              </p>
-              <p className="text-[10px] text-neutral-500 truncate">
-                {currentUser?.position || currentUser?.department || activeCompany.name}
-              </p>
             </div>
+            {isSuperAdmin || isCompanyAdmin ? (
+              <Shield className="w-4 h-4 text-[#22C55E] shrink-0" />
+            ) : (
+              <UserIcon className="w-4 h-4 text-slate-400 shrink-0" />
+            )}
           </div>
         </div>
       </aside>

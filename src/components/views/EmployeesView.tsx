@@ -237,10 +237,10 @@ export function EmployeesView({
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl font-bold text-neutral-900">
+          <h2 className="text-xl font-bold text-slate-900">
             دليل فريق العمل — {activeCompany.name}
           </h2>
-          <p className="text-xs text-neutral-500">
+          <p className="text-xs text-slate-500 mt-0.5">
             أعضاء الفريق ومسؤولياتهم، التوزيع حسب الشركات والأقسام، ومعدلات الأداء وإنجاز المهام.
           </p>
         </div>
@@ -258,15 +258,15 @@ export function EmployeesView({
       </div>
 
       {/* Filter Bar */}
-      <Card className="p-3 flex flex-col sm:flex-row items-center justify-between gap-3">
+      <Card className="p-3.5 flex flex-col sm:flex-row items-center justify-between gap-3">
         <div className="relative w-full sm:w-80">
-          <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
+          <Search className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           <input
             type="text"
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder="ابحث بالاسم، البريد، أو المسمى الوظيفي..."
-            className="w-full pr-9 pl-3.5 py-1.5 text-xs bg-neutral-50 rounded-xl border border-neutral-200 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+            className="w-full pr-10 pl-4 py-2 text-xs bg-[#F1F3F5] rounded-full border border-transparent text-slate-800 placeholder:text-slate-400 focus:bg-white focus:border-[#22C55E] focus:outline-none focus:ring-2 focus:ring-[#22C55E]/20 transition-all"
           />
         </div>
 
@@ -275,7 +275,7 @@ export function EmployeesView({
             <select
               value={companyFilter}
               onChange={e => setCompanyFilter(e.target.value)}
-              className="w-full sm:w-auto px-3 py-1.5 text-xs bg-neutral-50 rounded-xl border border-neutral-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+              className="w-full sm:w-auto px-4 py-2 text-xs bg-[#F1F3F5] rounded-full border border-transparent text-slate-700 font-medium focus:bg-white focus:border-[#22C55E] focus:outline-none focus:ring-2 focus:ring-[#22C55E]/20 transition-all"
             >
               <option value="All">كافة شركات المجموعة</option>
               {companies.map(c => (
@@ -289,7 +289,7 @@ export function EmployeesView({
           <select
             value={deptFilter}
             onChange={e => setDeptFilter(e.target.value)}
-            className="w-full sm:w-auto px-3 py-1.5 text-xs bg-neutral-50 rounded-xl border border-neutral-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+            className="w-full sm:w-auto px-4 py-2 text-xs bg-[#F1F3F5] rounded-full border border-transparent text-slate-700 font-medium focus:bg-white focus:border-[#22C55E] focus:outline-none focus:ring-2 focus:ring-[#22C55E]/20 transition-all"
           >
             <option value="All">كافة الأقسام</option>
             {Array.from(new Set(departments.map(d => d.name))).map(deptName => (
@@ -324,7 +324,7 @@ export function EmployeesView({
             const canEditEmp = canManageCompanyUsers(currentUser, empCompanyId);
 
             return (
-              <Card key={emp.id} hover className="p-4 flex flex-col justify-between space-y-4">
+              <Card key={emp.id} hover className="p-5 flex flex-col justify-between space-y-4">
                 <div>
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex items-center gap-3 min-w-0">
@@ -332,25 +332,25 @@ export function EmployeesView({
                         <img
                           src={emp.photoURL}
                           alt={emp.displayName}
-                          className="w-11 h-11 rounded-full object-cover border border-neutral-200 shadow-2xs shrink-0"
+                          className="w-11 h-11 rounded-full object-cover border border-slate-200/80 shrink-0"
                         />
                       ) : (
-                        <div className="w-11 h-11 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200 flex items-center justify-center font-bold text-xs shrink-0">
+                        <div className="w-11 h-11 rounded-full bg-[#DCFCE7] text-[#15803D] flex items-center justify-center font-bold text-xs shrink-0">
                           {emp.displayName.slice(0, 2).toUpperCase()}
                         </div>
                       )}
                       <div className="min-w-0">
                         <div className="flex items-center gap-1.5">
-                          <h3 className="text-sm font-bold text-neutral-900 truncate">
+                          <h3 className="text-sm font-bold text-slate-900 truncate">
                             {emp.displayName}
                           </h3>
                           <span
                             className={`w-2 h-2 rounded-full shrink-0 ${
-                              empActive ? 'bg-emerald-500' : 'bg-neutral-300'
+                              empActive ? 'bg-[#22C55E]' : 'bg-slate-300'
                             }`}
                           />
                         </div>
-                        <p className="text-xs text-neutral-500 font-medium truncate">
+                        <p className="text-xs text-slate-500 font-medium truncate">
                           {emp.position || 'عضو بالفريق'}
                         </p>
                       </div>
@@ -359,24 +359,24 @@ export function EmployeesView({
                     <RoleBadge role={emp.role} />
                   </div>
 
-                  <div className="mt-3 space-y-1.5 text-xs text-neutral-600">
+                  <div className="mt-4 space-y-2 text-xs text-slate-600">
                     <div className="flex items-center gap-2">
-                      <Layers className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                      <span className="font-semibold text-neutral-800">
+                      <Layers className="w-3.5 h-3.5 text-[#16A34A] shrink-0" />
+                      <span className="font-semibold text-slate-800">
                         {empCompany?.name || emp.companyName || empCompanyId}
                       </span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <Mail className="w-3.5 h-3.5 text-neutral-400 shrink-0" />
-                      <span className="truncate">{emp.email}</span>
+                      <Mail className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                      <span className="truncate font-mono">{emp.email}</span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <Building2 className="w-3.5 h-3.5 text-neutral-400 shrink-0" />
+                      <Building2 className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                       <span>{emp.department || 'عام'}</span>
                     </div>
                     {emp.managerName && (
                       <div className="flex items-center gap-2">
-                        <UserCog className="w-3.5 h-3.5 text-neutral-400 shrink-0" />
+                        <UserCog className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                         <span>المدير المباشر: {emp.managerName}</span>
                       </div>
                     )}
@@ -384,30 +384,30 @@ export function EmployeesView({
                 </div>
 
                 {/* Task Performance Metrics */}
-                <div className="pt-3 border-t border-neutral-100 space-y-2">
-                  <div className="grid grid-cols-3 text-center text-xs gap-1.5">
-                    <div className="p-1.5 rounded-lg bg-neutral-50">
-                      <p className="font-mono font-bold text-neutral-900">{empTasks.length}</p>
-                      <p className="text-[10px] text-neutral-400">إجمالي المهام</p>
+                <div className="pt-3.5 border-t border-slate-100 space-y-3">
+                  <div className="grid grid-cols-3 text-center text-xs gap-2">
+                    <div className="p-2 rounded-xl bg-[#F8F9FA]">
+                      <p className="font-mono font-bold text-slate-900 tabular-nums">{empTasks.length}</p>
+                      <p className="text-[10px] text-slate-400 mt-0.5">إجمالي المهام</p>
                     </div>
-                    <div className="p-1.5 rounded-lg bg-emerald-50">
-                      <p className="font-mono font-bold text-emerald-800">{activeTasks}</p>
-                      <p className="text-[10px] text-emerald-600">نشطة</p>
+                    <div className="p-2 rounded-xl bg-[#E8F8EE]">
+                      <p className="font-mono font-bold text-[#15803D] tabular-nums">{activeTasks}</p>
+                      <p className="text-[10px] text-[#16A34A] mt-0.5">نشطة</p>
                     </div>
-                    <div className="p-1.5 rounded-lg bg-teal-50">
-                      <p className="font-mono font-bold text-teal-800">{completedTasks}</p>
-                      <p className="text-[10px] text-teal-600">منجزة</p>
+                    <div className="p-2 rounded-xl bg-cyan-50/75">
+                      <p className="font-mono font-bold text-cyan-800 tabular-nums">{completedTasks}</p>
+                      <p className="text-[10px] text-cyan-600 mt-0.5">منجزة</p>
                     </div>
                   </div>
 
-                  <div className="space-y-1">
-                    <div className="flex justify-between text-[10px] text-neutral-500">
+                  <div className="space-y-1.5">
+                    <div className="flex justify-between text-[11px] text-slate-500">
                       <span>معدل الإنجاز</span>
-                      <span className="font-bold text-emerald-700">{completionRate}%</span>
+                      <span className="font-bold text-[#15803D] tabular-nums">{completionRate}%</span>
                     </div>
-                    <div className="h-1.5 w-full bg-neutral-100 rounded-full overflow-hidden">
+                    <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
                       <div
-                        className="h-full bg-emerald-600 rounded-full"
+                        className="h-full bg-[#22C55E] rounded-full transition-all"
                         style={{ width: `${completionRate}%` }}
                       />
                     </div>
@@ -417,17 +417,17 @@ export function EmployeesView({
                     <div className="flex items-center justify-end gap-2 pt-1">
                       <button
                         onClick={() => openEditModal(emp)}
-                        className="p-1.5 rounded-lg text-neutral-500 hover:text-neutral-900 hover:bg-neutral-100 text-xs flex items-center gap-1 font-medium transition-colors cursor-pointer"
+                        className="px-2.5 py-1.5 rounded-full text-slate-500 hover:text-slate-900 hover:bg-[#F1F3F5] text-xs flex items-center gap-1 font-medium transition-colors cursor-pointer"
                         title="تعديل البيانات والصلاحيات"
                       >
                         <Edit2 className="w-3.5 h-3.5" /> تعديل
                       </button>
                       <button
                         onClick={() => toggleStatus(emp)}
-                        className={`p-1.5 rounded-lg text-xs flex items-center gap-1 font-medium transition-colors cursor-pointer ${
+                        className={`px-2.5 py-1.5 rounded-full text-xs flex items-center gap-1 font-medium transition-colors cursor-pointer ${
                           empActive
                             ? 'text-amber-600 hover:bg-amber-50'
-                            : 'text-emerald-600 hover:bg-emerald-50'
+                            : 'text-[#16A34A] hover:bg-[#E8F8EE]'
                         }`}
                         title={empActive ? 'تجميد الحساب' : 'تنشيط الحساب'}
                       >
@@ -555,8 +555,13 @@ export function EmployeesView({
             />
           </div>
 
-          <div className="flex items-center justify-end gap-3 pt-3 border-t border-neutral-100">
-            <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)}>
+          <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
+            <Button
+              type="button"
+              variant="outline"
+              className="bg-[#E8F8EE] border-transparent text-[#15803D] hover:bg-[#DCFCE7]"
+              onClick={() => setIsModalOpen(false)}
+            >
               إلغاء
             </Button>
             <Button type="submit" variant="primary" isLoading={isSubmitting}>

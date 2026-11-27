@@ -58,35 +58,35 @@ export function ProfileView() {
   return (
     <div className="space-y-6 max-w-3xl" dir="rtl">
       <div>
-        <h2 className="text-xl font-bold text-neutral-900">الملف الشخصي</h2>
-        <p className="text-xs text-neutral-500">
+        <h2 className="text-xl font-bold text-slate-900">الملف الشخصي</h2>
+        <p className="text-xs text-slate-500 mt-0.5">
           إدارة بياناتك المهنية، المسمى الوظيفي، وهويتك المؤسسية في منظومة LUMERE GROUP.
         </p>
       </div>
 
-      <Card className="p-6 space-y-6">
+      <Card className="p-6 sm:p-7 space-y-6">
         {/* Profile Header */}
-        <div className="flex flex-col sm:flex-row items-center gap-5 border-b border-neutral-100 pb-6">
+        <div className="flex flex-col sm:flex-row items-center gap-5 border-b border-slate-100 pb-6">
           {currentUser.photoURL ? (
             <img
               src={currentUser.photoURL}
               alt={currentUser.displayName}
-              className="w-20 h-20 rounded-full object-cover border-2 border-emerald-500 shadow-md"
+              className="w-20 h-20 rounded-full object-cover ring-2 ring-[#22C55E] ring-offset-2"
             />
           ) : (
-            <div className="w-20 h-20 rounded-full bg-emerald-100 text-emerald-800 border-2 border-emerald-500 flex items-center justify-center font-bold text-xl shadow-md">
+            <div className="w-20 h-20 rounded-full bg-[#DCFCE7] text-[#15803D] ring-2 ring-[#22C55E] flex items-center justify-center font-bold text-xl">
               {currentUser.displayName.slice(0, 2).toUpperCase()}
             </div>
           )}
           <div className="text-center sm:text-right space-y-1">
-            <div className="flex items-center justify-center sm:justify-start gap-2 flex-wrap">
-              <h3 className="text-lg font-bold text-neutral-900">{currentUser.displayName}</h3>
+            <div className="flex items-center justify-center sm:justify-start gap-2.5 flex-wrap">
+              <h3 className="text-lg font-bold text-slate-900">{currentUser.displayName}</h3>
               <RoleBadge role={role} />
             </div>
-            <p className="text-xs text-neutral-500 font-medium">
+            <p className="text-xs text-slate-500 font-medium">
               {assignedCompanyLabel} • {currentUser.position || 'عضو فريق'} • {currentUser.department || 'عام'}
             </p>
-            <p className="text-xs font-mono text-neutral-400">{currentUser.email}</p>
+            <p className="text-xs font-mono text-slate-400">{currentUser.email}</p>
           </div>
         </div>
 

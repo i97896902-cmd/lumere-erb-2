@@ -132,10 +132,10 @@ export function EquipmentView({ equipment, employees, projects, onRefresh }: Equ
     <div id="equipment-view" className="space-y-5" dir="rtl">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl font-bold text-neutral-900">
+          <h2 className="text-xl font-bold text-slate-900">
             سجل المعدات والأصول — {activeCompany.name}
           </h2>
-          <p className="text-xs text-neutral-500">
+          <p className="text-xs text-slate-500 mt-0.5">
             إدارة الأصول والمعدات المسجلة، عهدة الموظفين، وحالة الصيانة لكل شركة بشكل مستقل.
           </p>
         </div>
@@ -156,21 +156,21 @@ export function EquipmentView({ equipment, employees, projects, onRefresh }: Equ
       </div>
 
       {/* Filters */}
-      <Card className="p-3 flex flex-col sm:flex-row items-center justify-between gap-3">
+      <Card className="p-3.5 flex flex-col sm:flex-row items-center justify-between gap-3">
         <div className="relative w-full sm:w-80">
-          <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
+          <Search className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           <input
             type="text"
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder="بحث بالاسم، الرقم التسلسلي، أو الموظف..."
-            className="w-full pr-9 pl-3 py-1.5 text-xs bg-neutral-50 rounded-xl border border-neutral-200 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+            className="w-full pr-10 pl-4 py-2 text-xs bg-[#F1F3F5] rounded-full border border-transparent text-slate-800 placeholder:text-slate-400 focus:bg-white focus:border-[#22C55E] focus:outline-none focus:ring-2 focus:ring-[#22C55E]/20 transition-all"
           />
         </div>
         <select
           value={statusFilter}
           onChange={e => setStatusFilter(e.target.value as 'all' | EquipmentStatus)}
-          className="w-full sm:w-auto px-3 py-1.5 text-xs bg-neutral-50 rounded-xl border border-neutral-200"
+          className="w-full sm:w-auto px-4 py-2 text-xs bg-[#F1F3F5] rounded-full border border-transparent text-slate-700 font-medium focus:bg-white focus:border-[#22C55E] focus:outline-none focus:ring-2 focus:ring-[#22C55E]/20 transition-all"
         >
           <option value="all">جميع الحالات</option>
           {Object.entries(STATUS_LABELS).map(([k, label]) => (
@@ -190,41 +190,41 @@ export function EquipmentView({ equipment, employees, projects, onRefresh }: Equ
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filtered.map(item => (
-            <Card key={item.id} className="p-4 space-y-3">
+            <Card key={item.id} hover className="p-5 space-y-3.5">
               <div className="flex items-start justify-between gap-2">
                 <div>
-                  <h3 className="text-sm font-bold text-neutral-900">{item.name}</h3>
-                  <p className="text-[11px] font-mono text-neutral-500 mt-0.5">
+                  <h3 className="text-sm font-bold text-slate-900">{item.name}</h3>
+                  <p className="text-[11px] font-mono text-slate-400 mt-0.5 tabular-nums">
                     SN: {item.serialNumber}
                   </p>
                 </div>
                 <span
                   className={`text-[11px] font-semibold ${
                     item.status === 'available'
-                      ? 'text-emerald-700'
+                      ? 'text-[#16A34A]'
                       : item.status === 'in_maintenance'
-                      ? 'text-amber-700'
-                      : 'text-neutral-600'
+                      ? 'text-amber-600'
+                      : 'text-slate-600'
                   }`}
                 >
                   {STATUS_LABELS[item.status] || item.status}
                 </span>
               </div>
 
-              <div className="pt-2 border-t border-neutral-100 space-y-1.5 text-xs text-neutral-600">
+              <div className="pt-3 border-t border-slate-100 space-y-1.5 text-xs text-slate-600">
                 <div className="flex items-center gap-2">
-                  <UserIcon className="w-3.5 h-3.5 text-neutral-400" />
+                  <UserIcon className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                   <span>العهدة: {item.assignedToName || 'غير مسندة'}</span>
                 </div>
                 {item.projectName && (
                   <div className="flex items-center gap-2">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                    <CheckCircle2 className="w-3.5 h-3.5 text-[#16A34A] shrink-0" />
                     <span>المشروع: {item.projectName}</span>
                   </div>
                 )}
                 {item.notes && (
                   <div className="flex items-center gap-2">
-                    <Wrench className="w-3.5 h-3.5 text-neutral-400" />
+                    <Wrench className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                     <span className="truncate">{item.notes}</span>
                   </div>
                 )}
@@ -314,8 +314,13 @@ export function EquipmentView({ equipment, employees, projects, onRefresh }: Equ
             onChange={e => setNotes(e.target.value)}
           />
 
-          <div className="flex items-center justify-end gap-2 pt-3 border-t border-neutral-100">
-            <Button type="button" variant="outline" onClick={() => setIsAddOpen(false)}>
+          <div className="flex items-center justify-end gap-2.5 pt-4 border-t border-slate-100">
+            <Button
+              type="button"
+              variant="outline"
+              className="bg-[#E8F8EE] border-transparent text-[#15803D] hover:bg-[#DCFCE7]"
+              onClick={() => setIsAddOpen(false)}
+            >
               إلغاء
             </Button>
             <Button type="submit" variant="primary" isLoading={isSubmitting}>

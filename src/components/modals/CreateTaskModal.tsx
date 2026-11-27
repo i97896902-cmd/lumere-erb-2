@@ -327,15 +327,15 @@ export function CreateTaskModal({
         {/* Subsidiary selector when in Group View */}
         {isGroupView && (
           <div>
-            <label className="block text-xs font-semibold text-neutral-700 mb-1.5 flex items-center gap-1.5">
-              <Building2 className="w-3.5 h-3.5 text-emerald-600" />
+            <label className="block text-xs font-semibold text-slate-600 mb-1.5 flex items-center gap-1.5">
+              <Building2 className="w-3.5 h-3.5 text-[#15803D]" />
               <span>الشركة التابعة المستهدفة *</span>
             </label>
             <select
               id="task-company-select"
               value={targetCompanyId}
               onChange={e => setTargetCompanyId(e.target.value)}
-              className="w-full px-3.5 py-2.5 rounded-xl border border-neutral-300 text-neutral-900 text-xs bg-white focus:outline-none focus:border-emerald-500 transition-colors"
+              className="w-full px-4 py-2.5 rounded-full bg-[#F1F3F5] border border-transparent text-slate-900 text-xs focus:bg-white focus:outline-none focus:border-[#22C55E] focus:ring-2 focus:ring-[#22C55E]/20 transition-all"
             >
               {subsidiaries.map(c => (
                 <option key={c.id} value={c.id}>
@@ -359,15 +359,15 @@ export function CreateTaskModal({
         {/* Project and Client Link */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <label className="block text-xs font-semibold text-neutral-700 mb-1.5 flex items-center gap-1.5">
-              <FolderKanban className="w-3.5 h-3.5 text-emerald-600" />
+            <label className="block text-xs font-semibold text-slate-600 mb-1.5 flex items-center gap-1.5">
+              <FolderKanban className="w-3.5 h-3.5 text-[#15803D]" />
               <span>المشروع المرتبط (اختياري)</span>
             </label>
             <select
               id="task-project-select"
               value={projectId}
               onChange={e => handleProjectChange(e.target.value)}
-              className="w-full px-3.5 py-2.5 rounded-xl border border-neutral-300 text-neutral-900 text-xs bg-white focus:outline-none focus:border-emerald-500 transition-colors"
+              className="w-full px-4 py-2.5 rounded-full bg-[#F1F3F5] border border-transparent text-slate-900 text-xs focus:bg-white focus:outline-none focus:border-[#22C55E] focus:ring-2 focus:ring-[#22C55E]/20 transition-all"
             >
               <option value="">-- بدون ربط بمشروع محدد --</option>
               {scopedProjects.map(p => (
@@ -379,15 +379,15 @@ export function CreateTaskModal({
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-neutral-700 mb-1.5 flex items-center gap-1.5">
-              <Building className="w-3.5 h-3.5 text-emerald-600" />
+            <label className="block text-xs font-semibold text-slate-600 mb-1.5 flex items-center gap-1.5">
+              <Building className="w-3.5 h-3.5 text-[#15803D]" />
               <span>العميل المرتبط (اختياري)</span>
             </label>
             <select
               id="task-client-select"
               value={clientId}
               onChange={e => setClientId(e.target.value)}
-              className="w-full px-3.5 py-2.5 rounded-xl border border-neutral-300 text-neutral-900 text-xs bg-white focus:outline-none focus:border-emerald-500 transition-colors"
+              className="w-full px-4 py-2.5 rounded-full bg-[#F1F3F5] border border-transparent text-slate-900 text-xs focus:bg-white focus:outline-none focus:border-[#22C55E] focus:ring-2 focus:ring-[#22C55E]/20 transition-all"
             >
               <option value="">-- بدون ربط بعميل محدد --</option>
               {scopedClients.map(c => (
@@ -476,10 +476,10 @@ export function CreateTaskModal({
 
         {/* Attachments Section */}
         <div>
-          <label className="block text-xs font-semibold text-neutral-700 uppercase tracking-wider mb-1.5">
+          <label className="block text-xs font-semibold text-slate-600 mb-1.5">
             المرفقات والملفات الداعمة (PDF, صور, مستندات, جداول)
           </label>
-          <div className="border border-dashed border-neutral-300 rounded-xl p-4 text-center hover:bg-neutral-50/50 transition-colors">
+          <div className="border border-dashed border-slate-300 bg-[#F8F9FA] rounded-2xl p-4 text-center hover:bg-slate-100/70 transition-colors">
             <input
               type="file"
               id="file-upload-input"
@@ -491,11 +491,11 @@ export function CreateTaskModal({
               htmlFor="file-upload-input"
               className="flex flex-col items-center justify-center cursor-pointer"
             >
-              <Upload className="w-6 h-6 text-neutral-400 mb-1" />
-              <span className="text-xs font-semibold text-emerald-700 hover:text-emerald-800">
+              <Upload className="w-6 h-6 text-slate-400 mb-1" />
+              <span className="text-xs font-semibold text-[#15803D] hover:text-emerald-800">
                 انقر لرفع المستندات والملفات
               </span>
-              <span className="text-[11px] text-neutral-400">
+              <span className="text-[11px] text-slate-400">
                 PDF, PNG, JPG, DOCX, XLSX حتى 15 ميجابايت
               </span>
             </label>
@@ -506,19 +506,19 @@ export function CreateTaskModal({
               {attachments.map(att => (
                 <div
                   key={att.id}
-                  className="flex items-center justify-between p-2 rounded-lg bg-neutral-50 border border-neutral-200 text-xs"
+                  className="flex items-center justify-between p-2.5 rounded-xl bg-[#F8F9FA] border border-slate-200/75 text-xs"
                 >
                   <div className="flex items-center gap-2 truncate">
-                    <FileText className="w-4 h-4 text-emerald-600 shrink-0" />
-                    <span className="font-medium text-neutral-800 truncate">{att.name}</span>
-                    <span className="text-[10px] text-neutral-400">
+                    <FileText className="w-4 h-4 text-[#15803D] shrink-0" />
+                    <span className="font-medium text-slate-800 truncate">{att.name}</span>
+                    <span className="text-[10px] text-slate-400">
                       ({Math.round(att.size / 1024)} KB)
                     </span>
                   </div>
                   <button
                     type="button"
                     onClick={() => removeAttachment(att.id)}
-                    className="p-1 text-neutral-400 hover:text-rose-600 transition-colors"
+                    className="p-1 text-slate-400 hover:text-rose-600 transition-colors"
                   >
                     <X className="w-4 h-4" />
                   </button>
@@ -529,10 +529,7 @@ export function CreateTaskModal({
         </div>
 
         {/* Modal Actions */}
-        <div className="flex items-center justify-end gap-3 pt-3 border-t border-neutral-100">
-          <Button type="button" variant="outline" onClick={onClose}>
-            إلغاء
-          </Button>
+        <div className="flex items-center justify-start gap-2.5 pt-3 border-t border-slate-100">
           <Button
             id="btn-submit-create-task"
             type="submit"
@@ -540,6 +537,14 @@ export function CreateTaskModal({
             isLoading={isSubmitting}
           >
             إنشاء وإسناد المهمة
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onClose}
+            className="bg-[#E8F8EE] hover:bg-[#DCFCE7] text-[#15803D] border-transparent"
+          >
+            إلغاء
           </Button>
         </div>
       </form>

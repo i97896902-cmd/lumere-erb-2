@@ -143,14 +143,14 @@ export function TasksView({
       {/* Header with Title & Quick Action */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl font-bold text-neutral-900">
+          <h2 className="text-xl font-extrabold text-slate-900">
             {role === 'EMPLOYEE'
               ? 'مهامي التنفيذية'
               : role === 'MANAGER'
               ? `مهام القسم — ${currentUser?.department || activeCompany.name}`
               : `دليل المهام — ${activeCompany.name}`}
           </h2>
-          <p className="text-xs text-neutral-500">
+          <p className="text-xs text-slate-500 mt-0.5">
             {role === 'EMPLOYEE'
               ? 'المهام والتكليفات المسندة إليك. حدّث نسب الإنجاز وارفع المخرجات للاعتماد.'
               : role === 'MANAGER'
@@ -172,7 +172,7 @@ export function TasksView({
       </div>
 
       {/* Quick Status Filter Tabs */}
-      <div className="flex items-center gap-1.5 overflow-x-auto pb-1 border-b border-neutral-200">
+      <div className="flex items-center gap-2 overflow-x-auto pb-1">
         {[
           { key: 'All', label: 'كافة المهام', count: counts.All },
           { key: 'In Progress', label: 'قيد التنفيذ', count: counts['In Progress'] },
@@ -184,22 +184,22 @@ export function TasksView({
           <button
             key={tab.key}
             onClick={() => setStatusFilter(tab.key)}
-            className={`flex items-center gap-2 px-3 py-2 text-xs font-semibold rounded-xl transition-colors whitespace-nowrap cursor-pointer ${
+            className={`flex items-center gap-2 px-3.5 py-1.5 text-xs font-semibold rounded-full transition-colors whitespace-nowrap cursor-pointer ${
               statusFilter === tab.key
                 ? tab.isDanger
-                  ? 'bg-rose-50 text-rose-700 border border-rose-200 shadow-2xs'
-                  : 'bg-emerald-50 text-emerald-900 border border-emerald-200 shadow-2xs'
-                : 'text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100'
+                  ? 'bg-rose-50 text-rose-700 border border-rose-200'
+                  : 'bg-[#DCFCE7] text-[#14532D] border border-[#22C55E]/40'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-white border border-transparent'
             }`}
           >
             <span>{tab.label}</span>
             <span
-              className={`px-1.5 py-0.2 rounded-md text-[10px] font-bold ${
+              className={`min-w-[20px] h-5 px-1.5 inline-flex items-center justify-center rounded-full text-[10px] font-bold tabular-nums ${
                 statusFilter === tab.key
                   ? tab.isDanger
-                    ? 'bg-rose-200/80 text-rose-900'
-                    : 'bg-emerald-200/80 text-emerald-900'
-                  : 'bg-neutral-200/70 text-neutral-700'
+                    ? 'bg-rose-500 text-white'
+                    : 'bg-[#22C55E] text-white'
+                  : 'bg-slate-200/80 text-slate-600'
               }`}
             >
               {tab.count}
@@ -209,17 +209,17 @@ export function TasksView({
       </div>
 
       {/* Filter Controls Bar */}
-      <Card className="p-3.5 space-y-3">
+      <Card className="p-4 space-y-3">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-2.5">
           {/* Search */}
           <div className="relative lg:col-span-2">
-            <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
+            <Search className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
             <input
               type="text"
               value={search}
               onChange={e => setSearch(e.target.value)}
               placeholder="ابحث بالعنوان، رمز المهمة، أو الموظف..."
-              className="w-full pr-9 pl-3.5 py-1.5 text-xs bg-neutral-50 rounded-xl border border-neutral-200 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600"
+              className="w-full pr-10 pl-4 py-2 text-xs bg-[#F1F3F5] rounded-full border border-transparent text-slate-900 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#22C55E]/20 focus:border-[#22C55E] transition-all"
             />
           </div>
 
@@ -228,7 +228,7 @@ export function TasksView({
             <select
               value={departmentFilter}
               onChange={e => setDepartmentFilter(e.target.value)}
-              className="px-3 py-1.5 text-xs bg-neutral-50 rounded-xl border border-neutral-200 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+              className="px-4 py-2 text-xs bg-[#F1F3F5] rounded-full border border-transparent text-slate-700 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#22C55E]/20 focus:border-[#22C55E] transition-all"
             >
               <option value="All">كافة الأقسام</option>
               {departments.map(d => (
@@ -244,7 +244,7 @@ export function TasksView({
             <select
               value={assigneeFilter}
               onChange={e => setAssigneeFilter(e.target.value)}
-              className="px-3 py-1.5 text-xs bg-neutral-50 rounded-xl border border-neutral-200 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+              className="px-4 py-2 text-xs bg-[#F1F3F5] rounded-full border border-transparent text-slate-700 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#22C55E]/20 focus:border-[#22C55E] transition-all"
             >
               <option value="All">كافة المكلفين</option>
               {employees.map(emp => (
@@ -259,7 +259,7 @@ export function TasksView({
           <select
             value={priorityFilter}
             onChange={e => setPriorityFilter(e.target.value)}
-            className="px-3 py-1.5 text-xs bg-neutral-50 rounded-xl border border-neutral-200 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+            className="px-4 py-2 text-xs bg-[#F1F3F5] rounded-full border border-transparent text-slate-700 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#22C55E]/20 focus:border-[#22C55E] transition-all"
           >
             <option value="All">كافة الأولويات</option>
             <option value="Urgent">عاجل جداً (Urgent)</option>
@@ -272,7 +272,7 @@ export function TasksView({
           <select
             value={sortBy}
             onChange={e => setSortBy(e.target.value as 'deadline' | 'createdAt' | 'priority' | 'title')}
-            className="px-3 py-1.5 text-xs bg-neutral-50 rounded-xl border border-neutral-200 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+            className="px-4 py-2 text-xs bg-[#F1F3F5] rounded-full border border-transparent text-slate-700 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#22C55E]/20 focus:border-[#22C55E] transition-all"
           >
             <option value="deadline">الترتيب: الموعد النهائي</option>
             <option value="createdAt">الترتيب: الأحدث إضافة</option>
@@ -281,17 +281,17 @@ export function TasksView({
           </select>
         </div>
 
-        <div className="flex items-center justify-between text-xs text-neutral-500 pt-1 border-t border-neutral-100">
-          <span>
-            يتم عرض <strong className="text-neutral-800">{filteredTasks.length}</strong> من أصل{' '}
+        <div className="flex items-center justify-between text-xs text-slate-500 pt-2.5 border-t border-slate-100">
+          <span className="tabular-nums">
+            يتم عرض <strong className="text-slate-900">{filteredTasks.length}</strong> من أصل{' '}
             {baseTasks.length} مهمة
           </span>
 
-          <div className="flex items-center gap-1 bg-neutral-100 p-0.5 rounded-lg">
+          <div className="flex items-center gap-1 bg-[#F1F3F5] p-1 rounded-full">
             <button
               onClick={() => setViewMode('table')}
-              className={`p-1.5 rounded-md transition-colors ${
-                viewMode === 'table' ? 'bg-white text-neutral-900 shadow-2xs font-bold' : 'text-neutral-500 hover:text-neutral-800'
+              className={`p-1.5 rounded-full transition-colors cursor-pointer ${
+                viewMode === 'table' ? 'bg-white text-slate-900 shadow-2xs font-bold' : 'text-slate-500 hover:text-slate-800'
               }`}
               title="عرض الجدول"
             >
@@ -299,8 +299,8 @@ export function TasksView({
             </button>
             <button
               onClick={() => setViewMode('grid')}
-              className={`p-1.5 rounded-md transition-colors ${
-                viewMode === 'grid' ? 'bg-white text-neutral-900 shadow-2xs font-bold' : 'text-neutral-500 hover:text-neutral-800'
+              className={`p-1.5 rounded-full transition-colors cursor-pointer ${
+                viewMode === 'grid' ? 'bg-white text-slate-900 shadow-2xs font-bold' : 'text-slate-500 hover:text-slate-800'
               }`}
               title="عرض البطاقات"
             >
@@ -350,51 +350,51 @@ export function TasksView({
         <Card className="p-0 overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-right text-sm">
-              <thead className="bg-neutral-50/80 border-b border-neutral-100 text-xs text-neutral-500 font-semibold uppercase tracking-wider">
+              <thead className="bg-[#F8F9FA] border-b border-slate-100 text-xs text-slate-500 font-semibold">
                 <tr>
-                  <th className="px-4 py-3">رمز وعنوان المهمة</th>
-                  <th className="px-4 py-3">القسم / المشروع</th>
-                  <th className="px-4 py-3">المكلف بالتنفيذ</th>
-                  <th className="px-4 py-3">الأولوية</th>
-                  <th className="px-4 py-3">الحالة</th>
-                  <th className="px-4 py-3">نسبة الإنجاز</th>
-                  <th className="px-4 py-3">الموعد النهائي</th>
+                  <th className="px-4 py-3.5">رمز وعنوان المهمة</th>
+                  <th className="px-4 py-3.5">القسم / المشروع</th>
+                  <th className="px-4 py-3.5">المكلف بالتنفيذ</th>
+                  <th className="px-4 py-3.5">الأولوية</th>
+                  <th className="px-4 py-3.5">الحالة</th>
+                  <th className="px-4 py-3.5">نسبة الإنجاز</th>
+                  <th className="px-4 py-3.5">الموعد النهائي</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-neutral-100">
+              <tbody className="divide-y divide-slate-100">
                 {filteredTasks.map(task => {
                   const isOverdue =
                     task.deadline < nowStr && task.status !== 'Completed' && task.status !== 'Cancelled';
                   return (
                     <tr
                       key={task.id}
-                      className="hover:bg-neutral-50/80 transition-colors cursor-pointer group"
+                      className="hover:bg-slate-50/80 transition-colors cursor-pointer group"
                       onClick={() => onSelectTask(task.id)}
                     >
                       <td className="px-4 py-3.5 max-w-sm">
                         <div className="flex items-center gap-2">
-                          <span className="font-mono text-xs font-bold text-emerald-800 bg-emerald-50 border border-emerald-200/60 px-1.5 py-0.5 rounded">
+                          <span className="font-mono text-xs font-bold text-[#15803D] bg-[#E8F8EE] px-2 py-0.5 rounded-lg shrink-0">
                             {task.taskId}
                           </span>
-                          <span className="font-medium text-neutral-900 group-hover:text-emerald-700 transition-colors truncate">
+                          <span className="font-semibold text-slate-900 group-hover:text-[#15803D] transition-colors truncate">
                             {task.title}
                           </span>
                         </div>
                         {task.attachments && task.attachments.length > 0 && (
-                          <span className="inline-flex items-center gap-1 text-[11px] text-neutral-400 mt-0.5">
+                          <span className="inline-flex items-center gap-1 text-[11px] text-slate-400 mt-0.5">
                             <Paperclip className="w-3 h-3" /> {task.attachments.length} مرفق
                           </span>
                         )}
                       </td>
-                      <td className="px-4 py-3.5 text-xs text-neutral-600 font-medium">
+                      <td className="px-4 py-3.5 text-xs text-slate-600 font-medium">
                         <div>{task.department}</div>
                         {isGroupView && task.companyId && (
-                          <div className="text-[10px] font-bold text-neutral-500">
+                          <div className="text-[10px] font-bold text-slate-500">
                             {getCompanyById(task.companyId)?.name || task.companyId}
                           </div>
                         )}
                         {task.projectName && (
-                          <div className="text-[11px] text-emerald-700 font-semibold">{task.projectName}</div>
+                          <div className="text-[11px] text-[#15803D] font-semibold">{task.projectName}</div>
                         )}
                       </td>
                       <td className="px-4 py-3.5">
@@ -403,14 +403,14 @@ export function TasksView({
                             <img
                               src={task.assignedToPhoto}
                               alt={task.assignedToName}
-                              className="w-6 h-6 rounded-full object-cover border"
+                              className="w-7 h-7 rounded-full object-cover border border-slate-200"
                             />
                           ) : (
-                            <div className="w-6 h-6 rounded-full bg-emerald-100 text-emerald-800 text-[10px] flex items-center justify-center font-bold">
+                            <div className="w-7 h-7 rounded-full bg-[#DCFCE7] text-[#15803D] text-[10px] flex items-center justify-center font-bold">
                               {task.assignedToName.slice(0, 2).toUpperCase()}
                             </div>
                           )}
-                          <span className="text-xs text-neutral-800 font-medium truncate max-w-[120px]">
+                          <span className="text-xs text-slate-800 font-medium truncate max-w-[120px]">
                             {task.assignedToName}
                           </span>
                         </div>
@@ -423,19 +423,19 @@ export function TasksView({
                       </td>
                       <td className="px-4 py-3.5">
                         <div className="w-24 space-y-1">
-                          <div className="flex justify-between text-[10px] font-mono text-neutral-500">
+                          <div className="flex justify-end text-[10px] font-mono text-slate-500 tabular-nums">
                             <span>{task.completionPercentage}%</span>
                           </div>
-                          <div className="h-1.5 w-full bg-neutral-200 rounded-full overflow-hidden">
+                          <div className="h-1.5 w-full bg-[#F1F3F5] rounded-full overflow-hidden">
                             <div
-                              className="h-full bg-emerald-600 rounded-full"
+                              className="h-full bg-[#22C55E] rounded-full"
                               style={{ width: `${task.completionPercentage}%` }}
                             />
                           </div>
                         </div>
                       </td>
-                      <td className="px-4 py-3.5 text-xs font-mono font-medium">
-                        <span className={isOverdue ? 'text-rose-600 font-bold' : 'text-neutral-700'}>
+                      <td className="px-4 py-3.5 text-xs font-mono font-medium tabular-nums">
+                        <span className={isOverdue ? 'text-rose-600 font-bold' : 'text-slate-700'}>
                           {task.deadline}
                         </span>
                       </td>
@@ -456,12 +456,12 @@ export function TasksView({
               <Card
                 key={task.id}
                 hover
-                className="p-4 cursor-pointer flex flex-col justify-between space-y-3"
+                className="p-5 cursor-pointer flex flex-col justify-between space-y-3"
                 onClick={() => onSelectTask(task.id)}
               >
                 <div>
-                  <div className="flex items-center justify-between gap-2 mb-2">
-                    <span className="font-mono text-xs font-bold text-emerald-800 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200/50">
+                  <div className="flex items-center justify-between gap-2 mb-2.5">
+                    <span className="font-mono text-xs font-bold text-[#15803D] bg-[#E8F8EE] px-2 py-0.5 rounded-lg">
                       {task.taskId}
                     </span>
                     <div className="flex items-center gap-1.5">
@@ -470,31 +470,31 @@ export function TasksView({
                     </div>
                   </div>
 
-                  <h3 className="text-sm font-bold text-neutral-900 hover:text-emerald-700 transition-colors line-clamp-2">
+                  <h3 className="text-sm font-bold text-slate-900 hover:text-[#15803D] transition-colors line-clamp-2">
                     {task.title}
                   </h3>
-                  <p className="text-xs text-neutral-500 mt-1 line-clamp-2 leading-relaxed">
+                  <p className="text-xs text-slate-500 mt-1 line-clamp-2 leading-relaxed">
                     {task.description}
                   </p>
                   {task.projectName && (
-                    <div className="mt-2 text-[11px] text-emerald-700 font-semibold">
+                    <div className="mt-2 text-[11px] text-[#15803D] font-semibold">
                       المشروع: {task.projectName}
                     </div>
                   )}
                 </div>
 
-                <div className="pt-3 border-t border-neutral-100 space-y-2.5 text-xs">
+                <div className="pt-3 border-t border-slate-100 space-y-2.5 text-xs">
                   {/* Progress Bar */}
                   <div className="space-y-1">
                     <div className="flex justify-between text-[11px]">
-                      <span className="text-neutral-400">نسبة الإنجاز</span>
-                      <span className="font-mono font-bold text-neutral-700">
+                      <span className="text-slate-400">نسبة الإنجاز</span>
+                      <span className="font-mono font-bold text-slate-700 tabular-nums">
                         {task.completionPercentage}%
                       </span>
                     </div>
-                    <div className="h-1.5 w-full bg-neutral-100 rounded-full overflow-hidden">
+                    <div className="h-1.5 w-full bg-[#F1F3F5] rounded-full overflow-hidden">
                       <div
-                        className="h-full bg-emerald-600 rounded-full"
+                        className="h-full bg-[#22C55E] rounded-full"
                         style={{ width: `${task.completionPercentage}%` }}
                       />
                     </div>
@@ -507,20 +507,20 @@ export function TasksView({
                         <img
                           src={task.assignedToPhoto}
                           alt={task.assignedToName}
-                          className="w-6 h-6 rounded-full object-cover border"
+                          className="w-6 h-6 rounded-full object-cover border border-slate-200"
                         />
                       ) : (
-                        <div className="w-6 h-6 rounded-full bg-emerald-100 text-emerald-800 text-[10px] flex items-center justify-center font-bold">
+                        <div className="w-6 h-6 rounded-full bg-[#DCFCE7] text-[#15803D] text-[10px] flex items-center justify-center font-bold">
                           {task.assignedToName.slice(0, 2).toUpperCase()}
                         </div>
                       )}
-                      <span className="text-xs font-medium text-neutral-700 truncate max-w-[120px]">
+                      <span className="text-xs font-medium text-slate-700 truncate max-w-[120px]">
                         {task.assignedToName}
                       </span>
                     </div>
 
-                    <div className="flex items-center gap-1 font-mono text-[11px] text-neutral-500">
-                      <Clock className="w-3.5 h-3.5 text-neutral-400" />
+                    <div className="flex items-center gap-1 font-mono text-[11px] text-slate-500 tabular-nums">
+                      <Clock className="w-3.5 h-3.5 text-slate-400" />
                       <span className={isOverdue ? 'text-rose-600 font-bold' : ''}>
                         {task.deadline}
                       </span>

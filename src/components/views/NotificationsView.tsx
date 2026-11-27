@@ -108,11 +108,11 @@ export function NotificationsView({
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl font-bold text-neutral-900 flex items-center gap-2">
-            <Bell className="w-5 h-5 text-emerald-600" />
+          <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+            <Bell className="w-5 h-5 text-[#16A34A]" />
             التنبيهات وإشعارات المواعيد النهائية (Push Alerts)
           </h2>
-          <p className="text-xs text-neutral-500">
+          <p className="text-xs text-slate-500 mt-0.5">
             مراقبة ذكية تحسب الفرق الزمني بين اللحظة الراهنة وتاريخ تسليم المهمة لتنبيه الموظفين تلقائياً.
           </p>
         </div>
@@ -122,6 +122,7 @@ export function NotificationsView({
             <Button
               size="sm"
               variant="outline"
+              className="bg-[#E8F8EE] border-transparent text-[#15803D] hover:bg-[#DCFCE7]"
               leftIcon={<Check className="w-4 h-4" />}
               onClick={onMarkAllRead}
             >
@@ -142,46 +143,46 @@ export function NotificationsView({
       </div>
 
       {/* Automated Deadline Push Service Status Banner */}
-      <Card className="p-4 bg-gradient-to-br from-neutral-900 via-neutral-900 to-neutral-800 text-white border-none shadow-md">
+      <Card className="p-5 sm:p-6 bg-[#16181A] text-white border-none shadow-sm rounded-3xl">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="space-y-1.5">
-            <div className="flex items-center gap-2.5">
+            <div className="flex flex-wrap items-center gap-2.5">
               <span className="flex h-2.5 w-2.5 relative">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#22C55E] opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-[#22C55E]"></span>
               </span>
-              <span className="text-xs font-bold uppercase tracking-wider text-emerald-400 font-mono">
+              <span className="text-xs font-bold uppercase tracking-wider text-[#22C55E] font-mono">
                 خدمة فحص وتنبيه المواعيد التلقائية نشطة
               </span>
-              <span className="text-[10px] bg-white/10 text-neutral-300 px-2 py-0.5 rounded-full font-mono">
+              <span className="text-[10px] bg-white/10 text-neutral-300 px-2.5 py-0.5 rounded-full font-mono tabular-nums">
                 معدل الفحص: كل {serviceStatus.settings.checkIntervalSeconds} ثانية
               </span>
             </div>
 
             <p className="text-xs text-neutral-300">
               حساب مستمر للفرق الزمني بين تاريخ اليوم والموعد النهائي بهامش تحذير{' '}
-              <span className="text-amber-300 font-medium">{serviceStatus.settings.thresholdHours} ساعة</span>.
+              <span className="text-amber-300 font-semibold tabular-nums">{serviceStatus.settings.thresholdHours} ساعة</span>.
               يرسل تنبيهات داخل النظام وإشعارات سطح المكتب (Desktop Push) للمكلف بالتنفيذ.
             </p>
 
             {scanSummary && (
-              <p className="text-[11px] text-emerald-300 bg-emerald-950/60 px-2.5 py-1 rounded border border-emerald-800/60 inline-block font-mono">
+              <p className="text-[11px] text-[#4ADE80] bg-emerald-950/60 px-3 py-1 rounded-full border border-emerald-800/60 inline-block font-mono">
                 {scanSummary}
               </p>
             )}
           </div>
 
-          <div className="flex items-center gap-3 shrink-0">
+          <div className="flex items-center gap-2.5 shrink-0">
             {serviceStatus.browserPermission === 'granted' ? (
-              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs font-medium">
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+              <div className="flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-[#22C55E]/15 border border-[#22C55E]/30 text-[#4ADE80] text-xs font-medium">
+                <CheckCircle2 className="w-3.5 h-3.5 text-[#22C55E]" />
                 إشعارات المتصفح مفعلة
               </div>
             ) : (
               <Button
                 size="sm"
                 variant="outline"
-                className="text-white border-white/20 hover:bg-white/10 text-xs cursor-pointer"
+                className="bg-white/10 text-white border-white/15 hover:bg-white/15 text-xs cursor-pointer"
                 leftIcon={<Bell className="w-3.5 h-3.5 text-amber-400" />}
                 onClick={handleRequestPushPermission}
               >
@@ -194,7 +195,7 @@ export function NotificationsView({
               onClick={() => DeadlinePushService.playGentleChime()}
               title="تجربة نغمة التنبيه الهادئة"
               aria-label="تجربة نغمة التنبيه الهادئة"
-              className="p-2 rounded-xl bg-white/10 hover:bg-white/15 text-neutral-300 hover:text-white transition-colors cursor-pointer"
+              className="w-9 h-9 rounded-full bg-white/10 hover:bg-white/15 text-neutral-300 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
             >
               <Volume2 className="w-4 h-4" />
             </button>
@@ -202,26 +203,26 @@ export function NotificationsView({
         </div>
 
         {/* Quick Stats Grid */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-3 mt-3 border-t border-white/10 text-center sm:text-right">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-4 mt-4 border-t border-white/10 text-center sm:text-right">
           <div>
             <p className="text-[10px] text-neutral-400 font-medium">مهام توشك على الانتهاء</p>
-            <p className="text-lg font-bold text-amber-400 font-mono">{approachingTasks.length}</p>
+            <p className="text-lg font-bold text-amber-400 font-mono tabular-nums">{approachingTasks.length}</p>
           </div>
           <div>
             <p className="text-[10px] text-neutral-400 font-medium">مهام نشطة قيد المراقبة</p>
-            <p className="text-lg font-bold text-white font-mono">
+            <p className="text-lg font-bold text-white font-mono tabular-nums">
               {tasks.filter(t => t.status !== 'Completed' && t.status !== 'Cancelled').length}
             </p>
           </div>
           <div>
             <p className="text-[10px] text-neutral-400 font-medium">مهام متأخرة تجاوزت الموعد</p>
-            <p className="text-lg font-bold text-rose-400 font-mono">
+            <p className="text-lg font-bold text-rose-400 font-mono tabular-nums">
               {approachingTasks.filter(item => item.calc.isOverdue).length}
             </p>
           </div>
           <div>
             <p className="text-[10px] text-neutral-400 font-medium">آخر فحص تلقائي</p>
-            <p className="text-xs text-neutral-300 font-mono mt-1">
+            <p className="text-xs text-neutral-200 font-mono mt-1 tabular-nums">
               {serviceStatus.lastCheckedAt
                 ? new Date(serviceStatus.lastCheckedAt).toLocaleTimeString('ar-SA', {
                     hour: '2-digit',
@@ -235,19 +236,19 @@ export function NotificationsView({
       </Card>
 
       {/* Tabs */}
-      <div className="flex items-center gap-2 border-b border-neutral-200">
+      <div className="flex items-center gap-3 border-b border-slate-200/80">
         <button
           type="button"
           onClick={() => setActiveTab('notifications')}
           className={`pb-3 px-3 text-xs font-bold transition-all relative cursor-pointer ${
             activeTab === 'notifications'
-              ? 'text-emerald-700 border-b-2 border-emerald-600'
-              : 'text-neutral-500 hover:text-neutral-700'
+              ? 'text-[#15803D] border-b-2 border-[#22C55E]'
+              : 'text-slate-500 hover:text-slate-800'
           }`}
         >
           سجل التنبيهات ({notifications.length})
           {unreadCount > 0 && (
-            <span className="mr-1.5 px-1.5 py-0.5 rounded-full text-[10px] bg-emerald-600 text-white font-bold">
+            <span className="mr-1.5 px-2 py-0.5 rounded-full text-[10px] bg-[#22C55E] text-white font-bold tabular-nums">
               {unreadCount} جديدة
             </span>
           )}
@@ -258,13 +259,13 @@ export function NotificationsView({
           onClick={() => setActiveTab('deadlines')}
           className={`pb-3 px-3 text-xs font-bold transition-all relative cursor-pointer ${
             activeTab === 'deadlines'
-              ? 'text-emerald-700 border-b-2 border-emerald-600'
-              : 'text-neutral-500 hover:text-neutral-700'
+              ? 'text-[#15803D] border-b-2 border-[#22C55E]'
+              : 'text-slate-500 hover:text-slate-800'
           }`}
         >
           قائمة مراقبة المواعيد الحرجة ({approachingTasks.length})
           {approachingTasks.length > 0 && (
-            <span className="mr-1.5 px-1.5 py-0.5 rounded-full text-[10px] bg-amber-500 text-white font-bold">
+            <span className="mr-1.5 px-2 py-0.5 rounded-full text-[10px] bg-amber-500 text-white font-bold tabular-nums">
               {approachingTasks.length}
             </span>
           )}
@@ -281,7 +282,7 @@ export function NotificationsView({
               description="أنت على اطلاع تام بكافة المستجدات. عندما تقترب مهامك من موعد التسليم، ستظهر التنبيهات هنا فورياً."
             />
           ) : (
-            <Card className="p-0 overflow-hidden divide-y divide-neutral-100">
+            <Card className="p-0 overflow-hidden divide-y divide-slate-100">
               {notifications.map(n => (
                 <div
                   key={n.id}
@@ -298,47 +299,47 @@ export function NotificationsView({
                       if (n.relatedTaskId) onSelectTask(n.relatedTaskId);
                     }
                   }}
-                  className={`p-4 flex items-start gap-3.5 hover:bg-neutral-50 transition-colors cursor-pointer ${
-                    !n.read ? 'bg-emerald-50/20' : ''
+                  className={`p-4 sm:p-5 flex items-start gap-3.5 hover:bg-[#F8F9FA] transition-colors cursor-pointer ${
+                    !n.read ? 'bg-[#E8F8EE]/25' : ''
                   }`}
                 >
                   <div className="mt-0.5 shrink-0">
                     {n.type === 'task_assigned' && (
-                      <div className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-800 flex items-center justify-center">
+                      <div className="w-9 h-9 rounded-full bg-[#DCFCE7] text-[#15803D] flex items-center justify-center">
                         <Plus className="w-4 h-4" />
                       </div>
                     )}
                     {n.type === 'task_approved' && (
-                      <div className="w-8 h-8 rounded-xl bg-teal-100 text-teal-800 flex items-center justify-center">
+                      <div className="w-9 h-9 rounded-full bg-cyan-50 text-cyan-700 flex items-center justify-center">
                         <CheckCircle2 className="w-4 h-4" />
                       </div>
                     )}
                     {n.type === 'deadline_approaching' && (
-                      <div className="w-8 h-8 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center">
+                      <div className="w-9 h-9 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center">
                         <Clock className="w-4 h-4" />
                       </div>
                     )}
                     {n.type !== 'task_assigned' &&
                       n.type !== 'task_approved' &&
                       n.type !== 'deadline_approaching' && (
-                        <div className="w-8 h-8 rounded-xl bg-neutral-100 text-neutral-700 flex items-center justify-center">
+                        <div className="w-9 h-9 rounded-full bg-[#F1F3F5] text-slate-600 flex items-center justify-center">
                           <Bell className="w-4 h-4" />
                         </div>
                       )}
                   </div>
 
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <h4 className="text-sm font-bold text-neutral-900">{n.title}</h4>
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h4 className="text-sm font-bold text-slate-900">{n.title}</h4>
                         {n.type === 'deadline_approaching' && (
-                          <span className="text-[10px] px-1.5 py-0.5 rounded font-medium bg-amber-100 text-amber-800">
+                          <span className="text-[10px] px-2.5 py-0.5 rounded-full font-semibold bg-amber-50 text-amber-700">
                             إنذار موعد تسليم
                           </span>
                         )}
                       </div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs text-neutral-400 font-mono">
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className="text-xs text-slate-400 font-mono tabular-nums">
                           {new Date(n.createdAt).toLocaleDateString('ar-SA', {
                             month: 'short',
                             day: 'numeric',
@@ -349,15 +350,15 @@ export function NotificationsView({
                           })}
                         </span>
                         {!n.read && (
-                          <span className="w-2.5 h-2.5 rounded-full bg-emerald-600 ring-4 ring-emerald-100" />
+                          <span className="w-2.5 h-2.5 rounded-full bg-[#22C55E] ring-4 ring-[#DCFCE7]" />
                         )}
                       </div>
                     </div>
 
-                    <p className="text-xs text-neutral-600 mt-1 leading-relaxed">{n.message}</p>
+                    <p className="text-xs text-slate-600 mt-1 leading-relaxed">{n.message}</p>
 
                     {n.relatedTaskId && (
-                      <span className="inline-flex items-center gap-1 mt-2 text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200/50">
+                      <span className="inline-flex items-center gap-1.5 mt-2.5 text-[11px] font-semibold text-[#15803D] bg-[#E8F8EE] px-3 py-1 rounded-full">
                         عرض تفاصيل المهمة
                         <ArrowLeft className="w-3 h-3" />
                       </span>
@@ -373,16 +374,16 @@ export function NotificationsView({
       {/* Tab Content: Approaching Deadlines Watchlist */}
       {activeTab === 'deadlines' && (
         <div className="space-y-4">
-          <p className="text-xs text-neutral-500">
+          <p className="text-xs text-slate-500">
             محسوبة بدقة بناءً على الفرق الزمني بين اليوم والموعد النهائي المحدد.
             المهام المتبقي عليها أقل من {serviceStatus.settings.thresholdHours} ساعة تنشئ إشعارات فورية تلقائياً.
           </p>
 
           {approachingTasks.length === 0 ? (
             <Card className="p-8 text-center">
-              <CheckCircle2 className="w-8 h-8 text-emerald-600 mx-auto mb-2" />
-              <h3 className="text-sm font-bold text-neutral-900">لا توجد مهام في دائرة الخطر</h3>
-              <p className="text-xs text-neutral-500 mt-1">
+              <CheckCircle2 className="w-8 h-8 text-[#16A34A] mx-auto mb-2" />
+              <h3 className="text-sm font-bold text-slate-900">لا توجد مهام في دائرة الخطر</h3>
+              <p className="text-xs text-slate-500 mt-1">
                 كافة المهام النشطة لديها متسع زمني كافٍ يتجاوز حد التنبيه ({serviceStatus.settings.thresholdHours} ساعة).
               </p>
             </Card>
@@ -391,48 +392,49 @@ export function NotificationsView({
               {approachingTasks.map(({ task, calc }) => (
                 <Card
                   key={task.id}
-                  className={`p-4 transition-all hover:shadow-md cursor-pointer border ${
+                  hover
+                  className={`p-5 transition-all cursor-pointer ${
                     calc.isOverdue
-                      ? 'border-rose-200 bg-rose-50/10'
+                      ? 'border-rose-200 bg-rose-50/15'
                       : calc.urgency === 'due_today'
-                      ? 'border-amber-300 bg-amber-50/15'
-                      : 'border-neutral-200 hover:border-neutral-300'
+                      ? 'border-amber-200 bg-amber-50/15'
+                      : ''
                   }`}
                   onClick={() => onSelectTask(task.id)}
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div>
-                      <span className="text-[10px] font-mono text-neutral-400">{task.taskId}</span>
-                      <h4 className="text-sm font-bold text-neutral-900 line-clamp-1 mt-0.5">
+                      <span className="text-[10px] font-mono text-slate-400">{task.taskId}</span>
+                      <h4 className="text-sm font-bold text-slate-900 line-clamp-1 mt-0.5">
                         {task.title}
                       </h4>
                     </div>
 
                     <span
-                      className={`px-2 py-0.5 rounded-full text-[11px] font-bold font-mono shrink-0 ${
+                      className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold font-mono shrink-0 ${
                         calc.isOverdue
-                          ? 'bg-rose-100 text-rose-800 border border-rose-200'
+                          ? 'bg-rose-100 text-rose-700'
                           : calc.urgency === 'due_today'
-                          ? 'bg-amber-100 text-amber-800 border border-amber-300'
-                          : 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                          ? 'bg-amber-100 text-amber-700'
+                          : 'bg-[#DCFCE7] text-[#15803D]'
                       }`}
                     >
                       {calc.humanReadableDiff}
                     </span>
                   </div>
 
-                  <p className="text-xs text-neutral-600 mt-2 line-clamp-2 leading-relaxed">
+                  <p className="text-xs text-slate-600 mt-2 line-clamp-2 leading-relaxed">
                     {task.description}
                   </p>
 
-                  <div className="mt-4 pt-3 border-t border-neutral-100 flex items-center justify-between text-xs">
-                    <div className="flex items-center gap-3 text-neutral-500">
-                      <span className="flex items-center gap-1">
-                        <Calendar className="w-3.5 h-3.5 text-neutral-400" />
-                        التسليم: <strong className="text-neutral-700">{task.deadline}</strong>
+                  <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
+                    <div className="flex items-center gap-3 text-slate-500">
+                      <span className="flex items-center gap-1 tabular-nums">
+                        <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                        التسليم: <strong className="text-slate-700">{task.deadline}</strong>
                       </span>
                       <span className="flex items-center gap-1">
-                        <UserIcon className="w-3.5 h-3.5 text-neutral-400" />
+                        <UserIcon className="w-3.5 h-3.5 text-slate-400" />
                         {task.assignedToName || 'غير مسندة'}
                       </span>
                     </div>
@@ -441,7 +443,7 @@ export function NotificationsView({
                       <Button
                         size="sm"
                         variant="outline"
-                        leftIcon={<Send className="w-3 h-3 text-neutral-500" />}
+                        leftIcon={<Send className="w-3 h-3 text-slate-500" />}
                         onClick={() => handleTriggerTaskPush(task)}
                         title="إرسال إشعار فوري فوري لهذه المهمة"
                       >

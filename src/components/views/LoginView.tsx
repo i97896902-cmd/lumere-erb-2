@@ -34,59 +34,60 @@ export function LoginView({ onSuccess }: LoginViewProps) {
 
   return (
     <div
-      className="min-h-screen bg-neutral-100 flex flex-col justify-center items-center p-4"
+      className="min-h-screen bg-[#F5F6F8] flex flex-col justify-center items-center p-4"
       dir="rtl"
     >
-      <div className="w-full max-w-md bg-white rounded-3xl border border-neutral-200/80 shadow-xl overflow-hidden">
-        {/* Brand Banner */}
-        <div className="bg-gradient-to-br from-neutral-900 via-neutral-950 to-neutral-900 p-8 text-white text-center border-b border-neutral-800">
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-600 to-teal-800 flex items-center justify-center mx-auto shadow-md text-white font-bold text-2xl tracking-wider border border-emerald-500/30 mb-3">
-            LG
-          </div>
-          <h1 className="font-serif tracking-widest text-2xl font-bold">LUMERE GROUP</h1>
-          <p className="text-xs tracking-wide text-neutral-400 font-medium mt-1">
-            منظومة إدارة موارد مجموعة الشركات المؤسسية
-          </p>
-          <p className="text-[11px] tracking-widest text-emerald-400/90 font-semibold mt-2.5">
-            LUMERE · NEX AURA · ORDARK
+      {/* Top Brand Lockup */}
+      <div className="text-center mb-6">
+        <img
+          src="/assets/aistudio/image_4888628b.png"
+          alt="Luméré"
+          className="h-28 w-auto mx-auto object-contain select-none"
+        />
+        <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight mt-2">
+          أهلاً بك في لوميريه
+        </h1>
+        <p className="text-xs text-slate-500 font-medium mt-1.5">
+          منظومة إدارة موارد مجموعة الشركات
+        </p>
+      </div>
+
+      {/* Main White Card */}
+      <div className="w-full max-w-sm bg-white rounded-3xl border border-slate-200/75 shadow-[0_8px_30px_rgba(15,23,42,0.04)] p-7 sm:p-8 space-y-5">
+        <div className="text-center space-y-1.5">
+          <h2 className="text-base font-bold text-slate-900">تسجيل الدخول</h2>
+          <p className="text-xs text-slate-400 leading-relaxed">
+            استخدم حساب Google الخاص بك للوصول الآمن إلى مساحة عمل شركتك.
           </p>
         </div>
 
-        {/* Google-Only Authentication Body */}
-        <div className="p-6 sm:p-8 space-y-6">
-          <div className="text-center space-y-1.5">
-            <h2 className="text-lg font-bold text-neutral-900">تسجيل الدخول إلى النظام</h2>
-            <p className="text-xs text-neutral-500 leading-relaxed">
-              استخدم حساب Google الخاص بك للوصول الآمن إلى مساحة عمل شركتك داخل مجموعة LUMERE GROUP.
-            </p>
-          </div>
-
-          {(errorMsg || authError) && (
-            <div
-              role="alert"
-              className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-medium flex items-start gap-2.5"
-            >
-              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-              <span className="leading-relaxed">{errorMsg || authError}</span>
-            </div>
-          )}
-
-          <button
-            type="button"
-            id="btn-google-signin"
-            onClick={handleGoogleSignIn}
-            disabled={isLoading}
-            aria-busy={isLoading}
-            aria-label="تسجيل الدخول بحساب Google"
-            className="w-full py-3.5 px-5 rounded-xl border border-neutral-200 hover:border-emerald-600 bg-white hover:bg-emerald-50/40 text-neutral-900 font-bold text-sm flex items-center justify-center gap-3 transition-all shadow-xs hover:shadow-md active:scale-[0.99] disabled:opacity-50 cursor-pointer"
+        {(errorMsg || authError) && (
+          <div
+            role="alert"
+            className="p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-medium flex items-start gap-2.5"
           >
-            {isLoading ? (
-              <span
-                className="h-5 w-5 animate-spin rounded-full border-2 border-neutral-300 border-t-emerald-600"
-                aria-hidden="true"
-              />
-            ) : (
-              <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24" aria-hidden="true">
+            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+            <span className="leading-relaxed">{errorMsg || authError}</span>
+          </div>
+        )}
+
+        <button
+          type="button"
+          id="btn-google-signin"
+          onClick={handleGoogleSignIn}
+          disabled={isLoading}
+          aria-busy={isLoading}
+          aria-label="تسجيل الدخول بحساب Google"
+          className="w-full py-3.5 px-5 rounded-full bg-[#18181B] hover:bg-neutral-800 text-white font-bold text-xs flex items-center justify-center gap-3 transition-all shadow-sm active:scale-[0.99] disabled:opacity-50 cursor-pointer"
+        >
+          {isLoading ? (
+            <span
+              className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white"
+              aria-hidden="true"
+            />
+          ) : (
+            <span className="w-5 h-5 rounded-full bg-white flex items-center justify-center shrink-0">
+              <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" aria-hidden="true">
                 <path
                   fill="#4285F4"
                   d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
@@ -104,15 +105,21 @@ export function LoginView({ onSuccess }: LoginViewProps) {
                   d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
                 />
               </svg>
-            )}
-            <span>{isLoading ? 'جارِ الاتصال بحساب Google...' : 'المتابعة باستخدام Google'}</span>
-          </button>
+            </span>
+          )}
+          <span>{isLoading ? 'جارِ الاتصال بحساب Google...' : 'المتابعة باستخدام Google'}</span>
+        </button>
+      </div>
 
-          <div className="pt-4 border-t border-neutral-100 flex items-center justify-center gap-2 text-[11px] text-neutral-500">
-            <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
-            <span>الدخول محصور بمصادقة Google المعتمدة لمنسوبي المجموعة</span>
-          </div>
+      {/* Footer Trust & Group Note */}
+      <div className="mt-5 text-center space-y-3">
+        <div className="flex items-center justify-center gap-1.5 text-[11px] text-slate-400">
+          <ShieldCheck className="w-4 h-4 text-[#22C55E] shrink-0" />
+          <span>الدخول محصور بمصادقة Google المعتمدة لمنسوبي المجموعة</span>
         </div>
+        <p className="text-[10px] tracking-[0.2em] text-slate-400 font-semibold">
+          LUMERE · NEX AURA · ORDARK
+        </p>
       </div>
     </div>
   );

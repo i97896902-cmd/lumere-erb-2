@@ -613,11 +613,13 @@ function LumereAppContent() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-neutral-900 flex flex-col items-center justify-center p-4" dir="rtl">
-        <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-600 to-teal-800 flex items-center justify-center shadow-lg text-white font-bold text-2xl tracking-wider border border-emerald-500/30 animate-bounce">
-          L
-        </div>
-        <p className="mt-4 text-xs tracking-widest uppercase font-bold text-neutral-400">
+      <div className="min-h-screen bg-[#F5F6F8] flex flex-col items-center justify-center p-4" dir="rtl">
+        <img
+          src="/assets/aistudio/image_4888628b.png"
+          alt="Luméré"
+          className="h-20 w-auto object-contain animate-pulse select-none"
+        />
+        <p className="mt-4 text-xs tracking-wider font-bold text-slate-500">
           جارِ تهيئة منظومة LUMERE GROUP المؤسسية...
         </p>
       </div>
@@ -650,18 +652,18 @@ function LumereAppContent() {
   // 5. Suspended / Inactive
   if (isSuspendedStatus(currentUser.status)) {
     return (
-      <div className="min-h-screen bg-neutral-100 flex items-center justify-center p-4" dir="rtl">
-        <div className="max-w-md w-full bg-white rounded-3xl border border-neutral-200 p-8 text-center shadow-xl">
+      <div className="min-h-screen bg-[#F5F6F8] flex items-center justify-center p-4" dir="rtl">
+        <div className="max-w-md w-full bg-white rounded-3xl border border-slate-200/75 p-8 text-center shadow-[0_8px_30px_rgba(15,23,42,0.04)]">
           <div className="w-14 h-14 rounded-2xl bg-rose-50 border border-rose-200 flex items-center justify-center mx-auto mb-4 text-rose-600">
             <AlertCircle className="w-7 h-7" />
           </div>
-          <h2 className="text-lg font-bold text-neutral-900 mb-2">الحساب موقوف مؤقتاً</h2>
-          <p className="text-xs text-neutral-600 mb-6 leading-relaxed">
+          <h2 className="text-lg font-bold text-slate-900 mb-2">الحساب موقوف مؤقتاً</h2>
+          <p className="text-xs text-slate-500 mb-6 leading-relaxed">
             تم إيقاف صلاحيات الوصول لهذا الحساب من قِبل إدارة {activeCompany.name}. يرجى التواصل مع مسؤول النظام لمعرفة التفاصيل وإعادة التفعيل.
           </p>
           <button
             onClick={() => logout()}
-            className="w-full py-2.5 px-4 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-white text-xs font-semibold transition-colors"
+            className="w-full py-2.5 px-5 rounded-full bg-[#18181B] hover:bg-neutral-800 text-white text-xs font-semibold transition-colors cursor-pointer"
           >
             تسجيل الخروج
           </button>
@@ -672,19 +674,19 @@ function LumereAppContent() {
 
   // Active Multi-Company Workspace with RTL Support
   return (
-    <div className="min-h-screen bg-neutral-100 flex" dir="rtl">
+    <div className="min-h-screen bg-[#F5F6F8] flex" dir="rtl">
       {installPrompt && !isInstalled && (
         <div
-          className="fixed bottom-4 left-4 right-4 z-50 mx-auto flex max-w-lg items-center justify-between gap-4 rounded-2xl border-emerald-200 bg-white p-4 shadow-xl"
+          className="fixed bottom-4 left-4 right-4 z-50 mx-auto flex max-w-lg items-center justify-between gap-4 rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xl"
           role="status"
         >
-          <p className="text-xs font-semibold text-neutral-800">
+          <p className="text-xs font-semibold text-slate-800">
             ثبّت LUMERE GROUP للوصول السريع والعمل كتطبيق.
           </p>
           <button
             type="button"
             onClick={installApp}
-            className="shrink-0 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-700"
+            className="shrink-0 rounded-full bg-[#22C55E] px-4 py-2 text-xs font-bold text-white hover:bg-[#16A34A] transition-colors cursor-pointer"
           >
             تثبيت التطبيق
           </button>

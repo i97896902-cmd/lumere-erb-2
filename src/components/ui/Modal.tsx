@@ -48,7 +48,7 @@ export function Modal({
     <div className="fixed inset-0 z-50 overflow-y-auto" dir="rtl">
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-neutral-950/60 transition-opacity"
+        className="fixed inset-0 bg-slate-900/35 backdrop-blur-[2px] transition-opacity"
         onClick={onClose}
         aria-hidden="true"
       />
@@ -59,27 +59,27 @@ export function Modal({
           role="dialog"
           aria-modal="true"
           aria-label={title}
-          className={`w-full ${maxWidthClass} pointer-events-auto rounded-2xl bg-white text-right align-middle shadow-2xl border border-neutral-200 overflow-hidden`}
+          className={`w-full ${maxWidthClass} pointer-events-auto rounded-3xl bg-white text-right align-middle shadow-2xl border border-slate-200/80 overflow-hidden`}
           onClick={e => e.stopPropagation()}
         >
           {/* Header */}
-          <div className="flex items-start justify-between border-b border-neutral-100 px-6 py-4.5 bg-neutral-50/80">
+          <div className="flex items-start justify-between px-6 pt-5 pb-4 bg-white border-b border-slate-100">
             <div>
-              <h3 className="text-lg font-bold text-neutral-900">{title}</h3>
-              {subtitle && <p className="mt-0.5 text-xs text-neutral-500">{subtitle}</p>}
+              <h3 className="text-lg font-bold text-zinc-900">{title}</h3>
+              {subtitle && <p className="mt-0.5 text-xs text-slate-500">{subtitle}</p>}
             </div>
             <button
               type="button"
               onClick={onClose}
-              className="rounded-lg p-1.5 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700 transition-colors"
+              className="rounded-full p-2 bg-[#F1F3F5] text-slate-500 hover:bg-slate-200 hover:text-zinc-900 transition-colors cursor-pointer"
               aria-label="إغلاق النافذة"
             >
-              <X className="w-5 h-5" />
+              <X className="w-4 h-4" />
             </button>
           </div>
 
           {/* Content */}
-          <div className="px-6 py-5 max-h-[80vh] overflow-y-auto text-neutral-900">{children}</div>
+          <div className="px-6 py-5 max-h-[80vh] overflow-y-auto text-zinc-900">{children}</div>
         </div>
       </div>
     </div>

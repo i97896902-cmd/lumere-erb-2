@@ -4,14 +4,20 @@
   :root {
     --font-sans: 'Cairo', 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
     --font-brand: 'Cinzel', serif;
+    --surface-canvas: #f5f6f8;
+    --surface-card: #ffffff;
+    --surface-control: #f1f3f5;
+    --accent-primary: #22c55e;
+    --accent-primary-hover: #16a34a;
   }
 
   body {
     font-family: var(--font-sans);
-    color: #0f172a;
-    background-color: #f8fafc;
+    color: #18181b;
+    background-color: var(--surface-canvas);
     direction: rtl;
     text-align: right;
+    -webkit-font-smoothing: antialiased;
   }
 }
 
@@ -24,9 +30,9 @@
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
+  background: #d4d4d8;
   border-radius: 9999px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+  background: #a1a1aa;
 }

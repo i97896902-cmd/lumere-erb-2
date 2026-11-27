@@ -141,12 +141,12 @@ export function DepartmentsView({
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl font-bold text-neutral-900">
+          <h2 className="text-xl font-bold text-slate-900">
             {isManager
               ? `إدارة القسم — ${currentUser?.department || activeCompany.name}`
               : `الأقسام والوحدات التشغيلية — ${activeCompany.name}`}
           </h2>
-          <p className="text-xs text-neutral-500">
+          <p className="text-xs text-slate-500 mt-0.5">
             {isManager
               ? `مركز متابعة فريق القسم والمهام التنفيذية ومعدلات الإنجاز داخل ${activeCompany.name}.`
               : 'توزيع الإدارات، قيادات الفرق، حجم الضغط التشغيلي، ومعدلات إنجاز الأعمال.'}
@@ -191,20 +191,20 @@ export function DepartmentsView({
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-3">
                     <div
-                      className={`w-10 h-10 rounded-xl flex items-center justify-center text-white font-bold shadow-2xs shrink-0 ${
+                      className={`w-11 h-11 rounded-2xl flex items-center justify-center text-white font-bold shrink-0 ${
                         dept.color?.startsWith('bg-') ? dept.color : ''
                       }`}
                       style={
                         dept.color?.startsWith('bg-')
                           ? undefined
-                          : { backgroundColor: dept.color || '#059669' }
+                          : { backgroundColor: dept.color || '#22C55E' }
                       }
                     >
                       <Building2 className="w-5 h-5" />
                     </div>
                     <div>
-                      <h3 className="text-base font-bold text-neutral-900">{dept.name}</h3>
-                      <p className="text-xs text-neutral-500">
+                      <h3 className="text-base font-bold text-slate-900">{dept.name}</h3>
+                      <p className="text-xs text-slate-500">
                         المسؤول: {dept.headName || 'قائد القسم'}
                         {isGroupView && dept.companyId
                           ? ` • ${getCompanyById(dept.companyId)?.name || dept.companyId}`
@@ -217,7 +217,7 @@ export function DepartmentsView({
                     <button
                       type="button"
                       onClick={() => openEditModal(dept)}
-                      className="p-1 text-neutral-400 hover:text-neutral-700 rounded-lg hover:bg-neutral-100 transition-colors cursor-pointer"
+                      className="p-1.5 text-slate-400 hover:text-slate-700 rounded-full hover:bg-[#F1F3F5] transition-colors cursor-pointer"
                       title="تعديل بيانات القسم"
                     >
                       <Edit2 className="w-4 h-4" />
@@ -225,37 +225,37 @@ export function DepartmentsView({
                   )}
                 </div>
 
-                <p className="text-xs text-neutral-600 mt-3 line-clamp-2 leading-relaxed">
+                <p className="text-xs text-slate-600 mt-3 line-clamp-2 leading-relaxed">
                   {dept.description}
                 </p>
               </div>
 
               {/* Department Statistics */}
-              <div className="pt-3 border-t border-neutral-100 space-y-3">
-                <div className="grid grid-cols-3 text-center text-xs gap-1.5">
-                  <div className="p-1.5 rounded-lg bg-neutral-50">
-                    <p className="font-mono font-bold text-neutral-900">{deptEmps.length}</p>
-                    <p className="text-[10px] text-neutral-400">الأعضاء</p>
+              <div className="pt-3.5 border-t border-slate-100 space-y-3">
+                <div className="grid grid-cols-3 text-center text-xs gap-2">
+                  <div className="p-2 rounded-xl bg-[#F8F9FA]">
+                    <p className="font-mono font-bold text-slate-900 tabular-nums">{deptEmps.length}</p>
+                    <p className="text-[10px] text-slate-400 mt-0.5">الأعضاء</p>
                   </div>
-                  <div className="p-1.5 rounded-lg bg-neutral-50">
-                    <p className="font-mono font-bold text-neutral-900">{deptTasks.length}</p>
-                    <p className="text-[10px] text-neutral-400">المهام</p>
+                  <div className="p-2 rounded-xl bg-[#F8F9FA]">
+                    <p className="font-mono font-bold text-slate-900 tabular-nums">{deptTasks.length}</p>
+                    <p className="text-[10px] text-slate-400 mt-0.5">المهام</p>
                   </div>
-                  <div className="p-1.5 rounded-lg bg-teal-50">
-                    <p className="font-mono font-bold text-teal-800">{completedTasks}</p>
-                    <p className="text-[10px] text-teal-600">المنجزة</p>
+                  <div className="p-2 rounded-xl bg-cyan-50/75">
+                    <p className="font-mono font-bold text-cyan-800 tabular-nums">{completedTasks}</p>
+                    <p className="text-[10px] text-cyan-600 mt-0.5">المنجزة</p>
                   </div>
                 </div>
 
                 {/* Completion rate bar */}
-                <div className="space-y-1">
+                <div className="space-y-1.5">
                   <div className="flex justify-between text-[11px]">
-                    <span className="text-neutral-500">نسبة الإنجاز</span>
-                    <span className="font-bold text-emerald-700">{rate}%</span>
+                    <span className="text-slate-500">نسبة الإنجاز</span>
+                    <span className="font-bold text-[#15803D] tabular-nums">{rate}%</span>
                   </div>
-                  <div className="h-1.5 w-full bg-neutral-100 rounded-full overflow-hidden">
+                  <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
                     <div
-                      className="h-full bg-emerald-600 rounded-full"
+                      className="h-full bg-[#22C55E] rounded-full transition-all"
                       style={{ width: `${rate}%` }}
                     />
                   </div>
@@ -273,8 +273,8 @@ export function DepartmentsView({
           <div className="lg:col-span-2 space-y-3">
             <div className="flex items-center justify-between">
               <div>
-                <h3 className="text-base font-bold text-neutral-900">مهام القسم الحالية</h3>
-                <p className="text-xs text-neutral-500">
+                <h3 className="text-base font-bold text-slate-900">مهام القسم الحالية</h3>
+                <p className="text-xs text-slate-500">
                   التكليفات النشطة وبانتظار الاعتماد ضمن نطاق إشرافك
                 </p>
               </div>
@@ -292,13 +292,13 @@ export function DepartmentsView({
 
             <Card className="p-0 overflow-hidden">
               {visibleTasks.length === 0 ? (
-                <div className="p-8 text-center text-xs text-neutral-500">
+                <div className="p-8 text-center text-xs text-slate-500">
                   لا توجد مهام مسجلة حالياً ضمن هذا القسم.
                 </div>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-right text-sm">
-                    <thead className="bg-neutral-50/80 border-b border-neutral-100 text-xs text-neutral-500 font-semibold">
+                    <thead className="bg-[#F8F9FA] border-b border-slate-100 text-xs text-slate-500 font-semibold">
                       <tr>
                         <th className="px-4 py-3">المهمة</th>
                         <th className="px-4 py-3">المكلف</th>
@@ -308,7 +308,7 @@ export function DepartmentsView({
                         <th className="px-4 py-3 text-left">فتح</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-neutral-100">
+                    <tbody className="divide-y divide-slate-100">
                       {visibleTasks.slice(0, 6).map(task => {
                         const isOverdue =
                           task.deadline < nowStr &&
@@ -317,20 +317,20 @@ export function DepartmentsView({
                         return (
                           <tr
                             key={task.id}
-                            className="hover:bg-neutral-50/80 transition-colors cursor-pointer group"
+                            className="hover:bg-[#F8F9FA]/80 transition-colors cursor-pointer group"
                             onClick={() => onSelectTask?.(task.id)}
                           >
                             <td className="px-4 py-3 max-w-xs">
                               <div className="flex items-center gap-2">
-                                <span className="font-mono text-xs font-bold text-emerald-800 bg-emerald-50 border border-emerald-200/50 px-1.5 py-0.5 rounded">
+                                <span className="font-mono text-xs font-bold text-[#15803D] bg-[#E8F8EE] px-2 py-0.5 rounded-lg">
                                   {task.taskId}
                                 </span>
-                                <span className="font-medium text-neutral-900 truncate">
+                                <span className="font-medium text-slate-900 truncate">
                                   {task.title}
                                 </span>
                               </div>
                             </td>
-                            <td className="px-4 py-3 text-xs text-neutral-700 font-medium">
+                            <td className="px-4 py-3 text-xs text-slate-700 font-medium">
                               {task.assignedToName}
                             </td>
                             <td className="px-4 py-3">
@@ -339,14 +339,14 @@ export function DepartmentsView({
                             <td className="px-4 py-3">
                               <StatusBadge status={task.status} isOverdue={isOverdue} />
                             </td>
-                            <td className="px-4 py-3 text-xs font-mono text-neutral-600">
+                            <td className="px-4 py-3 text-xs font-mono text-slate-600 tabular-nums">
                               <span className="inline-flex items-center gap-1">
-                                <Clock className="w-3 h-3 text-neutral-400" />
+                                <Clock className="w-3 h-3 text-slate-400" />
                                 {task.deadline}
                               </span>
                             </td>
                             <td className="px-4 py-3 text-left">
-                              <ArrowUpLeft className="w-4 h-4 text-neutral-400 group-hover:text-emerald-700 inline" />
+                              <ArrowUpLeft className="w-4 h-4 text-slate-400 group-hover:text-[#15803D] inline" />
                             </td>
                           </tr>
                         );
@@ -362,23 +362,23 @@ export function DepartmentsView({
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <div>
-                <h3 className="text-base font-bold text-neutral-900">فريق القسم</h3>
-                <p className="text-xs text-neutral-500">الأعضاء والمرؤوسون المباشرون</p>
+                <h3 className="text-base font-bold text-slate-900">فريق القسم</h3>
+                <p className="text-xs text-slate-500">الأعضاء والمرؤوسون المباشرون</p>
               </div>
               {onNavigateToTab && (
                 <button
                   type="button"
                   onClick={() => onNavigateToTab('employees')}
-                  className="text-xs font-semibold text-emerald-700 hover:text-emerald-800 cursor-pointer"
+                  className="text-xs font-semibold text-[#15803D] hover:text-[#166534] cursor-pointer"
                 >
                   كامل الفريق
                 </button>
               )}
             </div>
 
-            <Card className="p-4 space-y-3 max-h-[360px] overflow-y-auto">
+            <Card className="p-4 space-y-2.5 max-h-[360px] overflow-y-auto">
               {visibleEmployees.length === 0 ? (
-                <div className="py-8 text-center text-xs text-neutral-400">
+                <div className="py-8 text-center text-xs text-slate-400">
                   لا يوجد أعضاء مسجلون في هذا القسم حالياً
                 </div>
               ) : (
@@ -388,27 +388,27 @@ export function DepartmentsView({
                   return (
                     <div
                       key={member.id}
-                      className="flex items-center justify-between gap-3 p-2.5 rounded-xl bg-neutral-50/70 border border-neutral-100"
+                      className="flex items-center justify-between gap-3 p-3 rounded-2xl bg-[#F8F9FA]"
                     >
                       <div className="flex items-center gap-2.5 min-w-0">
-                        <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-800 flex items-center justify-center text-xs font-bold shrink-0">
+                        <div className="w-8 h-8 rounded-full bg-[#DCFCE7] text-[#15803D] flex items-center justify-center text-xs font-bold shrink-0">
                           {member.displayName.slice(0, 2).toUpperCase()}
                         </div>
                         <div className="min-w-0">
-                          <p className="text-xs font-bold text-neutral-900 truncate">
+                          <p className="text-xs font-bold text-slate-900 truncate">
                             {member.displayName}
                           </p>
-                          <p className="text-[11px] text-neutral-500 truncate">
+                          <p className="text-[11px] text-slate-500 truncate">
                             {member.position || member.department || 'عضو فريق'}
                           </p>
                         </div>
                       </div>
                       <div className="text-left shrink-0">
-                        <span className="inline-flex items-center gap-1 text-[11px] font-mono font-bold text-teal-700">
+                        <span className="inline-flex items-center gap-1 text-[11px] font-mono font-bold text-[#15803D] tabular-nums">
                           <CheckCircle2 className="w-3 h-3" />
                           {memberDone}/{memberTasks.length}
                         </span>
-                        <p className="text-[10px] text-neutral-400 flex items-center gap-1">
+                        <p className="text-[10px] text-slate-400 flex items-center gap-1">
                           <Users className="w-3 h-3" /> مهام
                         </p>
                       </div>
@@ -477,7 +477,7 @@ export function DepartmentsView({
           />
 
           <div className="space-y-1.5">
-            <label className="block text-xs font-semibold text-neutral-700">
+            <label className="block text-xs font-semibold text-slate-700">
               لون الهوية والتمييز
             </label>
             <div className="flex items-center gap-3">
@@ -485,14 +485,19 @@ export function DepartmentsView({
                 type="color"
                 value={color}
                 onChange={e => setColor(e.target.value)}
-                className="w-10 h-10 rounded-xl border border-neutral-200 cursor-pointer p-0.5"
+                className="w-10 h-10 rounded-2xl border border-slate-200 cursor-pointer p-0.5 bg-[#F1F3F5]"
               />
-              <span className="text-xs font-mono text-neutral-600">{color}</span>
+              <span className="text-xs font-mono text-slate-600">{color}</span>
             </div>
           </div>
 
-          <div className="flex items-center justify-end gap-3 pt-3 border-t border-neutral-100">
-            <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)}>
+          <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
+            <Button
+              type="button"
+              variant="outline"
+              className="bg-[#E8F8EE] border-transparent text-[#15803D] hover:bg-[#DCFCE7]"
+              onClick={() => setIsModalOpen(false)}
+            >
               إلغاء
             </Button>
             <Button type="submit" variant="primary" isLoading={isSubmitting}>

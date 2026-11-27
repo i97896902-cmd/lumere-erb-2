@@ -166,20 +166,20 @@ export function SettingsView({ onRefreshAllData }: SettingsViewProps) {
     <div className="space-y-6 max-w-4xl" dir="rtl">
       {/* Header */}
       <div>
-        <h2 className="text-xl font-bold text-neutral-900 flex items-center gap-2">
-          <Settings className="w-5 h-5 text-emerald-600" />
+        <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+          <Settings className="w-5 h-5 text-[#16A34A]" />
           إعدادات وتكوين نظام Luméré
         </h2>
-        <p className="text-xs text-neutral-500">
+        <p className="text-xs text-slate-500 mt-0.5">
           سياسات المؤسسة، ضوابط الأمان والصلاحيات، إعدادات الإشعارات الفورية، وصيانة النظام.
         </p>
       </div>
 
       {/* Brand & Organization */}
-      <Card className="p-5 space-y-4">
-        <div className="flex items-center gap-2.5 border-b border-neutral-100 pb-3">
-          <Building className="w-4 h-4 text-emerald-600" />
-          <h3 className="text-sm font-bold text-neutral-900">الهوية المؤسسية والافتراضيات</h3>
+      <Card className="p-6 space-y-4">
+        <div className="flex items-center gap-2.5 border-b border-slate-100 pb-3.5">
+          <Building className="w-4 h-4 text-[#16A34A]" />
+          <h3 className="text-sm font-bold text-slate-900">الهوية المؤسسية والافتراضيات</h3>
         </div>
 
         <form onSubmit={handleSaveGeneral} className="space-y-4">
@@ -207,15 +207,15 @@ export function SettingsView({ onRefreshAllData }: SettingsViewProps) {
             />
           </div>
 
-          <div className="flex items-center gap-3 pt-2">
+          <div className="flex items-center gap-3 pt-1">
             <input
               type="checkbox"
               id="require-review-toggle"
               checked={requireReview}
               onChange={e => setRequireReview(e.target.checked)}
-              className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+              className="w-4 h-4 rounded accent-[#22C55E] text-[#22C55E] focus:ring-[#22C55E] cursor-pointer"
             />
-            <label htmlFor="require-review-toggle" className="text-xs font-semibold text-neutral-700 cursor-pointer">
+            <label htmlFor="require-review-toggle" className="text-xs font-semibold text-slate-700 cursor-pointer">
               إلزامية مراجعة واعتماد المدير أو رئيس القسم قبل إغلاق أي مهمة مكتملة
             </label>
           </div>
@@ -229,26 +229,26 @@ export function SettingsView({ onRefreshAllData }: SettingsViewProps) {
       </Card>
 
       {/* Automated Deadline Push Notifications Configuration */}
-      <Card className="p-5 space-y-4">
-        <div className="flex items-center justify-between border-b border-neutral-100 pb-3">
+      <Card className="p-6 space-y-4">
+        <div className="flex items-center justify-between border-b border-slate-100 pb-3.5">
           <div className="flex items-center gap-2.5">
-            <Clock className="w-4 h-4 text-emerald-600" />
-            <h3 className="text-sm font-bold text-neutral-900">
+            <Clock className="w-4 h-4 text-[#16A34A]" />
+            <h3 className="text-sm font-bold text-slate-900">
               خدمة الإشعارات التلقائية الفورية للمواعيد النهائية
             </h3>
           </div>
-          <span className="flex items-center gap-1.5 text-xs font-mono text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-            <Radio className="w-3 h-3 text-emerald-600 animate-pulse" />
+          <span className="flex items-center gap-1.5 text-xs font-mono text-[#15803D] bg-[#E8F8EE] px-3 py-1 rounded-full">
+            <Radio className="w-3 h-3 text-[#22C55E] animate-pulse" />
             خدمة نشطة
           </span>
         </div>
 
-        <p className="text-xs text-neutral-500 leading-relaxed">
+        <p className="text-xs text-slate-500 leading-relaxed">
           يقوم محرك المراقبة بفحص المهام غير المكتملة ومقارنتها بالوقت الحالي كل {deadlineSettings.checkIntervalSeconds} ثانية.
           عندما يقترب الموعد من حد الإنذار، يتم إرسال إشعارات فورية وتنبيهات صوتية للموظف المسؤول.
         </p>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
           {/* Threshold Selection */}
           <Select
             label="حد الإنذار المسبق للموعد"
@@ -279,10 +279,10 @@ export function SettingsView({ onRefreshAllData }: SettingsViewProps) {
 
         {/* Toggles */}
         <div className="space-y-3 pt-2">
-          <div className="flex items-center justify-between p-3 rounded-xl bg-neutral-50 border border-neutral-100">
+          <div className="flex items-center justify-between p-3.5 rounded-2xl bg-[#F8F9FA]">
             <div>
-              <p className="text-xs font-bold text-neutral-900">تنبيهات المهام المتأخرة</p>
-              <p className="text-[11px] text-neutral-500">
+              <p className="text-xs font-bold text-slate-900">تنبيهات المهام المتأخرة</p>
+              <p className="text-[11px] text-slate-500 mt-0.5">
                 إرسال تنبيهات عاجلة ذات أولوية قصوى للمهام التي فات موعد تسليمها ولم تكتمل.
               </p>
             </div>
@@ -290,14 +290,14 @@ export function SettingsView({ onRefreshAllData }: SettingsViewProps) {
               type="checkbox"
               checked={deadlineSettings.includeOverdue}
               onChange={e => handleUpdateDeadlineSetting('includeOverdue', e.target.checked)}
-              className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+              className="w-4 h-4 rounded accent-[#22C55E] text-[#22C55E] focus:ring-[#22C55E] cursor-pointer"
             />
           </div>
 
-          <div className="flex items-center justify-between p-3 rounded-xl bg-neutral-50 border border-neutral-100">
+          <div className="flex items-center justify-between p-3.5 rounded-2xl bg-[#F8F9FA]">
             <div>
-              <p className="text-xs font-bold text-neutral-900">تصعيد المهام العاجلة للمدراء</p>
-              <p className="text-[11px] text-neutral-500">
+              <p className="text-xs font-bold text-slate-900">تصعيد المهام العاجلة للمدراء</p>
+              <p className="text-[11px] text-slate-500 mt-0.5">
                 إرسال نسخة من التنبيه لمنشئ المهمة ورؤساء الأقسام للمهام ذات الأولوية المرتفعة والعاجلة.
               </p>
             </div>
@@ -307,26 +307,27 @@ export function SettingsView({ onRefreshAllData }: SettingsViewProps) {
               onChange={e =>
                 handleUpdateDeadlineSetting('notifyManagersForUrgent', e.target.checked)
               }
-              className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+              className="w-4 h-4 rounded accent-[#22C55E] text-[#22C55E] focus:ring-[#22C55E] cursor-pointer"
             />
           </div>
 
-          <div className="flex items-center justify-between p-3 rounded-xl bg-neutral-50 border border-neutral-100">
+          <div className="flex items-center justify-between p-3.5 rounded-2xl bg-[#F8F9FA]">
             <div>
-              <p className="text-xs font-bold text-neutral-900">إشعارات المتصفح الأصلية (Desktop Push)</p>
-              <p className="text-[11px] text-neutral-500">
+              <p className="text-xs font-bold text-slate-900">إشعارات المتصفح الأصلية (Desktop Push)</p>
+              <p className="text-[11px] text-slate-500 mt-0.5">
                 إظهار نوافذ تنبيه منبثقة على سطح المكتب ونظام التشغيل حتى عند تصغير المتصفح.
               </p>
             </div>
             <div className="flex items-center gap-2">
               {browserPerm === 'granted' ? (
-                <span className="text-[11px] text-emerald-700 bg-emerald-100/70 px-2 py-0.5 rounded font-medium">
+                <span className="text-[11px] text-[#15803D] bg-[#DCFCE7] px-3 py-1 rounded-full font-semibold">
                   مفعلة
                 </span>
               ) : (
                 <Button
                   size="sm"
                   variant="outline"
+                  className="bg-[#E8F8EE] border-transparent text-[#15803D] hover:bg-[#DCFCE7]"
                   leftIcon={<Bell className="w-3 h-3 text-amber-600" />}
                   onClick={handleRequestPushPermission}
                 >
@@ -336,19 +337,19 @@ export function SettingsView({ onRefreshAllData }: SettingsViewProps) {
             </div>
           </div>
 
-          <div className="flex items-center justify-between p-3 rounded-xl bg-neutral-50 border border-neutral-100">
+          <div className="flex items-center justify-between p-3.5 rounded-2xl bg-[#F8F9FA]">
             <div>
-              <p className="text-xs font-bold text-neutral-900">نغمة التنبيه الصوتية الهادئة</p>
-              <p className="text-[11px] text-neutral-500">
+              <p className="text-xs font-bold text-slate-900">نغمة التنبيه الصوتية الهادئة</p>
+              <p className="text-[11px] text-slate-500 mt-0.5">
                 تشغيل رنين جيبي متناسق خفيف عند إرسال تنبيه اقتراب الموعد.
               </p>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2.5">
               <button
                 type="button"
                 onClick={() => DeadlinePushService.playGentleChime()}
                 title="معاينة الصوت"
-                className="p-1.5 rounded-lg bg-neutral-200/60 hover:bg-neutral-200 text-neutral-700 text-xs cursor-pointer"
+                className="w-8 h-8 rounded-full bg-[#F1F3F5] hover:bg-slate-200 text-slate-600 flex items-center justify-center transition-colors cursor-pointer"
               >
                 <Volume2 className="w-3.5 h-3.5" />
               </button>
@@ -356,7 +357,7 @@ export function SettingsView({ onRefreshAllData }: SettingsViewProps) {
                 type="checkbox"
                 checked={deadlineSettings.enableAudioChime}
                 onChange={e => handleUpdateDeadlineSetting('enableAudioChime', e.target.checked)}
-                className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                className="w-4 h-4 rounded accent-[#22C55E] text-[#22C55E] focus:ring-[#22C55E] cursor-pointer"
               />
             </div>
           </div>
@@ -368,7 +369,8 @@ export function SettingsView({ onRefreshAllData }: SettingsViewProps) {
             type="button"
             size="sm"
             variant="outline"
-            leftIcon={<Bell className="w-3.5 h-3.5 text-neutral-600" />}
+            className="bg-[#E8F8EE] border-transparent text-[#15803D] hover:bg-[#DCFCE7]"
+            leftIcon={<Bell className="w-3.5 h-3.5" />}
             onClick={handleTestPush}
           >
             إرسال إشعار تجريبي
@@ -377,28 +379,28 @@ export function SettingsView({ onRefreshAllData }: SettingsViewProps) {
       </Card>
 
       {/* Security & Access Architecture */}
-      <Card className="p-5 space-y-4">
-        <div className="flex items-center gap-2.5 border-b border-neutral-100 pb-3">
-          <Shield className="w-4 h-4 text-emerald-600" />
-          <h3 className="text-sm font-bold text-neutral-900">معمارية الأمان والتحكم بالصلاحيات (RBAC)</h3>
+      <Card className="p-6 space-y-4">
+        <div className="flex items-center gap-2.5 border-b border-slate-100 pb-3.5">
+          <Shield className="w-4 h-4 text-[#16A34A]" />
+          <h3 className="text-sm font-bold text-slate-900">معمارية الأمان والتحكم بالصلاحيات (RBAC)</h3>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
-          <div className="p-3 rounded-xl bg-neutral-50 border border-neutral-100">
-            <p className="font-bold text-neutral-900">التحكم بالوصول المبني على الأدوار</p>
-            <p className="text-neutral-500 mt-1">
+          <div className="p-4 rounded-2xl bg-[#F8F9FA]">
+            <p className="font-bold text-slate-900">التحكم بالوصول المبني على الأدوار</p>
+            <p className="text-slate-500 mt-1.5 leading-relaxed">
               مستويات الصلاحية للمدير العام، مدراء الأقسام، والموظفين محكمة عبر قواعد أمان Firestore.
             </p>
           </div>
-          <div className="p-3 rounded-xl bg-neutral-50 border border-neutral-100">
-            <p className="font-bold text-neutral-900">سجل تدقيق غير قابل للتلاعب</p>
-            <p className="text-neutral-500 mt-1">
+          <div className="p-4 rounded-2xl bg-[#F8F9FA]">
+            <p className="font-bold text-slate-900">سجل تدقيق غير قابل للتلاعب</p>
+            <p className="text-slate-500 mt-1.5 leading-relaxed">
               سجلات النشاطات محصورة بالكتابة فقط وتمنع الحذف أو التعديل لضمان الشفافية المؤسسية.
             </p>
           </div>
-          <div className="p-3 rounded-xl bg-neutral-50 border border-neutral-100">
-            <p className="font-bold text-neutral-900">فرض مسارات العمل المؤسسية</p>
-            <p className="text-neutral-500 mt-1">
+          <div className="p-4 rounded-2xl bg-[#F8F9FA]">
+            <p className="font-bold text-slate-900">فرض مسارات العمل المؤسسية</p>
+            <p className="text-slate-500 mt-1.5 leading-relaxed">
               قواعد النظام تمنع الموظف من إغلاق المهمة ذاتياً وتلزم بمرورها عبر مرحلة الاعتماد من الإدارة.
             </p>
           </div>
@@ -407,22 +409,22 @@ export function SettingsView({ onRefreshAllData }: SettingsViewProps) {
 
       {/* Database Maintenance */}
       {(isSuperAdmin || isCompanyAdmin) && (
-        <Card className="p-5 space-y-4 border-emerald-100 bg-emerald-50/20">
-          <div className="flex items-center gap-2.5 border-b border-emerald-100 pb-3">
-            <Database className="w-4 h-4 text-emerald-600" />
-            <h3 className="text-sm font-bold text-neutral-900">مزامنة وصيانة قاعدة البيانات والصلاحيات</h3>
+        <Card className="p-6 space-y-4 border-[#BBF7D0] bg-[#E8F8EE]/45">
+          <div className="flex items-center gap-2.5 border-b border-[#BBF7D0]/60 pb-3.5">
+            <Database className="w-4 h-4 text-[#16A34A]" />
+            <h3 className="text-sm font-bold text-slate-900">مزامنة وصيانة قاعدة البيانات والصلاحيات</h3>
           </div>
 
-          <p className="text-xs text-neutral-600 leading-relaxed">
+          <p className="text-xs text-slate-600 leading-relaxed">
             مزامنة بيانات {activeCompany.name} فوراً من Firestore وتحديث بطاقة صلاحيات Firebase Auth Custom Claims.
           </p>
 
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2.5">
             <Button
               size="sm"
               variant="outline"
               isLoading={isResetting}
-              leftIcon={<RefreshCw className="w-3.5 h-3.5 text-neutral-600" />}
+              leftIcon={<RefreshCw className="w-3.5 h-3.5 text-slate-600" />}
               onClick={handleRefreshDatabase}
             >
               تحديث ومزامنة البيانات الآن
@@ -431,8 +433,9 @@ export function SettingsView({ onRefreshAllData }: SettingsViewProps) {
             <Button
               size="sm"
               variant="outline"
+              className="bg-white"
               isLoading={isSyncingClaims}
-              leftIcon={<Shield className="w-3.5 h-3.5 text-emerald-700" />}
+              leftIcon={<Shield className="w-3.5 h-3.5 text-[#16A34A]" />}
               onClick={handleSyncClaims}
             >
               مزامنة صلاحيات الحساب (Custom Claims)

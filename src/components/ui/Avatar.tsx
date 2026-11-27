@@ -33,7 +33,7 @@ export function Avatar({ src, name, size = 'md', className = '', online }: Avata
         />
       ) : (
         <div
-          className={`${sizeMap[size]} rounded-full bg-emerald-700 text-emerald-100 flex items-center justify-center font-semibold border border-emerald-600 shadow-sm`}
+          className={`${sizeMap[size]} rounded-full bg-[#DCFCE7] text-[#15803D] flex items-center justify-center font-bold border border-emerald-200/70`}
         >
           {getInitials(name)}
         </div>

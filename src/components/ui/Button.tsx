@@ -24,27 +24,27 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     ref
   ) => {
     const base =
-      'inline-flex items-center justify-center font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed select-none whitespace-nowrap cursor-pointer';
+      'inline-flex items-center justify-center font-semibold transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed select-none whitespace-nowrap cursor-pointer rounded-full';
 
     const sizeStyles = {
-      sm: 'text-xs px-3 py-1.5 rounded-lg gap-1.5',
-      md: 'text-sm px-4 py-2 rounded-xl gap-2',
-      lg: 'text-base px-6 py-2.5 rounded-xl gap-2.5',
+      sm: 'text-xs px-4 py-2 gap-1.5',
+      md: 'text-xs sm:text-sm px-5 py-2.5 gap-2',
+      lg: 'text-sm sm:text-base px-6 py-3 gap-2.5',
     };
 
     const variantStyles = {
       primary:
-        'bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white shadow-sm hover:shadow focus:ring-emerald-500 border border-emerald-500',
+        'bg-[#22C55E] hover:bg-[#16A34A] active:bg-[#15803D] text-white shadow-[0_1px_2px_rgba(22,163,74,0.2)] focus:ring-[#22C55E] border border-transparent',
       gold:
-        'bg-amber-600 hover:bg-amber-700 active:bg-amber-800 text-white shadow-sm focus:ring-amber-500 border border-amber-500',
+        'bg-amber-500 hover:bg-amber-600 active:bg-amber-700 text-white shadow-xs focus:ring-amber-500 border border-transparent',
       secondary:
-        'bg-neutral-900 hover:bg-neutral-800 active:bg-neutral-950 text-white shadow-sm focus:ring-neutral-700 border border-neutral-800',
+        'bg-[#18181B] hover:bg-neutral-800 active:bg-neutral-950 text-white shadow-xs focus:ring-neutral-700 border border-transparent',
       outline:
-        'bg-white hover:bg-neutral-50 active:bg-neutral-100 text-neutral-700 border border-neutral-300 shadow-sm focus:ring-emerald-500',
+        'bg-white hover:bg-slate-50 active:bg-slate-100 text-slate-700 border border-slate-200/90 shadow-[0_1px_2px_rgba(15,23,42,0.03)] focus:ring-[#22C55E]',
       danger:
-        'bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white shadow-sm focus:ring-rose-500 border border-rose-500',
+        'bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white shadow-xs focus:ring-rose-500 border border-transparent',
       ghost:
-        'bg-transparent hover:bg-neutral-100 active:bg-neutral-200 text-neutral-600 hover:text-neutral-900 focus:ring-neutral-400',
+        'bg-transparent hover:bg-slate-100 active:bg-slate-200 text-slate-600 hover:text-slate-900 focus:ring-slate-400',
     };
 
     return (

@@ -36,36 +36,36 @@ export function ActivityLogView({ activityLogs }: ActivityLogViewProps) {
     <div className="space-y-5" dir="rtl">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl font-bold text-neutral-900 flex items-center gap-2">
-            <History className="w-5 h-5 text-emerald-600" />
+          <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+            <History className="w-5 h-5 text-[#16A34A]" />
             سجل النشاطات والتدقيق — {activeCompany.name}
           </h2>
-          <p className="text-xs text-neutral-500">
+          <p className="text-xs text-slate-500 mt-0.5">
             سجل تاريخي غير قابل للتعديل لكافة الإجراءات والعمليات المنفذة داخل النظام.
           </p>
         </div>
 
-        <span className="text-xs font-semibold px-3 py-1 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 self-start sm:self-auto font-mono">
+        <span className="text-xs font-semibold px-3.5 py-1.5 rounded-full bg-[#E8F8EE] text-[#15803D] self-start sm:self-auto font-mono tabular-nums">
           تم تسجيل {activityLogs.length} حدث ونشاط
         </span>
       </div>
 
-      <Card className="p-3 flex flex-col sm:flex-row items-center justify-between gap-3">
+      <Card className="p-3.5 flex flex-col sm:flex-row items-center justify-between gap-3">
         <div className="relative w-full sm:w-80">
-          <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
+          <Search className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           <input
             type="text"
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder="ابحث في سجل النشاطات..."
-            className="w-full pr-9 pl-3.5 py-1.5 text-xs bg-neutral-50 rounded-xl border border-neutral-200 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+            className="w-full pr-10 pl-4 py-2 text-xs bg-[#F1F3F5] rounded-full border border-transparent text-slate-800 placeholder:text-slate-400 focus:bg-white focus:border-[#22C55E] focus:outline-none focus:ring-2 focus:ring-[#22C55E]/20 transition-all"
           />
         </div>
 
         <select
           value={actionFilter}
           onChange={e => setActionFilter(e.target.value)}
-          className="w-full sm:w-auto px-3 py-1.5 text-xs bg-neutral-50 rounded-xl border border-neutral-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+          className="w-full sm:w-auto px-4 py-2 text-xs bg-[#F1F3F5] rounded-full border border-transparent text-slate-700 font-medium focus:bg-white focus:border-[#22C55E] focus:outline-none focus:ring-2 focus:ring-[#22C55E]/20 transition-all"
         >
           <option value="All">كافة أنواع الأحداث</option>
           <option value="Company">إدارة الشركات (Companies)</option>
@@ -80,21 +80,21 @@ export function ActivityLogView({ activityLogs }: ActivityLogViewProps) {
       <Card className="p-0 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-right text-sm">
-            <thead className="bg-neutral-50/80 border-b border-neutral-100 text-xs text-neutral-500 font-semibold uppercase tracking-wider">
+            <thead className="bg-[#F8F9FA] border-b border-slate-100 text-xs text-slate-500 font-semibold">
               <tr>
-                <th className="px-4 py-3">الوقت والتاريخ</th>
-                {isGroupView && <th className="px-4 py-3">الشركة</th>}
-                <th className="px-4 py-3">المنفّذ</th>
-                <th className="px-4 py-3">الصلاحية</th>
-                <th className="px-4 py-3">الإجراء</th>
-                <th className="px-4 py-3">الهدف / الموضوع</th>
-                <th className="px-4 py-3">التفاصيل والبيانات</th>
+                <th className="px-4 py-3.5">الوقت والتاريخ</th>
+                {isGroupView && <th className="px-4 py-3.5">الشركة</th>}
+                <th className="px-4 py-3.5">المنفّذ</th>
+                <th className="px-4 py-3.5">الصلاحية</th>
+                <th className="px-4 py-3.5">الإجراء</th>
+                <th className="px-4 py-3.5">الهدف / الموضوع</th>
+                <th className="px-4 py-3.5">التفاصيل والبيانات</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-neutral-100 text-xs">
+            <tbody className="divide-y divide-slate-100 text-xs">
               {filteredLogs.length === 0 ? (
                 <tr>
-                  <td colSpan={isGroupView ? 7 : 6} className="px-4 py-10 text-center text-neutral-400">
+                  <td colSpan={isGroupView ? 7 : 6} className="px-4 py-10 text-center text-slate-400">
                     <div className="space-y-2">
                       <p>لا توجد سجلات نشاط مطابقة لمعايير البحث الحالية.</p>
                       {(search.trim() || actionFilter !== 'All') && (
@@ -104,7 +104,7 @@ export function ActivityLogView({ activityLogs }: ActivityLogViewProps) {
                             setSearch('');
                             setActionFilter('All');
                           }}
-                          className="text-emerald-700 hover:text-emerald-800 font-semibold underline cursor-pointer"
+                          className="text-[#15803D] hover:text-[#166534] font-semibold underline cursor-pointer"
                         >
                           إعادة ضبط الفلاتر
                         </button>
@@ -117,16 +117,16 @@ export function ActivityLogView({ activityLogs }: ActivityLogViewProps) {
                 const canonical = normalizeRole(log.actorRole);
                 const roleBadgeClass =
                   canonical === 'SUPER_ADMIN'
-                    ? 'bg-emerald-100 text-emerald-800'
+                    ? 'bg-[#DCFCE7] text-[#15803D]'
                     : canonical === 'COMPANY_ADMIN'
-                    ? 'bg-blue-100 text-blue-800'
+                    ? 'bg-blue-50 text-blue-700'
                     : canonical === 'MANAGER'
-                    ? 'bg-amber-100 text-amber-800'
-                    : 'bg-neutral-100 text-neutral-700';
+                    ? 'bg-amber-50 text-amber-700'
+                    : 'bg-[#F1F3F5] text-slate-700';
 
                 return (
-                  <tr key={log.id} className="hover:bg-neutral-50/80 transition-colors">
-                    <td className="px-4 py-3 font-mono text-neutral-500 whitespace-nowrap">
+                  <tr key={log.id} className="hover:bg-[#F8F9FA]/80 transition-colors">
+                    <td className="px-4 py-3.5 font-mono text-slate-500 whitespace-nowrap tabular-nums">
                       {new Date(log.timestamp).toLocaleString('ar-SA', {
                         month: 'short',
                         day: 'numeric',
@@ -136,25 +136,25 @@ export function ActivityLogView({ activityLogs }: ActivityLogViewProps) {
                       })}
                     </td>
                     {isGroupView && (
-                      <td className="px-4 py-3 font-semibold text-neutral-700 whitespace-nowrap">
+                      <td className="px-4 py-3.5 font-semibold text-slate-700 whitespace-nowrap">
                         {getCompanyById(log.companyId)?.name || log.companyId || 'LUMERE GROUP'}
                       </td>
                     )}
-                    <td className="px-4 py-3 font-bold text-neutral-900 whitespace-nowrap">
+                    <td className="px-4 py-3.5 font-bold text-slate-900 whitespace-nowrap">
                       {log.actorName}
                     </td>
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${roleBadgeClass}`}>
+                    <td className="px-4 py-3.5 whitespace-nowrap">
+                      <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-semibold ${roleBadgeClass}`}>
                         {getRoleArabicLabel(log.actorRole)}
                       </span>
                     </td>
-                    <td className="px-4 py-3 font-semibold text-neutral-800 whitespace-nowrap">
+                    <td className="px-4 py-3.5 font-semibold text-slate-800 whitespace-nowrap">
                       {log.action}
                     </td>
-                    <td className="px-4 py-3 max-w-xs font-medium text-neutral-900 truncate">
+                    <td className="px-4 py-3.5 max-w-xs font-medium text-slate-900 truncate">
                       {log.target}
                     </td>
-                    <td className="px-4 py-3 text-neutral-500 max-w-sm truncate">
+                    <td className="px-4 py-3.5 text-slate-500 max-w-sm truncate">
                       {log.metadata || '—'}
                     </td>
                   </tr>

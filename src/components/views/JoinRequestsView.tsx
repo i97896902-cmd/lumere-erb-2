@@ -123,17 +123,17 @@ export const JoinRequestsView: React.FC<JoinRequestsViewProps> = ({ pendingUsers
   };
 
   return (
-    <div id="join-requests-view" className="space-y-6" dir="rtl">
+    <div id="join-requests-view" className="space-y-5" dir="rtl">
       {/* Header Banner */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-neutral-200/80 shadow-2xs">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-5 sm:p-6 rounded-3xl border border-slate-200/75 shadow-[0_1px_2px_rgba(15,23,42,0.03)]">
         <div>
-          <div className="flex items-center gap-2.5">
-            <div className="w-10 h-10 rounded-xl bg-amber-50 border border-amber-200/80 flex items-center justify-center text-amber-700">
+          <div className="flex items-center gap-3">
+            <div className="w-11 h-11 rounded-2xl bg-amber-50 flex items-center justify-center text-amber-600 shrink-0">
               <Clock className="w-5 h-5" />
             </div>
             <div>
-              <h1 className="text-xl font-bold text-neutral-900 tracking-tight">طلبات الانضمام والموظفين الجدد</h1>
-              <p className="text-xs text-neutral-500 mt-0.5">
+              <h1 className="text-xl font-bold text-slate-900 tracking-tight">طلبات الانضمام والموظفين الجدد</h1>
+              <p className="text-xs text-slate-500 mt-0.5">
                 مراجعة واعتماد طلبات الموظفين المسجلين حديثاً وتحديد صلاحياتهم في منظومة Luméré
               </p>
             </div>
@@ -141,7 +141,7 @@ export const JoinRequestsView: React.FC<JoinRequestsViewProps> = ({ pendingUsers
         </div>
 
         <div className="flex items-center gap-2">
-          <span className="px-3.5 py-1.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-800 border border-amber-200">
+          <span className="px-4 py-1.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 tabular-nums">
             {pendingUsers.length} {pendingUsers.length === 1 ? 'طلب في الانتظار' : 'طلبات في الانتظار'}
           </span>
         </div>
@@ -154,18 +154,18 @@ export const JoinRequestsView: React.FC<JoinRequestsViewProps> = ({ pendingUsers
             initial={{ opacity: 0, y: -8 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -8 }}
-            className="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs flex items-center gap-2.5 shadow-2xs"
+            className="p-4 rounded-2xl bg-[#E8F8EE] text-[#15803D] text-xs flex items-center gap-2.5"
           >
-            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+            <CheckCircle2 className="w-4 h-4 text-[#16A34A] shrink-0" />
             <span>{actionSuccess}</span>
           </motion.div>
         )}
       </AnimatePresence>
 
       {/* Search & Filters */}
-      <div className="flex items-center gap-3 bg-white p-3.5 rounded-xl border border-neutral-200/80 shadow-2xs">
+      <div className="flex items-center gap-3 bg-white p-3.5 rounded-3xl border border-slate-200/75 shadow-[0_1px_2px_rgba(15,23,42,0.03)]">
         <div className="relative flex-1">
-          <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-neutral-400">
+          <div className="absolute inset-y-0 right-0 pr-3.5 flex items-center pointer-events-none text-slate-400">
             <Search className="w-4 h-4" />
           </div>
           <input
@@ -173,19 +173,19 @@ export const JoinRequestsView: React.FC<JoinRequestsViewProps> = ({ pendingUsers
             value={searchTerm}
             onChange={e => setSearchTerm(e.target.value)}
             placeholder="بحث بالاسم، البريد، القسم، أو المسمى الوظيفي..."
-            className="w-full pr-9 pl-4 py-2 rounded-lg bg-neutral-50 border border-neutral-200 text-xs text-neutral-800 placeholder-neutral-400 focus:outline-none focus:bg-white focus:border-emerald-500 transition-colors"
+            className="w-full pr-10 pl-4 py-2 rounded-full bg-[#F1F3F5] border border-transparent text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:bg-white focus:border-[#22C55E] focus:ring-2 focus:ring-[#22C55E]/20 transition-all"
           />
         </div>
       </div>
 
       {/* Pending List */}
       {filteredUsers.length === 0 ? (
-        <div className="bg-white rounded-2xl border border-neutral-200/80 p-12 text-center">
-          <div className="w-14 h-14 mx-auto rounded-2xl bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-700 mb-3">
+        <div className="bg-white rounded-3xl border border-slate-200/75 shadow-[0_1px_2px_rgba(15,23,42,0.03)] p-12 text-center">
+          <div className="w-14 h-14 mx-auto rounded-2xl bg-[#E8F8EE] flex items-center justify-center text-[#16A34A] mb-3">
             <CheckCircle2 className="w-7 h-7" />
           </div>
-          <h3 className="text-base font-bold text-neutral-900 mb-1">لا توجد طلبات انضمام معلقة حالياً</h3>
-          <p className="text-xs text-neutral-500 max-w-sm mx-auto">
+          <h3 className="text-base font-bold text-slate-900 mb-1">لا توجد طلبات انضمام معلقة حالياً</h3>
+          <p className="text-xs text-slate-500 max-w-sm mx-auto">
             تمت معالجة كافة طلبات الموظفين الجدد بنجاح. ستظهر هنا أي حسابات جديدة فور إتمام تسجيلها.
           </p>
         </div>
@@ -196,7 +196,7 @@ export const JoinRequestsView: React.FC<JoinRequestsViewProps> = ({ pendingUsers
               key={user.id}
               initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
-              className="bg-white rounded-2xl border border-neutral-200/80 p-5 shadow-2xs flex flex-col justify-between hover:border-neutral-300 transition-colors"
+              className="bg-white rounded-3xl border border-slate-200/75 p-5 shadow-[0_1px_2px_rgba(15,23,42,0.03)] flex flex-col justify-between hover:border-slate-300 transition-colors"
             >
               <div>
                 {/* User Top Info */}
@@ -206,61 +206,61 @@ export const JoinRequestsView: React.FC<JoinRequestsViewProps> = ({ pendingUsers
                       <img
                         src={user.photoURL}
                         alt={user.displayName}
-                        className="w-12 h-12 rounded-xl object-cover border border-neutral-200 shadow-2xs"
+                        className="w-12 h-12 rounded-2xl object-cover border border-slate-200/80"
                       />
                     ) : (
-                      <div className="w-12 h-12 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-center font-bold text-emerald-800 text-sm">
+                      <div className="w-12 h-12 rounded-2xl bg-[#E8F8EE] flex items-center justify-center font-bold text-[#15803D] text-sm">
                         {user.displayName.slice(0, 2).toUpperCase()}
                       </div>
                     )}
                     <div>
-                      <h3 className="text-sm font-bold text-neutral-900">{user.displayName}</h3>
-                      <div className="flex items-center gap-1.5 text-xs text-neutral-500 mt-0.5">
-                        <Mail className="w-3 h-3 text-neutral-400 shrink-0" />
+                      <h3 className="text-sm font-bold text-slate-900">{user.displayName}</h3>
+                      <div className="flex items-center gap-1.5 text-xs text-slate-500 mt-0.5">
+                        <Mail className="w-3 h-3 text-slate-400 shrink-0" />
                         <span className="truncate max-w-[180px] font-mono dir-ltr">{user.email}</span>
                       </div>
                     </div>
                   </div>
 
-                  <span className="text-[11px] font-medium text-amber-800 bg-amber-50 border border-amber-200/80 px-2.5 py-0.5 rounded-full shrink-0">
+                  <span className="text-[11px] font-semibold text-amber-700 bg-amber-50 px-3 py-1 rounded-full shrink-0">
                     بانتظار الاعتماد
                   </span>
                 </div>
 
                 {/* Details Grid */}
-                <div className="grid grid-cols-2 gap-2.5 p-3 rounded-xl bg-neutral-50 border border-neutral-100 mb-4 text-xs">
-                  <div className="flex items-center gap-2 text-neutral-600">
-                    <Layers className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
+                <div className="grid grid-cols-2 gap-2.5 p-3.5 rounded-2xl bg-[#F8F9FA] mb-4 text-xs">
+                  <div className="flex items-center gap-2 text-slate-600">
+                    <Layers className="w-3.5 h-3.5 text-[#16A34A] shrink-0" />
                     <span className="truncate">
                       الشركة:{' '}
-                      <strong className="text-neutral-900">
+                      <strong className="text-slate-900">
                         {getCompanyById(user.companyId)?.name || user.companyName || 'LUMERE'}
                       </strong>
                     </span>
                   </div>
-                  <div className="flex items-center gap-2 text-neutral-600">
-                    <Building2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                    <span className="truncate">القسم: <strong className="text-neutral-900">{user.department || 'عام'}</strong></span>
+                  <div className="flex items-center gap-2 text-slate-600">
+                    <Building2 className="w-3.5 h-3.5 text-[#16A34A] shrink-0" />
+                    <span className="truncate">القسم: <strong className="text-slate-900">{user.department || 'عام'}</strong></span>
                   </div>
-                  <div className="flex items-center gap-2 text-neutral-600">
-                    <Briefcase className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-                    <span className="truncate">المسمى: <strong className="text-neutral-900">{user.position || 'موظف'}</strong></span>
+                  <div className="flex items-center gap-2 text-slate-600">
+                    <Briefcase className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                    <span className="truncate">المسمى: <strong className="text-slate-900">{user.position || 'موظف'}</strong></span>
                   </div>
                   {user.phone && (
-                    <div className="flex items-center gap-2 text-neutral-600">
-                      <Phone className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-                      <span className="truncate font-mono">{user.phone}</span>
+                    <div className="flex items-center gap-2 text-slate-600">
+                      <Phone className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                      <span className="truncate font-mono tabular-nums">{user.phone}</span>
                     </div>
                   )}
-                  <div className="flex items-center gap-2 text-neutral-600">
-                    <Calendar className="w-3.5 h-3.5 text-neutral-400 shrink-0" />
-                    <span className="truncate">التسجيل: {user.joinedDate || 'حديث'}</span>
+                  <div className="flex items-center gap-2 text-slate-600">
+                    <Calendar className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                    <span className="truncate tabular-nums">التسجيل: {user.joinedDate || 'حديث'}</span>
                   </div>
                 </div>
               </div>
 
               {/* Action Buttons */}
-              <div className="flex items-center gap-2 pt-2 border-t border-neutral-100">
+              <div className="flex items-center gap-2.5 pt-2">
                 <button
                   type="button"
                   id={`btn-approve-user-${user.id}`}
@@ -273,7 +273,7 @@ export const JoinRequestsView: React.FC<JoinRequestsViewProps> = ({ pendingUsers
                         : defaultWriteCompanyId
                     );
                   }}
-                  className="flex-1 py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white text-xs font-semibold transition-colors flex items-center justify-center gap-1.5 shadow-2xs"
+                  className="flex-1 py-2.5 px-4 rounded-full bg-[#22C55E] hover:bg-[#16A34A] text-white text-xs font-semibold transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
                 >
                   <UserCheck className="w-3.5 h-3.5" />
                   <span>اعتماد وقبول</span>
@@ -283,7 +283,7 @@ export const JoinRequestsView: React.FC<JoinRequestsViewProps> = ({ pendingUsers
                   type="button"
                   id={`btn-reject-user-${user.id}`}
                   onClick={() => setSelectedUserForRejection(user)}
-                  className="py-2 px-3 rounded-xl border border-rose-200 text-rose-700 hover:bg-rose-50 text-xs font-medium transition-colors flex items-center justify-center gap-1.5"
+                  className="py-2.5 px-4 rounded-full border border-rose-200 text-rose-600 hover:bg-rose-50 text-xs font-semibold transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
                 >
                   <UserX className="w-3.5 h-3.5" />
                   <span>رفض</span>
@@ -298,7 +298,7 @@ export const JoinRequestsView: React.FC<JoinRequestsViewProps> = ({ pendingUsers
       <AnimatePresence>
         {selectedUserForApproval && (
           <div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-neutral-950/60 p-4"
+            className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/35 backdrop-blur-[2px] p-4"
             dir="rtl"
             onClick={() => !isProcessing && setSelectedUserForApproval(null)}
           >
@@ -310,38 +310,40 @@ export const JoinRequestsView: React.FC<JoinRequestsViewProps> = ({ pendingUsers
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
               onClick={e => e.stopPropagation()}
-              className="bg-white rounded-2xl border border-neutral-200 shadow-xl max-w-md w-full p-6"
+              className="bg-white rounded-3xl border border-slate-200/80 shadow-2xl max-w-md w-full p-6"
             >
-              <div className="flex items-center justify-between pb-4 border-b border-neutral-100 mb-4">
-                <div className="flex items-center gap-2.5 text-emerald-800">
-                  <UserCheck className="w-5 h-5" />
-                  <h3 className="font-bold text-base text-neutral-900">اعتماد طلب الانضمام</h3>
+              <div className="flex items-center justify-between pb-4 border-b border-slate-100 mb-4">
+                <div className="flex items-center gap-2.5 text-[#15803D]">
+                  <div className="w-9 h-9 rounded-xl bg-[#E8F8EE] flex items-center justify-center">
+                    <UserCheck className="w-4.5 h-4.5" />
+                  </div>
+                  <h3 className="font-bold text-base text-slate-900">اعتماد طلب الانضمام</h3>
                 </div>
                 <button
                   type="button"
                   aria-label="إغلاق"
                   onClick={() => setSelectedUserForApproval(null)}
-                  className="text-neutral-400 hover:text-neutral-600 p-1"
+                  className="w-8 h-8 rounded-full bg-[#F1F3F5] hover:bg-slate-200 text-slate-500 hover:text-slate-700 flex items-center justify-center transition-colors cursor-pointer"
                 >
                   <X className="w-4 h-4" />
                 </button>
               </div>
 
-              <p className="text-xs text-neutral-600 mb-4">
-                سيتم تفعيل حساب <strong className="text-neutral-900">{selectedUserForApproval.displayName}</strong> والسماح له بالدخول للنظام والوصول للمهام والمشاريع.
+              <p className="text-xs text-slate-600 mb-4">
+                سيتم تفعيل حساب <strong className="text-slate-900">{selectedUserForApproval.displayName}</strong> والسماح له بالدخول للنظام والوصول للمهام والمشاريع.
               </p>
 
               {/* Company & Role Selection */}
               <div className="space-y-3 mb-6">
                 <div>
-                  <label className="block text-xs font-semibold text-neutral-700 mb-1.5">
+                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                     الشركة التابعة:
                   </label>
                   {isSuperAdmin ? (
                     <select
                       value={targetCompanyId}
                       onChange={e => setTargetCompanyId(e.target.value)}
-                      className="w-full px-3 py-2 rounded-xl border border-neutral-300 text-xs bg-white focus:outline-none focus:border-emerald-500"
+                      className="w-full px-4 py-2.5 rounded-full border border-transparent text-xs bg-[#F1F3F5] text-slate-900 focus:outline-none focus:bg-white focus:border-[#22C55E] focus:ring-2 focus:ring-[#22C55E]/20 transition-all"
                     >
                       {subsidiaries.map(c => (
                         <option key={c.id} value={c.id}>
@@ -350,20 +352,20 @@ export const JoinRequestsView: React.FC<JoinRequestsViewProps> = ({ pendingUsers
                       ))}
                     </select>
                   ) : (
-                    <div className="px-3 py-2 rounded-xl bg-neutral-50 border border-neutral-200 text-xs font-semibold text-neutral-800">
+                    <div className="px-4 py-2.5 rounded-full bg-[#F1F3F5] text-xs font-semibold text-slate-800">
                       {activeCompany.name}
                     </div>
                   )}
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-neutral-700 mb-1.5">
+                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                     الصلاحية الممنوحة:
                   </label>
                   <select
                     value={assignedRole}
                     onChange={e => setAssignedRole(e.target.value as CanonicalRole)}
-                    className="w-full px-3 py-2 rounded-xl border border-neutral-300 text-xs bg-white focus:outline-none focus:border-emerald-500"
+                    className="w-full px-4 py-2.5 rounded-full border border-transparent text-xs bg-[#F1F3F5] text-slate-900 focus:outline-none focus:bg-white focus:border-[#22C55E] focus:ring-2 focus:ring-[#22C55E]/20 transition-all"
                   >
                     {(assignableRoles.length > 0 ? assignableRoles : (['EMPLOYEE'] as CanonicalRole[])).map(
                       r => (
@@ -377,13 +379,13 @@ export const JoinRequestsView: React.FC<JoinRequestsViewProps> = ({ pendingUsers
               </div>
 
               {/* Action Buttons */}
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2.5">
                 <button
                   type="button"
                   id="btn-confirm-approve"
                   onClick={handleApprove}
                   disabled={isProcessing}
-                  className="flex-1 py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white text-xs font-semibold transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+                  className="flex-1 py-2.5 px-5 rounded-full bg-[#22C55E] hover:bg-[#16A34A] text-white text-xs font-semibold transition-colors flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
                 >
                   {isProcessing ? 'جارِ المعالجة...' : 'تأكيد الموافقة والتفعيل'}
                 </button>
@@ -391,7 +393,7 @@ export const JoinRequestsView: React.FC<JoinRequestsViewProps> = ({ pendingUsers
                   type="button"
                   onClick={() => setSelectedUserForApproval(null)}
                   disabled={isProcessing}
-                  className="py-2.5 px-4 rounded-xl border border-neutral-200 hover:bg-neutral-50 text-neutral-700 text-xs font-medium"
+                  className="py-2.5 px-5 rounded-full bg-[#E8F8EE] hover:bg-[#DCFCE7] text-[#15803D] text-xs font-semibold transition-colors cursor-pointer"
                 >
                   إلغاء
                 </button>
@@ -405,7 +407,7 @@ export const JoinRequestsView: React.FC<JoinRequestsViewProps> = ({ pendingUsers
       <AnimatePresence>
         {selectedUserForRejection && (
           <div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-neutral-950/60 p-4"
+            className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/35 backdrop-blur-[2px] p-4"
             dir="rtl"
             onClick={() => !isProcessing && setSelectedUserForRejection(null)}
           >
@@ -417,29 +419,31 @@ export const JoinRequestsView: React.FC<JoinRequestsViewProps> = ({ pendingUsers
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
               onClick={e => e.stopPropagation()}
-              className="bg-white rounded-2xl border border-neutral-200 shadow-xl max-w-md w-full p-6"
+              className="bg-white rounded-3xl border border-slate-200/80 shadow-2xl max-w-md w-full p-6"
             >
-              <div className="flex items-center justify-between pb-4 border-b border-neutral-100 mb-4">
-                <div className="flex items-center gap-2.5 text-rose-700">
-                  <UserX className="w-5 h-5" />
-                  <h3 className="font-bold text-base text-neutral-900">رفض طلب الانضمام</h3>
+              <div className="flex items-center justify-between pb-4 border-b border-slate-100 mb-4">
+                <div className="flex items-center gap-2.5 text-rose-600">
+                  <div className="w-9 h-9 rounded-xl bg-rose-50 flex items-center justify-center">
+                    <UserX className="w-4.5 h-4.5" />
+                  </div>
+                  <h3 className="font-bold text-base text-slate-900">رفض طلب الانضمام</h3>
                 </div>
                 <button
                   type="button"
                   aria-label="إغلاق"
                   onClick={() => setSelectedUserForRejection(null)}
-                  className="text-neutral-400 hover:text-neutral-600 p-1"
+                  className="w-8 h-8 rounded-full bg-[#F1F3F5] hover:bg-slate-200 text-slate-500 hover:text-slate-700 flex items-center justify-center transition-colors cursor-pointer"
                 >
                   <X className="w-4 h-4" />
                 </button>
               </div>
 
-              <p className="text-xs text-neutral-600 mb-4">
-                هل أنت متأكد من رغبتك في رفض طلب <strong className="text-neutral-900">{selectedUserForRejection.displayName}</strong>؟
+              <p className="text-xs text-slate-600 mb-4">
+                هل أنت متأكد من رغبتك في رفض طلب <strong className="text-slate-900">{selectedUserForRejection.displayName}</strong>؟
               </p>
 
               <div className="mb-5">
-                <label className="block text-xs font-semibold text-neutral-700 mb-1.5">
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                   سبب الرفض (سيظهر للمستخدم):
                 </label>
                 <textarea
@@ -447,17 +451,17 @@ export const JoinRequestsView: React.FC<JoinRequestsViewProps> = ({ pendingUsers
                   onChange={e => setRejectionReason(e.target.value)}
                   placeholder="مثال: يرجى استكمال بيانات التواصل، أو التواصل المباشر مع إدارة الموارد البشرية..."
                   rows={3}
-                  className="w-full p-3 rounded-xl border border-neutral-300 text-xs text-neutral-900 placeholder-neutral-400 focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 transition-colors"
+                  className="w-full p-3.5 rounded-2xl border border-transparent bg-[#F1F3F5] text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:bg-white focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 transition-all"
                 />
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2.5">
                 <button
                   type="button"
                   id="btn-confirm-reject"
                   onClick={handleReject}
                   disabled={isProcessing}
-                  className="flex-1 py-2.5 px-4 rounded-xl bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white text-xs font-semibold transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+                  className="flex-1 py-2.5 px-5 rounded-full bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold transition-colors flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
                 >
                   {isProcessing ? 'جارِ المعالجة...' : 'تأكيد الرفض'}
                 </button>
@@ -465,7 +469,7 @@ export const JoinRequestsView: React.FC<JoinRequestsViewProps> = ({ pendingUsers
                   type="button"
                   onClick={() => setSelectedUserForRejection(null)}
                   disabled={isProcessing}
-                  className="py-2.5 px-4 rounded-xl border border-neutral-200 hover:bg-neutral-50 text-neutral-700 text-xs font-medium"
+                  className="py-2.5 px-5 rounded-full bg-[#E8F8EE] hover:bg-[#DCFCE7] text-[#15803D] text-xs font-semibold transition-colors cursor-pointer"
                 >
                   إلغاء
                 </button>

@@ -168,10 +168,10 @@ export function ReportsView({ tasks, employees, departments }: ReportsViewProps)
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl font-bold text-neutral-900">
+          <h2 className="text-xl font-bold text-slate-900">
             التقارير التحليلية — {activeCompany.name}
           </h2>
-          <p className="text-xs text-neutral-500">
+          <p className="text-xs text-slate-500 mt-0.5">
             {isGroupView
               ? 'مؤشرات الأداء المجمعة لكافة شركات المجموعة والأقسام.'
               : `مؤشرات الأداء الرئيسية، قياس الإنتاجية، وسرعة تسليم التكليفات في ${activeCompany.name}.`}
@@ -182,7 +182,7 @@ export function ReportsView({ tasks, employees, departments }: ReportsViewProps)
           <select
             value={timeframe}
             onChange={e => setTimeframe(e.target.value as 'all' | 'month' | 'quarter')}
-            className="px-3 py-1.5 text-xs bg-white rounded-xl border border-neutral-200 shadow-2xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+            className="px-4 py-2 text-xs bg-white rounded-full border border-slate-200/80 text-slate-700 font-medium shadow-[0_1px_2px_rgba(15,23,42,0.03)] focus:outline-none focus:border-[#22C55E] focus:ring-2 focus:ring-[#22C55E]/20 transition-all"
           >
             <option value="all">كامل البيانات التاريخية</option>
             <option value="quarter">هذا الربع السنوي</option>
@@ -192,6 +192,7 @@ export function ReportsView({ tasks, employees, departments }: ReportsViewProps)
           <Button
             size="sm"
             variant="outline"
+            className="bg-[#E8F8EE] border-transparent text-[#15803D] hover:bg-[#DCFCE7]"
             isLoading={isSavingReport}
             leftIcon={<Save className="w-4 h-4" />}
             onClick={handleSaveSnapshotReport}
@@ -202,6 +203,7 @@ export function ReportsView({ tasks, employees, departments }: ReportsViewProps)
           <Button
             size="sm"
             variant="outline"
+            className="bg-[#E8F8EE] border-transparent text-[#15803D] hover:bg-[#DCFCE7]"
             leftIcon={<Printer className="w-4 h-4" />}
             onClick={handlePrint}
           >
@@ -221,47 +223,47 @@ export function ReportsView({ tasks, employees, departments }: ReportsViewProps)
 
       {/* KPI Overview */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="p-4 border-r-4 border-r-emerald-600">
-          <span className="text-xs font-semibold text-neutral-500">
+        <Card className="p-5 rounded-2xl border-r-[3px] border-r-[#22C55E]">
+          <span className="text-xs font-semibold text-slate-500">
             معدل الإنجاز العام
           </span>
-          <div className="mt-2 flex items-baseline gap-2">
-            <span className="text-3xl font-bold text-neutral-900">{completionRate}%</span>
-            <span className="text-xs text-emerald-700 font-medium font-mono">
+          <div className="mt-2.5 flex items-baseline gap-2">
+            <span className="text-3xl font-bold text-slate-900 tabular-nums">{completionRate}%</span>
+            <span className="text-xs text-[#15803D] font-semibold font-mono tabular-nums">
               {completedTasks}/{totalTasks} مهمة
             </span>
           </div>
         </Card>
 
-        <Card className="p-4 border-r-4 border-r-rose-500">
-          <span className="text-xs font-semibold text-neutral-500">
+        <Card className="p-5 rounded-2xl border-r-[3px] border-r-rose-500">
+          <span className="text-xs font-semibold text-slate-500">
             نسبة التأخير
           </span>
-          <div className="mt-2 flex items-baseline gap-2">
-            <span className="text-3xl font-bold text-rose-600">{overdueRate}%</span>
-            <span className="text-xs text-rose-700 font-medium font-mono">{overdueTasks} مهام</span>
+          <div className="mt-2.5 flex items-baseline gap-2">
+            <span className="text-3xl font-bold text-rose-600 tabular-nums">{overdueRate}%</span>
+            <span className="text-xs text-rose-600 font-semibold font-mono tabular-nums">{overdueTasks} مهام</span>
           </div>
         </Card>
 
-        <Card className="p-4 border-r-4 border-r-blue-600">
-          <span className="text-xs font-semibold text-neutral-500">
+        <Card className="p-5 rounded-2xl border-r-[3px] border-r-blue-500">
+          <span className="text-xs font-semibold text-slate-500">
             القوة العاملة النشطة
           </span>
-          <div className="mt-2 flex items-baseline gap-2">
-            <span className="text-3xl font-bold text-neutral-900">{employees.length}</span>
-            <span className="text-xs text-neutral-500">عبر {departments.length} أقسام</span>
+          <div className="mt-2.5 flex items-baseline gap-2">
+            <span className="text-3xl font-bold text-slate-900 tabular-nums">{employees.length}</span>
+            <span className="text-xs text-slate-500 tabular-nums">عبر {departments.length} أقسام</span>
           </div>
         </Card>
 
-        <Card className="p-4 border-r-4 border-r-amber-500">
-          <span className="text-xs font-semibold text-neutral-500">
+        <Card className="p-5 rounded-2xl border-r-[3px] border-r-amber-500">
+          <span className="text-xs font-semibold text-slate-500">
             متوسط كثافة التكليف
           </span>
-          <div className="mt-2 flex items-baseline gap-2">
-            <span className="text-3xl font-bold text-amber-900">
+          <div className="mt-2.5 flex items-baseline gap-2">
+            <span className="text-3xl font-bold text-amber-800 tabular-nums">
               {employees.length > 0 ? (totalTasks / employees.length).toFixed(1) : 0}
             </span>
-            <span className="text-xs text-amber-700 font-medium">مهمة / موظف</span>
+            <span className="text-xs text-amber-700 font-semibold">مهمة / موظف</span>
           </div>
         </Card>
       </div>
@@ -269,38 +271,38 @@ export function ReportsView({ tasks, employees, departments }: ReportsViewProps)
       {/* Leaderboard and Department Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Employee Performance Leaderboard */}
-        <Card className="p-5 space-y-4">
-          <div className="flex items-center justify-between border-b border-neutral-100 pb-3">
+        <Card className="p-6 space-y-4">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-3.5">
             <div>
-              <h3 className="text-sm font-bold text-neutral-900 flex items-center gap-2">
+              <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
                 <Award className="w-4 h-4 text-amber-500" />
                 لوحة شرف الأداء والكفاءة
               </h3>
-              <p className="text-xs text-neutral-500">الترتيب حسب حجم المهام المسلّمة بجودة عالية</p>
+              <p className="text-xs text-slate-500 mt-0.5">الترتيب حسب حجم المهام المسلّمة بجودة عالية</p>
             </div>
           </div>
 
           <div className="space-y-3">
             {employeeRankings.length === 0 ? (
-              <div className="py-8 text-center text-xs text-neutral-400">
+              <div className="py-8 text-center text-xs text-slate-400">
                 لا توجد بيانات موظفين لعرض الترتيب في النطاق المحدد.
               </div>
             ) : (
               employeeRankings.slice(0, 6).map((emp, index) => (
                 <div
                   key={emp.id}
-                  className="flex items-center justify-between p-3 rounded-xl bg-neutral-50/70 border border-neutral-100 text-xs"
+                  className="flex items-center justify-between p-3.5 rounded-2xl bg-[#F8F9FA] text-xs"
                 >
                   <div className="flex items-center gap-3">
                     <span
-                      className={`w-6 h-6 rounded-full flex items-center justify-center font-bold font-mono text-xs ${
+                      className={`w-6 h-6 rounded-full flex items-center justify-center font-bold font-mono text-xs tabular-nums ${
                         index === 0
                           ? 'bg-amber-100 text-amber-800'
                           : index === 1
-                          ? 'bg-neutral-200 text-neutral-800'
+                          ? 'bg-slate-200 text-slate-800'
                           : index === 2
                           ? 'bg-amber-50 text-amber-700'
-                          : 'bg-neutral-100 text-neutral-500'
+                          : 'bg-white text-slate-500 border border-slate-200/80'
                       }`}
                     >
                       {index + 1}
@@ -309,24 +311,24 @@ export function ReportsView({ tasks, employees, departments }: ReportsViewProps)
                       <img
                         src={emp.photoURL}
                         alt={emp.displayName}
-                        className="w-8 h-8 rounded-full object-cover border"
+                        className="w-8 h-8 rounded-full object-cover border border-slate-200"
                       />
                     ) : (
-                      <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-800 text-[10px] flex items-center justify-center font-bold border border-emerald-200">
+                      <div className="w-8 h-8 rounded-full bg-[#DCFCE7] text-[#15803D] text-[10px] flex items-center justify-center font-bold">
                         {emp.displayName.slice(0, 2).toUpperCase()}
                       </div>
                     )}
                     <div>
-                      <p className="font-bold text-neutral-900">{emp.displayName}</p>
-                      <p className="text-[11px] text-neutral-500">{emp.department}</p>
+                      <p className="font-bold text-slate-900">{emp.displayName}</p>
+                      <p className="text-[11px] text-slate-500">{emp.department}</p>
                     </div>
                   </div>
 
                   <div className="text-left">
-                    <p className="font-bold text-neutral-900 font-mono">
-                      {emp.completedCount} <span className="font-normal text-neutral-500 text-xs">منجزة</span>
+                    <p className="font-bold text-slate-900 font-mono tabular-nums">
+                      {emp.completedCount} <span className="font-normal text-slate-500 text-xs">منجزة</span>
                     </p>
-                    <p className="text-[10px] text-emerald-700 font-semibold font-mono">
+                    <p className="text-[10px] text-[#15803D] font-semibold font-mono tabular-nums">
                       {emp.rate}% نسبة النجاح
                     </p>
                   </div>
@@ -337,20 +339,20 @@ export function ReportsView({ tasks, employees, departments }: ReportsViewProps)
         </Card>
 
         {/* Department Throughput Comparison */}
-        <Card className="p-5 space-y-4">
-          <div className="flex items-center justify-between border-b border-neutral-100 pb-3">
+        <Card className="p-6 space-y-4">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-3.5">
             <div>
-              <h3 className="text-sm font-bold text-neutral-900 flex items-center gap-2">
-                <Building2 className="w-4 h-4 text-emerald-600" />
+              <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                <Building2 className="w-4 h-4 text-[#16A34A]" />
                 مصفوفة إنجاز الأقسام والوحدات
               </h3>
-              <p className="text-xs text-neutral-500">حجم المخرجات ومستوى تسليم المحطات المستهدفة</p>
+              <p className="text-xs text-slate-500 mt-0.5">حجم المخرجات ومستوى تسليم المحطات المستهدفة</p>
             </div>
           </div>
 
-          <div className="space-y-3.5">
+          <div className="space-y-4">
             {departmentBreakdown.length === 0 ? (
-              <div className="py-8 text-center text-xs text-neutral-400">
+              <div className="py-8 text-center text-xs text-slate-400">
                 لا توجد أقسام مسجلة في النطاق المحدد بعد.
               </div>
             ) : (
@@ -360,17 +362,17 @@ export function ReportsView({ tasks, employees, departments }: ReportsViewProps)
                     <div className="flex items-center gap-2">
                       <span
                         className="w-2.5 h-2.5 rounded-full"
-                        style={{ backgroundColor: dept.color || '#059669' }}
+                        style={{ backgroundColor: dept.color || '#22C55E' }}
                       />
-                      <span className="text-neutral-800">{dept.name}</span>
+                      <span className="text-slate-800">{dept.name}</span>
                     </div>
-                    <span className="font-mono text-neutral-600">
+                    <span className="font-mono text-slate-600 tabular-nums">
                       {dept.completed}/{dept.total} مكتملة ({dept.rate}%)
                     </span>
                   </div>
-                  <div className="h-2 w-full bg-neutral-100 rounded-full overflow-hidden">
+                  <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
                     <div
-                      className="h-full bg-emerald-600 rounded-full transition-all duration-500"
+                      className="h-full bg-[#22C55E] rounded-full transition-all duration-500"
                       style={{ width: `${dept.rate}%` }}
                     />
                   </div>

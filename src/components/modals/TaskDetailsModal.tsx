@@ -258,16 +258,16 @@ export function TaskDetailsModal({
       <div className="space-y-6" dir="rtl">
         {/* Project & Client Link Tag Banner */}
         {(task.projectName || task.clientName) && (
-          <div className="flex flex-wrap items-center gap-2 p-2.5 rounded-xl bg-emerald-50/60 border border-emerald-200/60 text-xs">
+          <div className="flex flex-wrap items-center gap-2 p-3 rounded-2xl bg-[#E8F8EE]/60 border border-[#22C55E]/20 text-xs">
             {task.projectName && (
-              <span className="flex items-center gap-1.5 font-bold text-emerald-900 bg-white px-2.5 py-1 rounded-lg border border-emerald-200 shadow-2xs">
-                <FolderKanban className="w-3.5 h-3.5 text-emerald-700" />
+              <span className="flex items-center gap-1.5 font-bold text-[#15803D] bg-white px-3 py-1 rounded-full border border-emerald-200/80 shadow-2xs">
+                <FolderKanban className="w-3.5 h-3.5 text-[#15803D]" />
                 المشروع: {task.projectName}
               </span>
             )}
             {task.clientName && (
-              <span className="flex items-center gap-1.5 font-bold text-neutral-800 bg-white px-2.5 py-1 rounded-lg border border-neutral-200 shadow-2xs">
-                <Building2 className="w-3.5 h-3.5 text-neutral-600" />
+              <span className="flex items-center gap-1.5 font-bold text-slate-800 bg-white px-3 py-1 rounded-full border border-slate-200/80 shadow-2xs">
+                <Building2 className="w-3.5 h-3.5 text-slate-600" />
                 العميل: {task.clientName}
               </span>
             )}
@@ -275,7 +275,7 @@ export function TaskDetailsModal({
         )}
 
         {/* Status & Action Banner */}
-        <div className="p-4 rounded-xl bg-neutral-50 border border-neutral-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="p-4 rounded-2xl bg-[#F8F9FA] border border-slate-200/75 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-2">
             <StatusBadge status={task.status} isOverdue={isOverdue} />
             <PriorityBadge priority={task.priority} />
@@ -380,7 +380,7 @@ export function TaskDetailsModal({
                 <button
                   type="button"
                   onClick={handleDelete}
-                  className="p-2 rounded-lg text-neutral-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                  className="p-2 rounded-full text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
                   title="حذف المهمة"
                 >
                   <Trash2 className="w-4 h-4" />
@@ -393,8 +393,8 @@ export function TaskDetailsModal({
         {/* Task Metadata Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           {/* Assignee */}
-          <div className="p-3.5 rounded-xl border border-neutral-200/80 bg-white">
-            <span className="text-[11px] font-semibold text-neutral-400 block mb-1.5">
+          <div className="p-4 rounded-2xl border border-slate-200/75 bg-white">
+            <span className="text-[11px] font-semibold text-slate-400 block mb-2">
               المسؤول عن التنفيذ
             </span>
             <div className="flex items-center gap-2.5">
@@ -402,35 +402,35 @@ export function TaskDetailsModal({
                 <img
                   src={task.assignedToPhoto}
                   alt={task.assignedToName}
-                  className="w-8 h-8 rounded-full object-cover border"
+                  className="w-8 h-8 rounded-full object-cover border border-slate-200"
                 />
               ) : (
-                <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-800 flex items-center justify-center font-bold text-xs">
+                <div className="w-8 h-8 rounded-full bg-[#DCFCE7] text-[#15803D] flex items-center justify-center font-bold text-xs">
                   {task.assignedToName.slice(0, 2).toUpperCase()}
                 </div>
               )}
               <div className="min-w-0">
-                <p className="text-xs font-bold text-neutral-900 truncate">{task.assignedToName}</p>
-                <p className="text-[10px] text-neutral-500 truncate">{task.assignedToEmail}</p>
+                <p className="text-xs font-bold text-slate-900 truncate">{task.assignedToName}</p>
+                <p className="text-[10px] text-slate-500 truncate">{task.assignedToEmail}</p>
               </div>
             </div>
           </div>
 
           {/* Dates */}
-          <div className="p-3.5 rounded-xl border border-neutral-200/80 bg-white">
-            <span className="text-[11px] font-semibold text-neutral-400 block mb-1.5">
+          <div className="p-4 rounded-2xl border border-slate-200/75 bg-white">
+            <span className="text-[11px] font-semibold text-slate-400 block mb-2">
               الجدول الزمني والموعد
             </span>
-            <div className="space-y-1 text-xs text-neutral-700">
+            <div className="space-y-1.5 text-xs text-slate-700">
               <div className="flex items-center gap-1.5">
-                <Calendar className="w-3.5 h-3.5 text-neutral-400" />
+                <Calendar className="w-3.5 h-3.5 text-slate-400" />
                 <span>البدء: </span>
-                <span className="font-mono font-semibold">{task.startDate}</span>
+                <span className="font-mono font-semibold tabular-nums">{task.startDate}</span>
               </div>
               <div className="flex items-center gap-1.5">
                 <Clock className="w-3.5 h-3.5 text-rose-500" />
                 <span>التسليم: </span>
-                <span className={`font-mono font-bold ${isOverdue ? 'text-rose-600' : 'text-neutral-900'}`}>
+                <span className={`font-mono font-bold tabular-nums ${isOverdue ? 'text-rose-600' : 'text-slate-900'}`}>
                   {task.deadline}
                 </span>
               </div>
@@ -438,12 +438,12 @@ export function TaskDetailsModal({
           </div>
 
           {/* Completion Progress */}
-          <div className="p-3.5 rounded-xl border border-neutral-200/80 bg-white">
-            <div className="flex items-center justify-between mb-1.5">
-              <span className="text-[11px] font-semibold text-neutral-400">
+          <div className="p-4 rounded-2xl border border-slate-200/75 bg-white">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[11px] font-semibold text-slate-400">
                 نسبة الإنجاز
               </span>
-              <span className="text-xs font-mono font-bold text-emerald-700">{progressVal}%</span>
+              <span className="text-xs font-mono font-bold text-[#15803D] tabular-nums">{progressVal}%</span>
             </div>
             <input
               type="range"
@@ -456,9 +456,9 @@ export function TaskDetailsModal({
               onMouseUp={handleProgressSave}
               onTouchEnd={handleProgressSave}
               onKeyUp={handleProgressSave}
-              className="w-full accent-emerald-600 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+              className="w-full accent-[#22C55E] cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
             />
-            <div className="flex justify-between text-[10px] text-neutral-400 mt-1">
+            <div className="flex justify-between text-[10px] text-slate-400 mt-1 tabular-nums">
               <span>0%</span>
               <span>50%</span>
               <span>100%</span>
@@ -468,10 +468,10 @@ export function TaskDetailsModal({
 
         {/* Description Section */}
         <div className="space-y-2">
-          <h4 className="text-xs font-bold text-neutral-500">
+          <h4 className="text-xs font-bold text-slate-500">
             نطاق العمل والتفاصيل
           </h4>
-          <div className="p-4 rounded-xl bg-neutral-50/70 border border-neutral-200/70 text-sm text-neutral-800 leading-relaxed whitespace-pre-wrap">
+          <div className="p-4 rounded-2xl bg-[#F8F9FA] border border-slate-200/75 text-sm text-slate-800 leading-relaxed whitespace-pre-wrap">
             {task.description}
           </div>
         </div>
@@ -479,12 +479,12 @@ export function TaskDetailsModal({
         {/* Attachments Section */}
         <div className="space-y-2.5">
           <div className="flex items-center justify-between">
-            <h4 className="text-xs font-bold text-neutral-500 flex items-center gap-1.5">
-              <Paperclip className="w-3.5 h-3.5 text-neutral-400" />
+            <h4 className="text-xs font-bold text-slate-500 flex items-center gap-1.5">
+              <Paperclip className="w-3.5 h-3.5 text-slate-400" />
               المرفقات والملفات ({task.attachments?.length || 0})
             </h4>
             {canModifyProgressOrAttachments && (
-              <label className="text-xs font-semibold text-emerald-700 hover:text-emerald-800 cursor-pointer flex items-center gap-1">
+              <label className="text-xs font-semibold text-[#15803D] hover:text-emerald-800 cursor-pointer flex items-center gap-1">
                 <Upload className="w-3.5 h-3.5" />
                 رفع ملف أو مخرج
                 <input type="file" multiple onChange={handleAttachmentUpload} className="hidden" />
@@ -493,17 +493,17 @@ export function TaskDetailsModal({
           </div>
 
           {task.attachments && task.attachments.length > 0 ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
               {task.attachments.map(att => (
                 <div
                   key={att.id}
-                  className="flex items-center justify-between p-2.5 rounded-xl border border-neutral-200 bg-white text-xs hover:border-neutral-300 transition-colors"
+                  className="flex items-center justify-between p-3 rounded-2xl border border-slate-200/75 bg-white text-xs hover:border-slate-300 transition-colors"
                 >
                   <div className="flex items-center gap-2.5 truncate">
-                    <FileText className="w-4 h-4 text-emerald-600 shrink-0" />
+                    <FileText className="w-4 h-4 text-[#15803D] shrink-0" />
                     <div className="truncate">
-                      <p className="font-semibold text-neutral-900 truncate">{att.name}</p>
-                      <p className="text-[10px] text-neutral-400">
+                      <p className="font-semibold text-slate-900 truncate">{att.name}</p>
+                      <p className="text-[10px] text-slate-400">
                         {Math.round(att.size / 1024)} ك.ب • رُفع بواسطة {att.uploaderName}
                       </p>
                     </div>
@@ -513,7 +513,7 @@ export function TaskDetailsModal({
                     download={att.name}
                     target="_blank"
                     rel="noreferrer"
-                    className="p-1.5 text-neutral-500 hover:text-emerald-700 hover:bg-neutral-100 rounded-lg transition-colors"
+                    className="p-1.5 text-slate-500 hover:text-[#15803D] hover:bg-slate-100 rounded-full transition-colors"
                     title="تحميل الملف"
                   >
                     <Download className="w-4 h-4" />
@@ -522,48 +522,48 @@ export function TaskDetailsModal({
               ))}
             </div>
           ) : (
-            <div className="p-4 rounded-xl border border-dashed border-neutral-200 text-center text-xs text-neutral-400">
+            <div className="p-4 rounded-2xl border border-dashed border-slate-200 bg-[#F8F9FA] text-center text-xs text-slate-400">
               لا توجد ملفات مرفقة بهذه المهمة بعد.
             </div>
           )}
         </div>
 
         {/* Comments & Discussion Section */}
-        <div className="space-y-3 pt-2 border-t border-neutral-100">
-          <h4 className="text-xs font-bold text-neutral-500 flex items-center gap-1.5">
-            <MessageSquare className="w-3.5 h-3.5 text-neutral-400" />
+        <div className="space-y-3 pt-3 border-t border-slate-100">
+          <h4 className="text-xs font-bold text-slate-500 flex items-center gap-1.5">
+            <MessageSquare className="w-3.5 h-3.5 text-slate-400" />
             الملاحظات والنقاشات ({comments.length})
           </h4>
 
           {/* Comments List */}
-          <div className="space-y-3 max-h-60 overflow-y-auto pl-1">
+          <div className="space-y-2.5 max-h-60 overflow-y-auto pl-1">
             {loadingComments ? (
-              <div className="py-4 text-center text-xs text-neutral-400">جارِ تحميل الملاحظات...</div>
+              <div className="py-4 text-center text-xs text-slate-400">جارِ تحميل الملاحظات...</div>
             ) : comments.length > 0 ? (
               comments.map(c => (
                 <div
                   key={c.id}
-                  className="p-3 rounded-xl bg-neutral-50 border border-neutral-200/70 text-xs space-y-1"
+                  className="p-3.5 rounded-2xl bg-[#F8F9FA] border border-slate-200/75 text-xs space-y-1"
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <span className="font-bold text-neutral-900">{c.userName}</span>
-                      <span className="text-[10px] text-neutral-400 font-semibold">
+                      <span className="font-bold text-slate-900">{c.userName}</span>
+                      <span className="text-[10px] text-slate-400 font-semibold">
                         {getRoleArabicLabel(c.userRole)}
                       </span>
                     </div>
-                    <span className="text-[10px] text-neutral-400 font-mono">
+                    <span className="text-[10px] text-slate-400 font-mono tabular-nums">
                       {new Date(c.createdAt).toLocaleTimeString('ar-SA', {
                         hour: '2-digit',
                         minute: '2-digit',
                       })}
                     </span>
                   </div>
-                  <p className="text-neutral-700 leading-relaxed whitespace-pre-wrap">{c.message}</p>
+                  <p className="text-slate-700 leading-relaxed whitespace-pre-wrap">{c.message}</p>
                 </div>
               ))
             ) : (
-              <div className="py-4 text-center text-xs text-neutral-400">
+              <div className="py-4 text-center text-xs text-slate-400">
                 لا توجد نقاشات بعد. أضف تعليقاً أو استفساراً أدناه.
               </div>
             )}
@@ -577,7 +577,7 @@ export function TaskDetailsModal({
               value={newComment}
               onChange={e => setNewComment(e.target.value)}
               placeholder="اكتب ملاحظة، استفساراً، أو ملاحظات الاعتماد..."
-              className="flex-1 px-3.5 py-2 rounded-xl border border-neutral-200 text-xs text-neutral-900 focus:outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-500/20"
+              className="flex-1 px-4 py-2.5 rounded-full bg-[#F1F3F5] border border-transparent text-xs text-slate-900 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:border-[#22C55E] focus:ring-2 focus:ring-[#22C55E]/20 transition-all"
             />
             <Button
               id="btn-post-comment"

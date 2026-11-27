@@ -91,9 +91,9 @@ export function CompaniesManagementView({
     return (
       <div dir="rtl">
         <Card className="p-8 text-center">
-          <Shield className="w-8 h-8 text-neutral-400 mx-auto mb-2" />
-          <h3 className="text-sm font-bold text-neutral-900">صلاحية محصورة بإدارة المجموعة</h3>
-          <p className="text-xs text-neutral-500 mt-1">
+          <Shield className="w-8 h-8 text-slate-400 mx-auto mb-2" />
+          <h3 className="text-sm font-bold text-slate-900">صلاحية محصورة بإدارة المجموعة</h3>
+          <p className="text-xs text-slate-500 mt-1">
             إدارة الشركات التابعة متاحة حصراً لحساب مدير المجموعة الأعلى (SUPER_ADMIN).
           </p>
         </Card>
@@ -239,8 +239,8 @@ export function CompaniesManagementView({
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold text-neutral-900">إدارة شركات LUMERE GROUP</h1>
-          <p className="text-xs text-neutral-500 mt-0.5">
+          <h1 className="text-xl font-bold text-slate-900">إدارة شركات LUMERE GROUP</h1>
+          <p className="text-xs text-slate-500 mt-0.5">
             إضافة شركات تابعة جديدة، تحديث الهوية والشعارات، تعيين مدراء الشركات، والتحكم بحالة التفعيل.
           </p>
         </div>
@@ -261,7 +261,7 @@ export function CompaniesManagementView({
         {companies.map(company => {
           const isParent = company.type === 'parent';
           const metrics = metricsMap.get(company.id);
-          const accent = company.theme?.primary || '#059669';
+          const accent = company.theme?.primary || '#22C55E';
           const companyAdmins = employees.filter(
             e =>
               e.companyId === company.id &&
@@ -269,7 +269,7 @@ export function CompaniesManagementView({
           );
 
           return (
-            <Card key={company.id} className="p-5 flex flex-col justify-between gap-4">
+            <Card key={company.id} hover className="p-5 sm:p-6 flex flex-col justify-between gap-4">
               <div>
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex items-center gap-3 min-w-0">
@@ -278,11 +278,11 @@ export function CompaniesManagementView({
                         src={company.logo}
                         alt={company.name}
                         referrerPolicy="no-referrer"
-                        className="w-12 h-12 rounded-xl object-cover border border-neutral-200 shrink-0"
+                        className="w-12 h-12 rounded-2xl object-cover border border-slate-200/80 shrink-0"
                       />
                     ) : (
                       <div
-                        className="w-12 h-12 rounded-xl flex items-center justify-center text-white font-bold text-sm shrink-0"
+                        className="w-12 h-12 rounded-2xl flex items-center justify-center text-white font-bold text-sm shrink-0"
                         style={{ backgroundColor: accent }}
                       >
                         {getCompanyInitials(company.name)}
@@ -290,14 +290,14 @@ export function CompaniesManagementView({
                     )}
                     <div className="min-w-0">
                       <div className="flex items-center gap-2">
-                        <h3 className="text-base font-bold text-neutral-900 truncate">
+                        <h3 className="text-base font-bold text-slate-900 truncate">
                           {company.name}
                         </h3>
-                        <span className="text-[11px] font-semibold text-neutral-500">
+                        <span className="text-[11px] font-semibold text-slate-500">
                           · {isParent ? 'الشركة الأم' : 'شركة تابعة'}
                         </span>
                       </div>
-                      <p className="text-xs text-neutral-500 truncate">
+                      <p className="text-xs text-slate-500 truncate">
                         {company.arabicName || company.businessSector}
                       </p>
                     </div>
@@ -305,39 +305,39 @@ export function CompaniesManagementView({
 
                   <span
                     className={`text-xs font-semibold shrink-0 ${
-                      company.status === 'active' ? 'text-emerald-700' : 'text-rose-600'
+                      company.status === 'active' ? 'text-[#16A34A]' : 'text-rose-600'
                     }`}
                   >
                     {company.status === 'active' ? 'نشطة' : 'معطّلة'}
                   </span>
                 </div>
 
-                <p className="text-xs text-neutral-600 mt-3 leading-relaxed">
+                <p className="text-xs text-slate-600 mt-3 leading-relaxed">
                   {company.description || 'لا يوجد وصف مسجل بعد.'}
                 </p>
 
                 {/* Real Metrics Row */}
-                <div className="mt-4 pt-3 border-t border-neutral-100 grid grid-cols-4 gap-2 text-center">
+                <div className="mt-4 pt-3.5 border-t border-slate-100 grid grid-cols-4 gap-2 text-center">
                   <div>
-                    <p className="font-mono tabular-nums text-sm font-bold text-neutral-900">
+                    <p className="font-mono tabular-nums text-sm font-bold text-slate-900">
                       {isParent ? employees.length : metrics?.employeesCount ?? 0}
                     </p>
-                    <p className="text-[10px] text-neutral-500">الموظفون</p>
+                    <p className="text-[10px] text-slate-500">الموظفون</p>
                   </div>
                   <div>
-                    <p className="font-mono tabular-nums text-sm font-bold text-neutral-900">
+                    <p className="font-mono tabular-nums text-sm font-bold text-slate-900">
                       {isParent ? projects.length : metrics?.projectsCount ?? 0}
                     </p>
-                    <p className="text-[10px] text-neutral-500">المشاريع</p>
+                    <p className="text-[10px] text-slate-500">المشاريع</p>
                   </div>
                   <div>
-                    <p className="font-mono tabular-nums text-sm font-bold text-neutral-900">
+                    <p className="font-mono tabular-nums text-sm font-bold text-slate-900">
                       {isParent ? tasks.length : metrics?.totalTasksCount ?? 0}
                     </p>
-                    <p className="text-[10px] text-neutral-500">المهام</p>
+                    <p className="text-[10px] text-slate-500">المهام</p>
                   </div>
                   <div>
-                    <p className="font-mono tabular-nums text-sm font-bold text-emerald-700">
+                    <p className="font-mono tabular-nums text-sm font-bold text-[#16A34A]">
                       {isParent
                         ? tasks.length > 0
                           ? Math.round(
@@ -348,14 +348,14 @@ export function CompaniesManagementView({
                         : metrics?.completionRate ?? 0}
                       %
                     </p>
-                    <p className="text-[10px] text-neutral-500">الإنجاز</p>
+                    <p className="text-[10px] text-slate-500">الإنجاز</p>
                   </div>
                 </div>
 
                 {!isParent && (
-                  <div className="mt-3 text-[11px] text-neutral-500">
+                  <div className="mt-3 text-[11px] text-slate-500">
                     مدراء الشركة:{' '}
-                    <span className="font-semibold text-neutral-800">
+                    <span className="font-semibold text-slate-800">
                       {companyAdmins.length > 0
                         ? companyAdmins.map(a => a.displayName).join('، ')
                         : 'لم يُعيَّن مدير شركة بعد'}
@@ -365,12 +365,12 @@ export function CompaniesManagementView({
               </div>
 
               {/* Actions */}
-              <div className="pt-3 border-t border-neutral-100 flex flex-wrap items-center justify-between gap-2">
-                <div className="flex items-center gap-1.5">
+              <div className="pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-1">
                   <button
                     type="button"
                     onClick={() => openEditModal(company)}
-                    className="px-2.5 py-1.5 rounded-lg text-xs font-medium text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900 flex items-center gap-1 cursor-pointer"
+                    className="px-2.5 py-1.5 rounded-full text-xs font-medium text-slate-600 hover:bg-[#F1F3F5] hover:text-slate-900 flex items-center gap-1 transition-colors cursor-pointer"
                   >
                     <Edit2 className="w-3.5 h-3.5" />
                     تعديل
@@ -384,7 +384,7 @@ export function CompaniesManagementView({
                           setDetailsCompany(company);
                           setDetailsTab('overview');
                         }}
-                        className="px-2.5 py-1.5 rounded-lg text-xs font-medium text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900 flex items-center gap-1 cursor-pointer"
+                        className="px-2.5 py-1.5 rounded-full text-xs font-medium text-slate-600 hover:bg-[#F1F3F5] hover:text-slate-900 flex items-center gap-1 transition-colors cursor-pointer"
                       >
                         <Eye className="w-3.5 h-3.5" />
                         التفاصيل
@@ -396,7 +396,7 @@ export function CompaniesManagementView({
                           setAdminTargetCompany(company);
                           setSelectedAdminUserId(employees[0]?.id || '');
                         }}
-                        className="px-2.5 py-1.5 rounded-lg text-xs font-medium text-blue-700 hover:bg-blue-50 flex items-center gap-1 cursor-pointer"
+                        className="px-2.5 py-1.5 rounded-full text-xs font-medium text-blue-600 hover:bg-blue-50 flex items-center gap-1 transition-colors cursor-pointer"
                       >
                         <Shield className="w-3.5 h-3.5" />
                         تعيين مدير
@@ -405,10 +405,10 @@ export function CompaniesManagementView({
                       <button
                         type="button"
                         onClick={() => handleToggleCompanyStatus(company)}
-                        className={`px-2.5 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1 cursor-pointer ${
+                        className={`px-2.5 py-1.5 rounded-full text-xs font-medium flex items-center gap-1 transition-colors cursor-pointer ${
                           company.status === 'active'
-                            ? 'text-amber-700 hover:bg-amber-50'
-                            : 'text-emerald-700 hover:bg-emerald-50'
+                            ? 'text-amber-600 hover:bg-amber-50'
+                            : 'text-[#16A34A] hover:bg-[#E8F8EE]'
                         }`}
                       >
                         <Power className="w-3.5 h-3.5" />
@@ -421,7 +421,7 @@ export function CompaniesManagementView({
                 <button
                   type="button"
                   onClick={() => onEnterCompany(company.id)}
-                  className="px-3 py-1.5 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-white text-xs font-semibold flex items-center gap-1.5 cursor-pointer"
+                  className="px-4 py-2 rounded-full bg-[#18181B] hover:bg-neutral-800 text-white text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
                 >
                   <span>{isParent ? 'لوحة المجموعة' : 'الدخول للشركة'}</span>
                   <ArrowLeft className="w-3.5 h-3.5" />
@@ -486,12 +486,12 @@ export function CompaniesManagementView({
           />
 
           <div>
-            <label className="block text-xs font-semibold text-neutral-700 mb-1.5">
+            <label className="block text-xs font-semibold text-slate-700 mb-1.5">
               شعار الشركة (Firebase Storage)
             </label>
             <div className="flex items-center gap-3">
-              <label className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl border border-neutral-300 bg-white hover:bg-neutral-50 text-xs font-semibold text-neutral-700 cursor-pointer">
-                <Upload className="w-4 h-4 text-emerald-700" />
+              <label className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[#F1F3F5] hover:bg-slate-200/70 text-xs font-semibold text-slate-700 cursor-pointer transition-colors">
+                <Upload className="w-4 h-4 text-[#16A34A]" />
                 <span>{logoFile ? logoFile.name : 'اختيار صورة الشعار'}</span>
                 <input
                   type="file"
@@ -505,26 +505,31 @@ export function CompaniesManagementView({
                   src={logoUrl}
                   alt="شعار الشركة"
                   referrerPolicy="no-referrer"
-                  className="w-10 h-10 rounded-lg object-cover border border-neutral-200"
+                  className="w-10 h-10 rounded-xl object-cover border border-slate-200"
                 />
               )}
             </div>
           </div>
 
           {!editingCompany && (
-            <label className="flex items-center gap-2 text-xs text-neutral-700 cursor-pointer">
+            <label className="flex items-center gap-2 text-xs text-slate-700 cursor-pointer">
               <input
                 type="checkbox"
                 checked={seedSuggestedDepts}
                 onChange={e => setSeedSuggestedDepts(e.target.checked)}
-                className="rounded border-neutral-300 text-emerald-600 focus:ring-emerald-500"
+                className="rounded accent-[#22C55E] text-[#22C55E] focus:ring-[#22C55E]"
               />
               <span>إنشاء قسم افتراضي أساسي تلقائياً داخل الشركة الجديدة</span>
             </label>
           )}
 
-          <div className="flex items-center justify-end gap-2 pt-3 border-t border-neutral-100">
-            <Button type="button" variant="outline" onClick={() => setIsFormOpen(false)}>
+          <div className="flex items-center justify-end gap-2.5 pt-4 border-t border-slate-100">
+            <Button
+              type="button"
+              variant="outline"
+              className="bg-[#E8F8EE] border-transparent text-[#15803D] hover:bg-[#DCFCE7]"
+              onClick={() => setIsFormOpen(false)}
+            >
               إلغاء
             </Button>
             <Button type="submit" variant="primary" isLoading={isSaving}>
@@ -556,8 +561,13 @@ export function CompaniesManagementView({
                 : [{ value: '', label: 'لا يوجد موظفون مسجلون حالياً' }]
             }
           />
-          <div className="flex items-center justify-end gap-2 pt-3 border-t border-neutral-100">
-            <Button type="button" variant="outline" onClick={() => setAdminTargetCompany(null)}>
+          <div className="flex items-center justify-end gap-2.5 pt-4 border-t border-slate-100">
+            <Button
+              type="button"
+              variant="outline"
+              className="bg-[#E8F8EE] border-transparent text-[#15803D] hover:bg-[#DCFCE7]"
+              onClick={() => setAdminTargetCompany(null)}
+            >
               إلغاء
             </Button>
             <Button
@@ -582,7 +592,7 @@ export function CompaniesManagementView({
       >
         {detailsCompany && (
           <div className="space-y-4" dir="rtl">
-            <div className="flex items-center gap-1 p-1 bg-neutral-100 rounded-xl">
+            <div className="flex items-center gap-1 p-1.5 bg-[#F1F3F5] rounded-full">
               {(
                 [
                   { id: 'overview', label: 'نظرة عامة', icon: Building2 },
@@ -597,10 +607,10 @@ export function CompaniesManagementView({
                     key={tab.id}
                     type="button"
                     onClick={() => setDetailsTab(tab.id)}
-                    className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
+                    className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-full text-xs font-semibold transition-colors cursor-pointer ${
                       detailsTab === tab.id
-                        ? 'bg-white text-neutral-900 shadow-2xs'
-                        : 'text-neutral-600 hover:text-neutral-900'
+                        ? 'bg-white text-slate-900 shadow-2xs'
+                        : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >
                     <Icon className="w-3.5 h-3.5" />
@@ -612,29 +622,29 @@ export function CompaniesManagementView({
 
             {detailsTab === 'overview' && (
               <div className="space-y-3 text-xs">
-                <p className="text-neutral-700 leading-relaxed">{detailsCompany.description}</p>
+                <p className="text-slate-700 leading-relaxed">{detailsCompany.description}</p>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">
-                  <div className="p-3 rounded-xl bg-neutral-50 border border-neutral-100">
-                    <p className="text-neutral-500 text-[11px]">الموظفون</p>
-                    <p className="text-lg font-bold font-mono tabular-nums text-neutral-900 mt-1">
+                  <div className="p-3.5 rounded-2xl bg-[#F8F9FA]">
+                    <p className="text-slate-500 text-[11px]">الموظفون</p>
+                    <p className="text-lg font-bold font-mono tabular-nums text-slate-900 mt-1">
                       {detailsEmployees.length}
                     </p>
                   </div>
-                  <div className="p-3 rounded-xl bg-neutral-50 border border-neutral-100">
-                    <p className="text-neutral-500 text-[11px]">المشاريع</p>
-                    <p className="text-lg font-bold font-mono tabular-nums text-neutral-900 mt-1">
+                  <div className="p-3.5 rounded-2xl bg-[#F8F9FA]">
+                    <p className="text-slate-500 text-[11px]">المشاريع</p>
+                    <p className="text-lg font-bold font-mono tabular-nums text-slate-900 mt-1">
                       {detailsProjects.length}
                     </p>
                   </div>
-                  <div className="p-3 rounded-xl bg-neutral-50 border border-neutral-100">
-                    <p className="text-neutral-500 text-[11px]">المهام</p>
-                    <p className="text-lg font-bold font-mono tabular-nums text-neutral-900 mt-1">
+                  <div className="p-3.5 rounded-2xl bg-[#F8F9FA]">
+                    <p className="text-slate-500 text-[11px]">المهام</p>
+                    <p className="text-lg font-bold font-mono tabular-nums text-slate-900 mt-1">
                       {detailsTasks.length}
                     </p>
                   </div>
-                  <div className="p-3 rounded-xl bg-neutral-50 border border-neutral-100">
-                    <p className="text-neutral-500 text-[11px]">الحالة</p>
-                    <p className="text-sm font-bold text-emerald-700 mt-1">
+                  <div className="p-3.5 rounded-2xl bg-[#F8F9FA]">
+                    <p className="text-slate-500 text-[11px]">الحالة</p>
+                    <p className="text-sm font-bold text-[#16A34A] mt-1">
                       {detailsCompany.status === 'active' ? 'نشطة' : 'معطّلة'}
                     </p>
                   </div>
@@ -643,19 +653,19 @@ export function CompaniesManagementView({
             )}
 
             {detailsTab === 'employees' && (
-              <div className="max-h-72 overflow-y-auto divide-y divide-neutral-100 text-xs">
+              <div className="max-h-72 overflow-y-auto divide-y divide-slate-100 text-xs">
                 {detailsEmployees.length === 0 ? (
-                  <p className="py-8 text-center text-neutral-400">لا يوجد موظفون في هذه الشركة بعد.</p>
+                  <p className="py-8 text-center text-slate-400">لا يوجد موظفون في هذه الشركة بعد.</p>
                 ) : (
                   detailsEmployees.map(emp => (
                     <div key={emp.id} className="py-2.5 flex items-center justify-between">
                       <div>
-                        <p className="font-bold text-neutral-900">{emp.displayName}</p>
-                        <p className="text-[11px] text-neutral-500">
+                        <p className="font-bold text-slate-900">{emp.displayName}</p>
+                        <p className="text-[11px] text-slate-500">
                           {emp.position || emp.department} · {emp.email}
                         </p>
                       </div>
-                      <span className="text-[11px] font-semibold text-neutral-600">{emp.role}</span>
+                      <span className="text-[11px] font-semibold text-slate-600">{emp.role}</span>
                     </div>
                   ))
                 )}
@@ -663,17 +673,17 @@ export function CompaniesManagementView({
             )}
 
             {detailsTab === 'projects' && (
-              <div className="max-h-72 overflow-y-auto divide-y divide-neutral-100 text-xs">
+              <div className="max-h-72 overflow-y-auto divide-y divide-slate-100 text-xs">
                 {detailsProjects.length === 0 ? (
-                  <p className="py-8 text-center text-neutral-400">لا توجد مشاريع مسجلة لهذه الشركة.</p>
+                  <p className="py-8 text-center text-slate-400">لا توجد مشاريع مسجلة لهذه الشركة.</p>
                 ) : (
                   detailsProjects.map(proj => (
                     <div key={proj.id} className="py-2.5 flex items-center justify-between">
                       <div>
-                        <p className="font-bold text-neutral-900">{proj.name}</p>
-                        <p className="text-[11px] text-neutral-500">العميل: {proj.clientName}</p>
+                        <p className="font-bold text-slate-900">{proj.name}</p>
+                        <p className="text-[11px] text-slate-500">العميل: {proj.clientName}</p>
                       </div>
-                      <span className="text-[11px] font-semibold text-neutral-600">{proj.status}</span>
+                      <span className="text-[11px] font-semibold text-slate-600">{proj.status}</span>
                     </div>
                   ))
                 )}
@@ -681,30 +691,35 @@ export function CompaniesManagementView({
             )}
 
             {detailsTab === 'tasks' && (
-              <div className="max-h-72 overflow-y-auto divide-y divide-neutral-100 text-xs">
+              <div className="max-h-72 overflow-y-auto divide-y divide-slate-100 text-xs">
                 {detailsTasks.length === 0 ? (
-                  <p className="py-8 text-center text-neutral-400">لا توجد مهام مسجلة لهذه الشركة.</p>
+                  <p className="py-8 text-center text-slate-400">لا توجد مهام مسجلة لهذه الشركة.</p>
                 ) : (
                   detailsTasks.map(t => (
                     <div key={t.id} className="py-2.5 flex items-center justify-between">
                       <div>
-                        <p className="font-bold text-neutral-900">
-                          <span className="font-mono text-emerald-700 ml-1.5">{t.taskId}</span>
+                        <p className="font-bold text-slate-900">
+                          <span className="font-mono text-[#16A34A] ml-1.5">{t.taskId}</span>
                           {t.title}
                         </p>
-                        <p className="text-[11px] text-neutral-500">
+                        <p className="text-[11px] text-slate-500">
                           المكلف: {t.assignedToName} · التسليم: {t.deadline}
                         </p>
                       </div>
-                      <span className="text-[11px] font-semibold text-neutral-600">{t.status}</span>
+                      <span className="text-[11px] font-semibold text-slate-600">{t.status}</span>
                     </div>
                   ))
                 )}
               </div>
             )}
 
-            <div className="pt-3 border-t border-neutral-100 flex items-center justify-between">
-              <Button variant="outline" size="sm" onClick={() => setDetailsCompany(null)}>
+            <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
+              <Button
+                variant="outline"
+                size="sm"
+                className="bg-[#E8F8EE] border-transparent text-[#15803D] hover:bg-[#DCFCE7]"
+                onClick={() => setDetailsCompany(null)}
+              >
                 إغلاق
               </Button>
               <Button

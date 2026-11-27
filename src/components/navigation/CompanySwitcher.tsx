@@ -25,7 +25,7 @@ export function CompanySwitcher({ compact = false, onCompanyChanged }: CompanySw
     return () => document.removeEventListener('mousedown', handleOutside);
   }, []);
 
-  const accentColor = activeCompany?.theme?.primary || '#059669';
+  const accentColor = activeCompany?.theme?.primary || '#22C55E';
 
   const handleSelect = (companyId: string) => {
     switchCompany(companyId);
@@ -37,8 +37,8 @@ export function CompanySwitcher({ compact = false, onCompanyChanged }: CompanySw
   if (!canSwitchCompanies) {
     return (
       <div
-        className={`flex items-center gap-2.5 rounded-xl border border-neutral-200 bg-neutral-50/90 ${
-          compact ? 'px-2.5 py-1.5' : 'px-3 py-2 w-full'
+        className={`flex items-center gap-2.5 rounded-2xl border border-slate-200/75 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.02)] ${
+          compact ? 'px-2.5 py-1.5' : 'px-3 py-2.5 w-full'
         }`}
         dir="rtl"
       >
@@ -47,22 +47,22 @@ export function CompanySwitcher({ compact = false, onCompanyChanged }: CompanySw
             src={activeCompany.logo}
             alt={activeCompany.name}
             referrerPolicy="no-referrer"
-            className="w-7 h-7 rounded-lg object-cover border border-neutral-200 shrink-0"
+            className="w-8 h-8 rounded-xl object-cover border border-slate-200 shrink-0"
           />
         ) : (
           <div
-            className="w-7 h-7 rounded-lg flex items-center justify-center text-white text-[11px] font-bold shrink-0"
+            className="w-8 h-8 rounded-xl flex items-center justify-center text-white text-[11px] font-bold shrink-0"
             style={{ backgroundColor: accentColor }}
           >
             {getCompanyInitials(activeCompany.name)}
           </div>
         )}
         <div className="min-w-0 flex-1 text-right">
-          <p className="text-xs font-bold text-neutral-900 truncate leading-tight">
+          <p className="text-xs font-bold text-slate-900 truncate leading-tight">
             {activeCompany.name}
           </p>
           {!compact && (
-            <p className="text-[10px] text-neutral-500 truncate leading-tight">
+            <p className="text-[10px] text-slate-500 truncate leading-tight">
               {activeCompany.arabicName || activeCompany.businessSector}
             </p>
           )}
@@ -77,8 +77,8 @@ export function CompanySwitcher({ compact = false, onCompanyChanged }: CompanySw
         type="button"
         id="company-switcher-trigger"
         onClick={() => setOpen(prev => !prev)}
-        className={`flex items-center justify-between gap-2.5 rounded-xl border border-neutral-200 bg-white hover:border-neutral-300 hover:bg-neutral-50 transition-colors cursor-pointer ${
-          compact ? 'px-2.5 py-1.5 min-w-[180px]' : 'px-3 py-2 w-full'
+        className={`flex items-center justify-between gap-2.5 rounded-2xl border border-slate-200/75 bg-white hover:border-slate-300 shadow-[0_1px_2px_rgba(15,23,42,0.02)] transition-colors cursor-pointer ${
+          compact ? 'px-2.5 py-1.5 min-w-[180px]' : 'px-3 py-2.5 w-full'
         }`}
         aria-expanded={open}
         aria-haspopup="listbox"
@@ -89,15 +89,15 @@ export function CompanySwitcher({ compact = false, onCompanyChanged }: CompanySw
               src={activeCompany.logo}
               alt={activeCompany.name}
               referrerPolicy="no-referrer"
-              className="w-7 h-7 rounded-lg object-cover border border-neutral-200 shrink-0"
+              className="w-8 h-8 rounded-xl object-cover border border-slate-200 shrink-0"
             />
           ) : (
             <div
-              className="w-7 h-7 rounded-lg flex items-center justify-center text-white text-[11px] font-bold shrink-0"
-              style={{ backgroundColor: accentColor }}
+              className="w-8 h-8 rounded-xl flex items-center justify-center text-white text-[11px] font-bold shrink-0"
+              style={{ backgroundColor: activeCompany.id === PARENT_COMPANY_ID ? '#22C55E' : accentColor }}
             >
               {activeCompany.type === 'parent' ? (
-                <Layers className="w-3.5 h-3.5" />
+                <Layers className="w-4 h-4" />
               ) : (
                 getCompanyInitials(activeCompany.name)
               )}
@@ -105,10 +105,10 @@ export function CompanySwitcher({ compact = false, onCompanyChanged }: CompanySw
           )}
 
           <div className="min-w-0 text-right">
-            <p className="text-xs font-bold text-neutral-900 truncate leading-tight">
+            <p className="text-xs font-bold text-slate-900 truncate leading-tight">
               {activeCompany.name}
             </p>
-            <p className="text-[10px] text-neutral-500 truncate leading-tight">
+            <p className="text-[10px] text-slate-500 truncate leading-tight">
               {activeCompany.id === PARENT_COMPANY_ID
                 ? 'إدارة المجموعة المركزية'
                 : activeCompany.arabicName || activeCompany.businessSector || 'شركة تابعة'}
@@ -116,7 +116,7 @@ export function CompanySwitcher({ compact = false, onCompanyChanged }: CompanySw
           </div>
         </div>
         <ChevronDown
-          className={`w-4 h-4 text-neutral-400 shrink-0 transition-transform duration-150 ${
+          className={`w-4 h-4 text-slate-400 shrink-0 transition-transform duration-150 ${
             open ? 'rotate-180' : ''
           }`}
         />
@@ -125,11 +125,11 @@ export function CompanySwitcher({ compact = false, onCompanyChanged }: CompanySw
       {open && (
         <div
           role="listbox"
-          className="absolute top-full right-0 mt-1.5 w-72 bg-white rounded-xl border border-neutral-200 shadow-xl z-50 overflow-hidden"
+          className="absolute top-full right-0 mt-1.5 w-72 bg-white rounded-2xl border border-slate-200/80 shadow-xl z-50 overflow-hidden"
         >
-          <div className="px-3.5 py-2.5 border-b border-neutral-100 bg-neutral-50/70">
-            <p className="text-[11px] font-bold text-neutral-700">تبديل مساحة عمل الشركة</p>
-            <p className="text-[10px] text-neutral-500">
+          <div className="px-3.5 py-2.5 border-b border-slate-100 bg-[#F8F9FA]">
+            <p className="text-[11px] font-bold text-slate-700">تبديل مساحة عمل الشركة</p>
+            <p className="text-[10px] text-slate-500">
               انتقل بين الإدارة المركزية أو أي شركة تابعة
             </p>
           </div>
@@ -138,7 +138,7 @@ export function CompanySwitcher({ compact = false, onCompanyChanged }: CompanySw
             {companies.map(company => {
               const isSelected = company.id === activeCompanyId;
               const isParent = company.type === 'parent';
-              const companyAccent = company.theme?.primary || (isParent ? '#059669' : '#334155');
+              const companyAccent = company.theme?.primary || (isParent ? '#22C55E' : '#334155');
               const isInactive = company.status === 'inactive';
 
               return (
@@ -147,10 +147,10 @@ export function CompanySwitcher({ compact = false, onCompanyChanged }: CompanySw
                   type="button"
                   id={`switch-company-${company.id}`}
                   onClick={() => handleSelect(company.id)}
-                  className={`w-full flex items-center justify-between gap-2.5 px-2.5 py-2 rounded-lg text-right transition-colors cursor-pointer ${
+                  className={`w-full flex items-center justify-between gap-2.5 px-2.5 py-2 rounded-xl text-right transition-colors cursor-pointer ${
                     isSelected
-                      ? 'bg-emerald-50 text-emerald-950'
-                      : 'hover:bg-neutral-50 text-neutral-700'
+                      ? 'bg-[#DCFCE7] text-[#14532D]'
+                      : 'hover:bg-slate-50 text-slate-700'
                   }`}
                 >
                   <div className="flex items-center gap-2.5 min-w-0">
@@ -159,12 +159,12 @@ export function CompanySwitcher({ compact = false, onCompanyChanged }: CompanySw
                         src={company.logo}
                         alt={company.name}
                         referrerPolicy="no-referrer"
-                        className="w-7 h-7 rounded-lg object-cover border border-neutral-200 shrink-0"
+                        className="w-7 h-7 rounded-xl object-cover border border-slate-200 shrink-0"
                       />
                     ) : (
                       <div
-                        className="w-7 h-7 rounded-lg flex items-center justify-center text-white text-[10px] font-bold shrink-0"
-                        style={{ backgroundColor: companyAccent }}
+                        className="w-7 h-7 rounded-xl flex items-center justify-center text-white text-[10px] font-bold shrink-0"
+                        style={{ backgroundColor: isParent ? '#22C55E' : companyAccent }}
                       >
                         {isParent ? (
                           <Layers className="w-3.5 h-3.5" />
@@ -176,11 +176,11 @@ export function CompanySwitcher({ compact = false, onCompanyChanged }: CompanySw
 
                     <div className="min-w-0">
                       <div className="flex items-center gap-1.5">
-                        <span className="text-xs font-bold text-neutral-900 truncate">
+                        <span className="text-xs font-bold text-slate-900 truncate">
                           {company.name}
                         </span>
                         {isParent && (
-                          <span className="text-[10px] text-emerald-700 font-semibold">
+                          <span className="text-[10px] text-[#15803D] font-semibold">
                             · القابضة
                           </span>
                         )}
@@ -190,13 +190,13 @@ export function CompanySwitcher({ compact = false, onCompanyChanged }: CompanySw
                           </span>
                         )}
                       </div>
-                      <p className="text-[10px] text-neutral-500 truncate">
+                      <p className="text-[10px] text-slate-500 truncate">
                         {company.arabicName || company.businessSector || 'شركة تابعة'}
                       </p>
                     </div>
                   </div>
 
-                  {isSelected && <Check className="w-4 h-4 text-emerald-700 shrink-0" />}
+                  {isSelected && <Check className="w-4 h-4 text-[#15803D] shrink-0" />}
                 </button>
               );
             })}
