@@ -7,7 +7,7 @@ import { Task, User, Department, TaskPriority, TaskAttachment, Project, Client }
 import { useAuth } from '../../context/AuthContext';
 import { useCompany } from '../../context/CompanyContext';
 import { useToast } from '../../context/ToastContext';
-import { DataService } from '../../services/dataService';
+import { DataService } from '../../services/data/dataService';
 import { DEFAULT_SUBSIDIARY_ID } from '../../config/companies';
 import { getUserCompanyId, isActiveStatus, validateTaskAssignment } from '../../utils/rbac';
 import { formatLocalDate } from '../../utils/sanitize';

@@ -1,0 +1,448 @@
+import React, { useState, useEffect } from 'react';
+import {
+  Settings,
+  Shield,
+  Database,
+  Building,
+  CheckCircle2,
+  RefreshCw,
+  Bell,
+  Lock,
+  Radio,
+  Clock,
+  Volume2,
+  Sparkles,
+} from 'lucide-react';
+import { Card } from '../../components/ui/Card';
+import { Button } from '../../components/ui/Button';
+import { Input, Select } from '../../components/ui/Input';
+import { useAuth } from '../../context/AuthContext';
+import { useCompany } from '../../context/CompanyContext';
+import { useToast } from '../../context/ToastContext';
+import { DataService } from '../../services/data/dataService';
+import { PrivilegedService } from '../../services/firebase/privilegedService';
+import {
+  DeadlinePushService,
+  DeadlineServiceSettings,
+} from '../../services/integrations/deadlinePushService';
+
+const PREFS_STORAGE_KEY = 'lumere_erp_company_prefs_v1';
+
+interface SettingsViewProps {
+  onRefreshAllData: () => Promise<void> | void;
+}
+
+export function SettingsView({ onRefreshAllData }: SettingsViewProps) {
+  const { currentUser, isSuperAdmin, isCompanyAdmin, refreshCurrentUser } = useAuth();
+  const { activeCompany, refreshCompanies } = useCompany();
+  const { showToast } = useToast();
+
+  const canRenameCompany = isSuperAdmin && activeCompany.id !== 'lumere-group';
+  const [companyName, setCompanyName] = useState(activeCompany.name);
+  const [defaultDeadlineDays, setDefaultDeadlineDays] = useState('7');
+  const [requireReview, setRequireReview] = useState(true);
+  const [isSavingGeneral, setIsSavingGeneral] = useState(false);
+  const [isResetting, setIsResetting] = useState(false);
+  const [isSyncingClaims, setIsSyncingClaims] = useState(false);
+
+  useEffect(() => {
+    setCompanyName(activeCompany.name);
+    try {
+      const raw = localStorage.getItem(`${PREFS_STORAGE_KEY}_${activeCompany.id}`);
+      if (raw) {
+        const parsed = JSON.parse(raw) as { defaultDeadlineDays?: string; requireReview?: boolean };
+        setDefaultDeadlineDays(parsed.defaultDeadlineDays || '7');
+        setRequireReview(parsed.requireReview ?? true);
+      } else {
+        setDefaultDeadlineDays('7');
+        setRequireReview(true);
+      }
+    } catch {
+      setDefaultDeadlineDays('7');
+      setRequireReview(true);
+    }
+  }, [activeCompany.id, activeCompany.name]);
+
+  // Deadline Push Settings
+  const [deadlineSettings, setDeadlineSettings] = useState<DeadlineServiceSettings>(
+    DeadlinePushService.getSettings()
+  );
+  const [browserPerm, setBrowserPerm] = useState<NotificationPermission | 'unsupported'>(
+    DeadlinePushService.getBrowserPushPermissionStatus()
+  );
+
+  useEffect(() => {
+    const unsub = DeadlinePushService.subscribeStatus(status => {
+      setDeadlineSettings(status.settings);
+      setBrowserPerm(status.browserPermission);
+    });
+    return () => unsub();
+  }, []);
+
+  const handleSaveGeneral = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSavingGeneral(true);
+    try {
+      localStorage.setItem(
+        `${PREFS_STORAGE_KEY}_${activeCompany.id}`,
+        JSON.stringify({
+          defaultDeadlineDays: String(Math.max(1, Number(defaultDeadlineDays) || 7)),
+          requireReview,
+        })
+      );
+      if (canRenameCompany && currentUser && companyName.trim() && companyName.trim() !== activeCompany.name) {
+        await DataService.updateCompany(activeCompany.id, { name: companyName.trim() }, currentUser);
+        await refreshCompanies();
+      }
+      showToast('تم حفظ إعدادات وتفضيلات المنشأة بنجاح', 'success');
+    } catch {
+      showToast('تعذر حفظ إعدادات المنشأة', 'error');
+    } finally {
+      setIsSavingGeneral(false);
+    }
+  };
+
+  const handleUpdateDeadlineSetting = <K extends keyof DeadlineServiceSettings>(
+    key: K,
+    value: DeadlineServiceSettings[K]
+  ) => {
+    const updated = DeadlinePushService.saveSettings({ [key]: value });
+    setDeadlineSettings(updated);
+    showToast(`تم تحديث إعدادات تنبيهات المواعيد`, 'info');
+  };
+
+  const handleRequestPushPermission = async () => {
+    const perm = await DeadlinePushService.requestBrowserPushPermission();
+    setBrowserPerm(perm);
+    if (perm === 'granted') {
+      showToast('تم تفعيل إشعارات المتصفح بنجاح!', 'success');
+      DeadlinePushService.playGentleChime();
+    } else if (perm === 'denied') {
+      showToast('تم رفض إذن إشعارات المتصفح', 'info');
+    }
+  };
+
+  const handleTestPush = () => {
+    DeadlinePushService.playGentleChime();
+    if ('Notification' in window && Notification.permission === 'granted') {
+      new Notification('تنبيه تجريبي من Luméré', {
+        body: 'خدمة فحص المواعيد النهائية تعمل بنجاح! ستتلقى تنبيهات فورية للمهام القريبة من الانتهاء.',
+        icon: '/favicon.ico',
+      });
+      showToast('تم إرسال إشعار فوري تجريبي!', 'success');
+    } else {
+      showToast('تم تشغيل الصوت التجريبي! يرجى منح إذن إشعارات المتصفح أعلاه لتلقي النوافذ المنبثقة.', 'info');
+    }
+  };
+
+  const handleRefreshDatabase = async () => {
+    setIsResetting(true);
+    try {
+      await onRefreshAllData();
+      showToast('تمت مزامنة وتحديث كافة البيانات بنجاح من Firestore!', 'success');
+    } catch {
+      showToast('فشل تحديث البيانات', 'error');
+    } finally {
+      setIsResetting(false);
+    }
+  };
+
+  const handleSyncClaims = async () => {
+    setIsSyncingClaims(true);
+    try {
+      const synced = await PrivilegedService.syncCurrentUserClaims();
+      await refreshCurrentUser();
+      if (synced) {
+        showToast('تمت مزامنة صلاحيات Firebase Auth Custom Claims بنجاح.', 'success');
+      } else {
+        showToast('لم يتم نشر Cloud Functions بعد؛ يعمل النظام حالياً عبر قواعد Firestore.', 'info');
+      }
+    } finally {
+      setIsSyncingClaims(false);
+    }
+  };
+
+  return (
+    <div className="space-y-6 max-w-4xl" dir="rtl">
+      {/* Header */}
+      <div>
+        <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+          <Settings className="w-5 h-5 text-[#16A34A]" />
+          إعدادات وتكوين نظام Luméré
+        </h2>
+        <p className="text-xs text-slate-500 mt-0.5">
+          سياسات المؤسسة، ضوابط الأمان والصلاحيات، إعدادات الإشعارات الفورية، وصيانة النظام.
+        </p>
+      </div>
+
+      {/* Brand & Organization */}
+      <Card className="p-6 space-y-4">
+        <div className="flex items-center gap-2.5 border-b border-slate-100 pb-3.5">
+          <Building className="w-4 h-4 text-[#16A34A]" />
+          <h3 className="text-sm font-bold text-slate-900">الهوية المؤسسية والافتراضيات</h3>
+        </div>
+
+        <form onSubmit={handleSaveGeneral} className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Input
+              label="اسم المنشأة"
+              value={companyName}
+              onChange={e => setCompanyName(e.target.value)}
+              disabled={!canRenameCompany}
+              helperText={
+                !isSuperAdmin
+                  ? 'تعديل اسم المنشأة متاح للمدير العام فقط'
+                  : activeCompany.id === 'lumere-group'
+                  ? 'اختر شركة تابعة محددة لتعديل اسمها'
+                  : undefined
+              }
+            />
+
+            <Input
+              label="المهلة الافتراضية للمهمة (بالأيام)"
+              type="number"
+              min={1}
+              value={defaultDeadlineDays}
+              onChange={e => setDefaultDeadlineDays(e.target.value)}
+            />
+          </div>
+
+          <div className="flex items-center gap-3 pt-1">
+            <input
+              type="checkbox"
+              id="require-review-toggle"
+              checked={requireReview}
+              onChange={e => setRequireReview(e.target.checked)}
+              className="w-4 h-4 rounded accent-[#22C55E] text-[#22C55E] focus:ring-[#22C55E] cursor-pointer"
+            />
+            <label htmlFor="require-review-toggle" className="text-xs font-semibold text-slate-700 cursor-pointer">
+              إلزامية مراجعة واعتماد المدير أو رئيس القسم قبل إغلاق أي مهمة مكتملة
+            </label>
+          </div>
+
+          <div className="flex justify-end pt-2">
+            <Button type="submit" size="sm" variant="primary" isLoading={isSavingGeneral}>
+              حفظ التفضيلات
+            </Button>
+          </div>
+        </form>
+      </Card>
+
+      {/* Automated Deadline Push Notifications Configuration */}
+      <Card className="p-6 space-y-4">
+        <div className="flex items-center justify-between border-b border-slate-100 pb-3.5">
+          <div className="flex items-center gap-2.5">
+            <Clock className="w-4 h-4 text-[#16A34A]" />
+            <h3 className="text-sm font-bold text-slate-900">
+              خدمة الإشعارات التلقائية الفورية للمواعيد النهائية
+            </h3>
+          </div>
+          <span className="flex items-center gap-1.5 text-xs font-mono text-[#15803D] bg-[#E8F8EE] px-3 py-1 rounded-full">
+            <Radio className="w-3 h-3 text-[#22C55E] animate-pulse" />
+            خدمة نشطة
+          </span>
+        </div>
+
+        <p className="text-xs text-slate-500 leading-relaxed">
+          يقوم محرك المراقبة بفحص المهام غير المكتملة ومقارنتها بالوقت الحالي كل {deadlineSettings.checkIntervalSeconds} ثانية.
+          عندما يقترب الموعد من حد الإنذار، يتم إرسال إشعارات فورية وتنبيهات صوتية للموظف المسؤول.
+        </p>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
+          {/* Threshold Selection */}
+          <Select
+            label="حد الإنذار المسبق للموعد"
+            value={String(deadlineSettings.thresholdHours)}
+            onChange={e => handleUpdateDeadlineSetting('thresholdHours', Number(e.target.value))}
+            options={[
+              { value: '24', label: '24 ساعة (المستحقة اليوم / خلال يوم واحد)' },
+              { value: '48', label: '48 ساعة (خلال يومين - موصى به)' },
+              { value: '72', label: '72 ساعة (خلال 3 أيام)' },
+              { value: '120', label: '120 ساعة (خلال 5 أيام)' },
+            ]}
+          />
+
+          {/* Evaluation Interval */}
+          <Select
+            label="معدل تكرار الفحص الآلي"
+            value={String(deadlineSettings.checkIntervalSeconds)}
+            onChange={e =>
+              handleUpdateDeadlineSetting('checkIntervalSeconds', Number(e.target.value))
+            }
+            options={[
+              { value: '30', label: 'كل 30 ثانية' },
+              { value: '60', label: 'كل 60 ثانية (الافتراضي)' },
+              { value: '300', label: 'كل 5 دقائق' },
+            ]}
+          />
+        </div>
+
+        {/* Toggles */}
+        <div className="space-y-3 pt-2">
+          <div className="flex items-center justify-between p-3.5 rounded-2xl bg-[#F8F9FA]">
+            <div>
+              <p className="text-xs font-bold text-slate-900">تنبيهات المهام المتأخرة</p>
+              <p className="text-[11px] text-slate-500 mt-0.5">
+                إرسال تنبيهات عاجلة ذات أولوية قصوى للمهام التي فات موعد تسليمها ولم تكتمل.
+              </p>
+            </div>
+            <input
+              type="checkbox"
+              checked={deadlineSettings.includeOverdue}
+              onChange={e => handleUpdateDeadlineSetting('includeOverdue', e.target.checked)}
+              className="w-4 h-4 rounded accent-[#22C55E] text-[#22C55E] focus:ring-[#22C55E] cursor-pointer"
+            />
+          </div>
+
+          <div className="flex items-center justify-between p-3.5 rounded-2xl bg-[#F8F9FA]">
+            <div>
+              <p className="text-xs font-bold text-slate-900">تصعيد المهام العاجلة للمدراء</p>
+              <p className="text-[11px] text-slate-500 mt-0.5">
+                إرسال نسخة من التنبيه لمنشئ المهمة ورؤساء الأقسام للمهام ذات الأولوية المرتفعة والعاجلة.
+              </p>
+            </div>
+            <input
+              type="checkbox"
+              checked={deadlineSettings.notifyManagersForUrgent}
+              onChange={e =>
+                handleUpdateDeadlineSetting('notifyManagersForUrgent', e.target.checked)
+              }
+              className="w-4 h-4 rounded accent-[#22C55E] text-[#22C55E] focus:ring-[#22C55E] cursor-pointer"
+            />
+          </div>
+
+          <div className="flex items-center justify-between p-3.5 rounded-2xl bg-[#F8F9FA]">
+            <div>
+              <p className="text-xs font-bold text-slate-900">إشعارات المتصفح الأصلية (Desktop Push)</p>
+              <p className="text-[11px] text-slate-500 mt-0.5">
+                إظهار نوافذ تنبيه منبثقة على سطح المكتب ونظام التشغيل حتى عند تصغير المتصفح.
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              {browserPerm === 'granted' ? (
+                <span className="text-[11px] text-[#15803D] bg-[#DCFCE7] px-3 py-1 rounded-full font-semibold">
+                  مفعلة
+                </span>
+              ) : (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="bg-[#E8F8EE] border-transparent text-[#15803D] hover:bg-[#DCFCE7]"
+                  leftIcon={<Bell className="w-3 h-3 text-amber-600" />}
+                  onClick={handleRequestPushPermission}
+                >
+                  منح الإذن
+                </Button>
+              )}
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between p-3.5 rounded-2xl bg-[#F8F9FA]">
+            <div>
+              <p className="text-xs font-bold text-slate-900">نغمة التنبيه الصوتية الهادئة</p>
+              <p className="text-[11px] text-slate-500 mt-0.5">
+                تشغيل رنين جيبي متناسق خفيف عند إرسال تنبيه اقتراب الموعد.
+              </p>
+            </div>
+            <div className="flex items-center gap-2.5">
+              <button
+                type="button"
+                onClick={() => DeadlinePushService.playGentleChime()}
+                title="معاينة الصوت"
+                className="w-8 h-8 rounded-full bg-[#F1F3F5] hover:bg-slate-200 text-slate-600 flex items-center justify-center transition-colors cursor-pointer"
+              >
+                <Volume2 className="w-3.5 h-3.5" />
+              </button>
+              <input
+                type="checkbox"
+                checked={deadlineSettings.enableAudioChime}
+                onChange={e => handleUpdateDeadlineSetting('enableAudioChime', e.target.checked)}
+                className="w-4 h-4 rounded accent-[#22C55E] text-[#22C55E] focus:ring-[#22C55E] cursor-pointer"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Test Trigger Button */}
+        <div className="pt-2 flex justify-end">
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            className="bg-[#E8F8EE] border-transparent text-[#15803D] hover:bg-[#DCFCE7]"
+            leftIcon={<Bell className="w-3.5 h-3.5" />}
+            onClick={handleTestPush}
+          >
+            إرسال إشعار تجريبي
+          </Button>
+        </div>
+      </Card>
+
+      {/* Security & Access Architecture */}
+      <Card className="p-6 space-y-4">
+        <div className="flex items-center gap-2.5 border-b border-slate-100 pb-3.5">
+          <Shield className="w-4 h-4 text-[#16A34A]" />
+          <h3 className="text-sm font-bold text-slate-900">معمارية الأمان والتحكم بالصلاحيات (RBAC)</h3>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
+          <div className="p-4 rounded-2xl bg-[#F8F9FA]">
+            <p className="font-bold text-slate-900">التحكم بالوصول المبني على الأدوار</p>
+            <p className="text-slate-500 mt-1.5 leading-relaxed">
+              مستويات الصلاحية للمدير العام، مدراء الأقسام، والموظفين محكمة عبر قواعد أمان Firestore.
+            </p>
+          </div>
+          <div className="p-4 rounded-2xl bg-[#F8F9FA]">
+            <p className="font-bold text-slate-900">سجل تدقيق غير قابل للتلاعب</p>
+            <p className="text-slate-500 mt-1.5 leading-relaxed">
+              سجلات النشاطات محصورة بالكتابة فقط وتمنع الحذف أو التعديل لضمان الشفافية المؤسسية.
+            </p>
+          </div>
+          <div className="p-4 rounded-2xl bg-[#F8F9FA]">
+            <p className="font-bold text-slate-900">فرض مسارات العمل المؤسسية</p>
+            <p className="text-slate-500 mt-1.5 leading-relaxed">
+              قواعد النظام تمنع الموظف من إغلاق المهمة ذاتياً وتلزم بمرورها عبر مرحلة الاعتماد من الإدارة.
+            </p>
+          </div>
+        </div>
+      </Card>
+
+      {/* Database Maintenance */}
+      {(isSuperAdmin || isCompanyAdmin) && (
+        <Card className="p-6 space-y-4 border-[#BBF7D0] bg-[#E8F8EE]/45">
+          <div className="flex items-center gap-2.5 border-b border-[#BBF7D0]/60 pb-3.5">
+            <Database className="w-4 h-4 text-[#16A34A]" />
+            <h3 className="text-sm font-bold text-slate-900">مزامنة وصيانة قاعدة البيانات والصلاحيات</h3>
+          </div>
+
+          <p className="text-xs text-slate-600 leading-relaxed">
+            مزامنة بيانات {activeCompany.name} فوراً من Firestore وتحديث بطاقة صلاحيات Firebase Auth Custom Claims.
+          </p>
+
+          <div className="flex flex-wrap items-center gap-2.5">
+            <Button
+              size="sm"
+              variant="outline"
+              isLoading={isResetting}
+              leftIcon={<RefreshCw className="w-3.5 h-3.5 text-slate-600" />}
+              onClick={handleRefreshDatabase}
+            >
+              تحديث ومزامنة البيانات الآن
+            </Button>
+
+            <Button
+              size="sm"
+              variant="outline"
+              className="bg-white"
+              isLoading={isSyncingClaims}
+              leftIcon={<Shield className="w-3.5 h-3.5 text-[#16A34A]" />}
+              onClick={handleSyncClaims}
+            >
+              مزامنة صلاحيات الحساب (Custom Claims)
+            </Button>
+          </div>
+        </Card>
+      )}
+    </div>
+  );
+}

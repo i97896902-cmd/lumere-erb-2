@@ -25,9 +25,9 @@ import { Task, TaskComment, TaskAttachment, TaskStatus } from '../../types';
 import { useAuth } from '../../context/AuthContext';
 import { useCompany } from '../../context/CompanyContext';
 import { useToast } from '../../context/ToastContext';
-import { DataService } from '../../services/dataService';
+import { DataService } from '../../services/data/dataService';
 import { DEFAULT_SUBSIDIARY_ID } from '../../config/companies';
-import { canApproveTasks, canDeleteTask, getRoleArabicLabel } from '../../utils/rbac';
+import { canApproveTasks, canDeleteTask, getRoleArabicLabel, isTaskAssignedToUser } from '../../utils/rbac';
 import { formatLocalDate } from '../../utils/sanitize';
 
 interface TaskDetailsModalProps {
@@ -82,12 +82,13 @@ export function TaskDetailsModal({
 
   const nowStr = formatLocalDate();
   const isOverdue =
-    task.deadline < nowStr && task.status !== 'Completed' && task.status !== 'Cancelled';
+    Boolean(task.deadline) && task.deadline < nowStr && task.status !== 'Completed' && task.status !== 'Cancelled';
 
   // Permission flags (4-tier company-scoped RBAC)
   const taskCompanyId = task.companyId || DEFAULT_SUBSIDIARY_ID;
   const taskCompany = getCompanyById(taskCompanyId);
-  const isAssignee = currentUser?.id === task.assignedTo;
+  const assigneeDisplayName = task.assignedToName || task.assignedToEmail || 'غير محدد';
+  const isAssignee = isTaskAssignedToUser(currentUser, task);
   const canApproveOrReject = canApproveTasks(currentUser, taskCompanyId);
   const canDelete = canDeleteTask(currentUser, taskCompanyId);
   const canStartOrSubmit = isAssignee || canApproveOrReject;
@@ -401,16 +402,16 @@ export function TaskDetailsModal({
               {task.assignedToPhoto ? (
                 <img
                   src={task.assignedToPhoto}
-                  alt={task.assignedToName}
+                  alt={assigneeDisplayName}
                   className="w-8 h-8 rounded-full object-cover border border-slate-200"
                 />
               ) : (
                 <div className="w-8 h-8 rounded-full bg-[#DCFCE7] text-[#15803D] flex items-center justify-center font-bold text-xs">
-                  {task.assignedToName.slice(0, 2).toUpperCase()}
+                  {assigneeDisplayName.slice(0, 2).toUpperCase()}
                 </div>
               )}
               <div className="min-w-0">
-                <p className="text-xs font-bold text-slate-900 truncate">{task.assignedToName}</p>
+                <p className="text-xs font-bold text-slate-900 truncate">{assigneeDisplayName}</p>
                 <p className="text-[10px] text-slate-500 truncate">{task.assignedToEmail}</p>
               </div>
             </div>

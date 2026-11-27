@@ -1,15 +1,18 @@
 {
+  "id": "/",
   "name": "Luméré",
   "short_name": "Luméré",
   "description": "نظام إدارة الشركة والمهام والمشاريع والعملاء",
   "lang": "ar",
   "dir": "rtl",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
   "theme_color": "#059669",
-  "background_color": "#f8fafc",
+  "background_color": "#000000",
   "icons": [
-    { "src": "/icon-192.svg", "sizes": "192x192", "type": "image/svg+xml", "purpose": "any maskable" },
-    { "src": "/icon-512.svg", "sizes": "512x512", "type": "image/svg+xml", "purpose": "any maskable" }
+    { "src": "/pwa-192x192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/pwa-512x512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/pwa-maskable-512x512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ]
 }

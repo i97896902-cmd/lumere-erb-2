@@ -23,6 +23,7 @@ import {
   PRIMARY_SUPER_ADMIN_EMAIL,
 } from '../utils/rbac';
 import { DEFAULT_SUBSIDIARY_ID, PARENT_COMPANY_ID } from '../config/companies';
+import { PrivilegedService } from '../services/firebase/privilegedService';
 
 // Authentication is strictly enabled (Google Sign-In only via Firebase Auth)
 export const AUTH_DISABLED = false;
@@ -110,7 +111,9 @@ function resolveUserProfile(
   const isPrimarySuperAdmin = fUser.email?.toLowerCase() === PRIMARY_SUPER_ADMIN_EMAIL;
   const resolvedRole: CanonicalRole = isPrimarySuperAdmin
     ? 'SUPER_ADMIN'
-    : claims.role || normalizeRole(data.role, fUser.email);
+    : data.role
+      ? normalizeRole(data.role, fUser.email)
+      : claims.role || 'EMPLOYEE';
 
   const resolvedCompanyId =
     data.companyId ||
@@ -205,6 +208,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               } catch {
                 // Non-blocking if legacy Firestore rules only allow 'ADMIN' prior to rule deployment
               }
+            }
+
+            if (
+              isActiveStatus(normalized.status) &&
+              (tokenClaims.companyId !== normalized.companyId ||
+                tokenClaims.role !== normalized.role)
+            ) {
+              void PrivilegedService.syncCurrentUserClaims().then(async synced => {
+                if (!synced || !active) return;
+                try {
+                  await fUser.getIdToken(true);
+                  const updatedClaims = await readUserClaims(fUser);
+                  if (active) setClaims(updatedClaims);
+                } catch {
+                  // Non-blocking token refresh
+                }
+              });
             }
 
             if (active) {

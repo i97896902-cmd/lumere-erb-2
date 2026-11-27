@@ -2,28 +2,28 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { AUTH_DISABLED, AuthProvider, useAuth } from './context/AuthContext';
 import { CompanyProvider, useCompany } from './context/CompanyContext';
 import { ToastProvider, useToast } from './context/ToastContext';
-import { Sidebar, TabType } from './components/navigation/Sidebar';
-import { Navbar } from './components/navigation/Navbar';
-import { GroupDashboardView } from './components/views/GroupDashboardView';
-import { CompaniesManagementView } from './components/views/CompaniesManagementView';
-import { DashboardView } from './components/views/DashboardView';
-import { TasksView } from './components/views/TasksView';
-import { ProjectsView } from './components/views/ProjectsView';
-import { ClientsView } from './components/views/ClientsView';
-import { EquipmentView } from './components/views/EquipmentView';
-import { JoinRequestsView } from './components/views/JoinRequestsView';
-import { CalendarView } from './components/views/CalendarView';
-import { EmployeesView } from './components/views/EmployeesView';
-import { DepartmentsView } from './components/views/DepartmentsView';
-import { ReportsView } from './components/views/ReportsView';
-import { ActivityLogView } from './components/views/ActivityLogView';
-import { NotificationsView } from './components/views/NotificationsView';
-import { SettingsView } from './components/views/SettingsView';
-import { ProfileView } from './components/views/ProfileView';
-import { LoginView } from './components/views/LoginView';
-import { CompleteProfileView } from './components/views/CompleteProfileView';
-import { PendingApprovalView } from './components/views/PendingApprovalView';
-import { RejectedView } from './components/views/RejectedView';
+import { Sidebar, TabType } from './components/layout/Sidebar';
+import { Navbar } from './components/layout/Navbar';
+import { GroupDashboardView } from './pages/dashboard/GroupDashboardView';
+import { CompaniesManagementView } from './pages/organization/CompaniesManagementView';
+import { DashboardView } from './pages/dashboard/DashboardView';
+import { TasksView } from './pages/operations/TasksView';
+import { ProjectsView } from './pages/operations/ProjectsView';
+import { ClientsView } from './pages/organization/ClientsView';
+import { EquipmentView } from './pages/organization/EquipmentView';
+import { JoinRequestsView } from './pages/organization/JoinRequestsView';
+import { CalendarView } from './pages/operations/CalendarView';
+import { EmployeesView } from './pages/organization/EmployeesView';
+import { DepartmentsView } from './pages/organization/DepartmentsView';
+import { ReportsView } from './pages/analytics/ReportsView';
+import { ActivityLogView } from './pages/analytics/ActivityLogView';
+import { NotificationsView } from './pages/analytics/NotificationsView';
+import { SettingsView } from './pages/account/SettingsView';
+import { ProfileView } from './pages/account/ProfileView';
+import { LoginView } from './pages/auth/LoginView';
+import { CompleteProfileView } from './pages/auth/CompleteProfileView';
+import { PendingApprovalView } from './pages/auth/PendingApprovalView';
+import { RejectedView } from './pages/auth/RejectedView';
 import { CreateTaskModal } from './components/modals/CreateTaskModal';
 import { TaskDetailsModal } from './components/modals/TaskDetailsModal';
 import {
@@ -36,8 +36,8 @@ import {
   Project,
   Equipment,
 } from './types';
-import { DataService } from './services/dataService';
-import { DeadlinePushService } from './services/deadlinePushService';
+import { DataService } from './services/data/dataService';
+import { DeadlinePushService } from './services/integrations/deadlinePushService';
 import { getFirestoreSubscriptionScope } from './utils/appGuards';
 import {
   canAccessTab,

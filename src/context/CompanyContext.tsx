@@ -5,7 +5,7 @@ import {
   DEFAULT_SUBSIDIARY_ID,
   PARENT_COMPANY_ID,
 } from '../config/companies';
-import { DataService } from '../services/dataService';
+import { DataService } from '../services/data/dataService';
 import { useAuth } from './AuthContext';
 import {
   canSwitchCompanies,

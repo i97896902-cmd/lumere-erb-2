@@ -1,3 +1,5 @@
+import { isActiveStatus } from './rbac';
+
 export type FirestoreSubscriptionScope = 'none' | 'departments_only' | 'full';
 
 export interface AuthSubscriptionState {
@@ -22,7 +24,7 @@ export function getFirestoreSubscriptionScope(
     return 'departments_only';
   }
 
-  if (state.status === 'active') {
+  if (isActiveStatus(state.status)) {
     return 'full';
   }
 

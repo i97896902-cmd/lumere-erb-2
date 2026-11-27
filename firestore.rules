@@ -104,17 +104,15 @@ service cloud.firestore {
     function currentUserRole() {
       return isBootstrapSuperAdmin()
         ? 'SUPER_ADMIN'
-        : (request.auth.token.role is string
-            ? request.auth.token.role
-            : (hasUserDoc() ? currentUserData().role : 'EMPLOYEE'));
+        : (hasUserDoc() && currentUserData().role is string && currentUserData().role.size() > 0
+            ? currentUserData().role
+            : (request.auth.token.role is string ? request.auth.token.role : 'EMPLOYEE'));
     }
 
     function currentUserCompanyId() {
-      return request.auth.token.companyId is string
-        ? request.auth.token.companyId
-        : (hasUserDoc() && currentUserData().companyId is string
-            ? currentUserData().companyId
-            : '');
+      return hasUserDoc() && currentUserData().companyId is string && currentUserData().companyId.size() > 0
+        ? currentUserData().companyId
+        : (request.auth.token.companyId is string ? request.auth.token.companyId : '');
     }
 
     function isSuperAdmin() {
@@ -784,7 +782,16 @@ service cloud.firestore {
           // Tier 2: Assigned Employee can ONLY progress non-terminal tasks (no self-approval or completion skip)
           || (
             belongsToCompany(resource.data.companyId)
-            && resource.data.assignedTo == request.auth.uid
+            && (
+              resource.data.assignedTo == request.auth.uid
+              || ('coAssignees' in resource.data
+                  && resource.data.coAssignees is list
+                  && request.auth.uid in resource.data.coAssignees)
+              || ('assignedToEmail' in resource.data
+                  && resource.data.assignedToEmail is string
+                  && request.auth.token.email is string
+                  && resource.data.assignedToEmail.lower() == request.auth.token.email.lower())
+            )
             && !(resource.data.status in ['Completed', 'Cancelled'])
             && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
               'status', 'completionPercentage', 'updatedAt', 'attachments', 'reviewStatus'

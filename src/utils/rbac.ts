@@ -375,14 +375,91 @@ export function canAccessTab(
   return ALLOWED_TABS_BY_ROLE[role].includes(tab);
 }
 
+type ScopedActor = Pick<User, 'id' | 'role' | 'email' | 'status'> & {
+  uid?: string;
+  companyId?: string;
+  department?: string;
+};
+
+function normalizeEmail(email?: string | null): string {
+  return (email || '').trim().toLowerCase();
+}
+
+function isUserIdentityAlias(
+  user: ScopedActor,
+  candidate: Pick<User, 'id' | 'uid' | 'email' | 'companyId' | 'role'>
+): boolean {
+  const role = normalizeRole(user.role, user.email);
+  if (role !== 'SUPER_ADMIN' && user.companyId && candidate.companyId) {
+    if (getUserCompanyId(user) !== getUserCompanyId(candidate)) {
+      return false;
+    }
+  }
+
+  if (candidate.id === user.id) return true;
+  if (user.uid && (candidate.id === user.uid || candidate.uid === user.uid)) return true;
+  if (candidate.uid && candidate.uid === user.id) return true;
+
+  const userEmail = normalizeEmail(user.email);
+  if (userEmail && normalizeEmail(candidate.email) === userEmail) return true;
+
+  return false;
+}
+
+export function getUserIdentityIds(
+  user: ScopedActor | null | undefined,
+  employees: User[] = []
+): Set<string> {
+  const ids = new Set<string>();
+  if (!user) return ids;
+  if (user.id) ids.add(user.id);
+  if (user.uid) ids.add(user.uid);
+
+  for (const emp of employees) {
+    if (isUserIdentityAlias(user, emp)) {
+      if (emp.id) ids.add(emp.id);
+      if (emp.uid) ids.add(emp.uid);
+    }
+  }
+  return ids;
+}
+
+export function isTaskAssignedToUser(
+  user: ScopedActor | null | undefined,
+  task: Partial<Pick<Task, 'assignedTo' | 'assignedToEmail' | 'coAssignees' | 'companyId'>> | null | undefined,
+  employees: User[] = []
+): boolean {
+  if (!user || !isActiveStatus(user.status) || !task) return false;
+
+  const role = normalizeRole(user.role, user.email);
+  if (role !== 'SUPER_ADMIN' && user.companyId && task.companyId && task.companyId.trim().length > 0) {
+    if (task.companyId.trim() !== getUserCompanyId(user)) {
+      return false;
+    }
+  }
+
+  const identityIds = getUserIdentityIds(user, employees);
+  if (task.assignedTo && identityIds.has(task.assignedTo)) return true;
+  if (Array.isArray(task.coAssignees) && task.coAssignees.some(id => identityIds.has(id))) {
+    return true;
+  }
+
+  const userEmail = normalizeEmail(user.email);
+  if (userEmail && normalizeEmail(task.assignedToEmail) === userEmail) {
+    return true;
+  }
+
+  return false;
+}
+
 /**
  * Scopes employees visibility by canonical role:
  * - SUPER_ADMIN / COMPANY_ADMIN: full company/group list
  * - MANAGER: members in their department, their direct reports, or self (falls back to all if manager has no department)
- * - EMPLOYEE: self only
+ * - EMPLOYEE: self (including same-company pre-created/alias records sharing uid or email)
  */
 export function scopeEmployeesForUser(
-  user: (Pick<User, 'id' | 'role' | 'email' | 'status'> & { department?: string }) | null | undefined,
+  user: ScopedActor | null | undefined,
   employees: User[]
 ): User[] {
   if (!user || !isActiveStatus(user.status)) return [];
@@ -390,15 +467,16 @@ export function scopeEmployeesForUser(
   if (role === 'SUPER_ADMIN' || role === 'COMPANY_ADMIN') return employees;
   if (role === 'MANAGER') {
     const dept = (user.department || '').trim().toLowerCase();
+    const identityIds = getUserIdentityIds(user, employees);
     const scoped = employees.filter(emp => {
-      if (emp.id === user.id) return true;
-      if (emp.managerId && emp.managerId === user.id) return true;
+      if (isUserIdentityAlias(user, emp)) return true;
+      if (emp.managerId && identityIds.has(emp.managerId)) return true;
       if (dept && (emp.department || '').trim().toLowerCase() === dept) return true;
       return false;
     });
     return dept || scoped.length > 0 ? scoped : employees;
   }
-  return employees.filter(emp => emp.id === user.id);
+  return employees.filter(emp => isUserIdentityAlias(user, emp));
 }
 
 /**
@@ -439,10 +517,10 @@ export function scopeDepartmentsForUser(
  * Scopes tasks visibility by canonical role:
  * - SUPER_ADMIN / COMPANY_ADMIN: all tasks in active scope
  * - MANAGER: tasks in their department, tasks assigned to their team/self, or created by self
- * - EMPLOYEE: strictly tasks assigned to self (or co-assigned)
+ * - EMPLOYEE: strictly tasks assigned to self (by uid/doc id/co-assignee/email within same company)
  */
 export function scopeTasksForUser(
-  user: (Pick<User, 'id' | 'role' | 'email' | 'status'> & { department?: string }) | null | undefined,
+  user: ScopedActor | null | undefined,
   tasks: Task[],
   employees: User[] = []
 ): Task[] {
@@ -450,26 +528,28 @@ export function scopeTasksForUser(
   const role = normalizeRole(user.role, user.email);
   if (role === 'SUPER_ADMIN' || role === 'COMPANY_ADMIN') return tasks;
 
+  const userCompanyId = user.companyId ? getUserCompanyId(user) : null;
+
   if (role === 'MANAGER') {
     const dept = (user.department || '').trim().toLowerCase();
-    const teamIds = new Set(
-      scopeEmployeesForUser(user, employees).map(emp => emp.id)
-    );
-    teamIds.add(user.id);
+    const identityIds = getUserIdentityIds(user, employees);
+    const teamIds = new Set(scopeEmployeesForUser(user, employees).map(emp => emp.id));
+    identityIds.forEach(id => teamIds.add(id));
 
     if (!dept && teamIds.size <= 1) return tasks;
 
     return tasks.filter(task => {
-      if (task.assignedTo === user.id || task.createdBy === user.id) return true;
-      if (teamIds.has(task.assignedTo)) return true;
+      if (userCompanyId && task.companyId && task.companyId.trim() && task.companyId.trim() !== userCompanyId) {
+        return false;
+      }
+      if (isTaskAssignedToUser(user, task, employees)) return true;
+      if (task.createdBy && identityIds.has(task.createdBy)) return true;
+      if (task.assignedTo && teamIds.has(task.assignedTo)) return true;
+      if (Array.isArray(task.coAssignees) && task.coAssignees.some(id => teamIds.has(id))) return true;
       if (dept && (task.department || '').trim().toLowerCase() === dept) return true;
       return false;
     });
   }
 
-  return tasks.filter(
-    task =>
-      task.assignedTo === user.id ||
-      (Array.isArray(task.coAssignees) && task.coAssignees.includes(user.id))
-  );
+  return tasks.filter(task => isTaskAssignedToUser(user, task, employees));
 }
